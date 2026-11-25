@@ -1,7 +1,7 @@
 name: 校验
 
-# PR 与 main 的每一次变更都必须通过：全仓类型检查 + web 生产构建 + 真实进程冒烟测试。
-# 这是 PR 合并前的唯一门禁（AGENTS.md「协作与提交」）。
+# PR 与 main 的每次变更都必须通过：Go 构建/静态检查/测试 + 面板构建 + 文档构建。
+# 这是 PR 合并前的唯一门禁，见 AGENTS.md「协作与提交」。
 
 on:
   pull_request:
@@ -12,14 +12,37 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.ref }}
+  group: 校验-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: 类型检查与冒烟测试
+  go:
+    name: Go 构建与测试
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 构建
+        run: go build ./...
+
+      - name: 静态检查
+        run: go vet ./...
+
+      - name: 测试
+        run: go test ./...
+
+  web:
+    name: 面板构建
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -34,23 +57,67 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
+          cache-dependency-path: web/panel/pnpm-lock.yaml
 
-      - name: 安装依赖
-        run: pnpm install --frozen-lockfile
-
-      - name: 类型检查与前端构建
-        run: node scripts/check.mjs
-
-      - name: 冒烟测试
-        run: node scripts/smoke.mjs
+      - name: 安装依赖并构建
+        working-directory: web/panel
+        run: |
+          pnpm install --frozen-lockfile 2>&1 | tee build.log
+          pnpm build 2>&1 | tee -a build.log
 
       - name: 失败时上传日志
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: mpanel-verify-logs
-          path: |
-            **/*.log
-            web/dist/**
+          name: panel-build-log
+          path: web/panel/build.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  docs:
+    name: 文档构建
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 检查文档工程
+        id: docs
+        run: |
+          if [ -f web/docs/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=跳过文档构建::web/docs/package.json 尚未创建"
+          fi
+
+      - name: 安装 pnpm
+        if: steps.docs.outputs.exists == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - name: 安装 Node
+        if: steps.docs.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/docs/pnpm-lock.yaml
+
+      - name: 安装依赖并构建
+        if: steps.docs.outputs.exists == 'true'
+        working-directory: web/docs
+        run: |
+          pnpm install --frozen-lockfile 2>&1 | tee build.log
+          pnpm build 2>&1 | tee -a build.log
+
+      - name: 失败时上传日志
+        if: failure() && steps.docs.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-build-log
+          path: web/docs/build.log
           retention-days: 7
           if-no-files-found: ignore

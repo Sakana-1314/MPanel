@@ -1,0 +1,130 @@
+import { defineConfig } from 'vitepress'
+
+export default defineConfig({
+  base: process.env.DOCS_BASE ?? '/MPanel/docs/',
+  lang: 'zh-CN',
+  title: 'MPanel 文档',
+  description:
+    'MPanel 服务器管理面板文档：web/panel、core、agent 三端分离，1Panel 风格路径与 systemd 约定，站点管理使用 Caddy。',
+  appearance: true,
+  lastUpdated: true,
+  markdown: {
+    lineNumbers: true
+  },
+  themeConfig: {
+    nav: [
+      { text: '快速开始', link: '/guide/install' },
+      { text: '安装部署', link: '/guide/deploy' },
+      { text: '配置', link: '/guide/config' },
+      {
+        text: '功能',
+        items: [
+          { text: '站点（Caddy）', link: '/guide/sites' },
+          { text: '数据库与 dbx', link: '/guide/databases' },
+          { text: '边缘节点', link: '/guide/edge' },
+          { text: '常见问题', link: '/guide/faq' }
+        ]
+      },
+      {
+        text: 'API',
+        items: [
+          { text: 'REST API v1 契约', link: '/api/contract' },
+          { text: '隧道协议 v1', link: '/api/protocol' }
+        ]
+      },
+      { text: '运维', link: '/ops/troubleshooting' }
+    ],
+    sidebar: {
+      '/guide/': [
+        {
+          text: '开始',
+          items: [
+            { text: '从源码安装', link: '/guide/install' },
+            { text: '配置文件与环境变量', link: '/guide/config' },
+            { text: '生产部署', link: '/guide/deploy' }
+          ]
+        },
+        {
+          text: '功能',
+          items: [
+            { text: '站点与 Caddy', link: '/guide/sites' },
+            { text: '数据库与 dbx', link: '/guide/databases' },
+            { text: '边缘节点', link: '/guide/edge' }
+          ]
+        },
+        {
+          text: '其他',
+          items: [{ text: '常见问题', link: '/guide/faq' }]
+        }
+      ],
+      '/api/': [
+        {
+          text: 'API',
+          items: [
+            { text: 'REST API v1 契约', link: '/api/contract' },
+            { text: '隧道协议 v1', link: '/api/protocol' }
+          ]
+        },
+        {
+          text: '参考',
+          items: [
+            { text: '配置字段', link: '/guide/config' },
+            { text: '故障排查', link: '/ops/troubleshooting' }
+          ]
+        }
+      ],
+      '/ops/': [
+        {
+          text: '运维',
+          items: [
+            { text: '故障排查', link: '/ops/troubleshooting' },
+            { text: '生产部署', link: '/guide/deploy' },
+            { text: '配置字段', link: '/guide/config' }
+          ]
+        }
+      ]
+    },
+    search: {
+      provider: 'local',
+      options: {
+        translations: {
+          button: {
+            buttonText: '搜索文档',
+            buttonAriaLabel: '搜索文档'
+          },
+          modal: {
+            noResultsText: '没有找到相关结果',
+            resetButtonTitle: '清除查询条件',
+            resetButtonAriaLabel: '清除查询条件',
+            cancelButtonText: '取消',
+            cancelButtonAriaLabel: '取消',
+            footer: {
+              selectText: '选择',
+              navigateText: '切换',
+              closeText: '关闭',
+              navigateUpKeyAriaLabel: '向上',
+              navigateDownKeyAriaLabel: '向下',
+              selectKeyAriaLabel: '回车',
+              closeKeyAriaLabel: 'Esc'
+            }
+          }
+        }
+      }
+    },
+    outline: {
+      level: [2, 3],
+      label: '本页目录'
+    },
+    docFooter: {
+      prev: '上一页',
+      next: '下一页'
+    },
+    lastUpdatedText: '最后更新',
+    darkModeSwitchLabel: '主题',
+    lightModeSwitchTitle: '切换到浅色模式',
+    darkModeSwitchTitle: '切换到深色模式',
+    sidebarMenuLabel: '目录',
+    returnToTopLabel: '回到顶部',
+    externalLinkIcon: true
+  }
+})

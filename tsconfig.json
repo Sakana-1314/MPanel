@@ -1,8 +1,0 @@
-{
-  "files": [],
-  "references": [
-    { "path": "./server/shared" },
-    { "path": "./server/core" },
-    { "path": "./server/worker" }
-  ]
-}
