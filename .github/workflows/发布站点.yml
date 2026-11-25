@@ -53,6 +53,7 @@ jobs:
         env:
           DOCS_BASE: /MPanel/docs/
         run: |
+          set -euo pipefail
           if [ ! -f package.json ]; then
             echo "::notice title=跳过文档构建::web/docs/package.json 尚未创建"
             exit 0
