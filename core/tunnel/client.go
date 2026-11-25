@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // Client is the agent side of a tunnel: it dials the core (reverse-ws) or

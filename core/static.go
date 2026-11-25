@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 // staticHandler serves the built panel with SPA fallback and a generated

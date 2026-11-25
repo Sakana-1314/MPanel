@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // RenderSite renders one site into a Caddyfile fragment. It is a pure function

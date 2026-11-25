@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/httpapi"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/httpapi"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // handleRoots implements GET /api/v1/files/roots.

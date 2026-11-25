@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/protocol"
-	"github.com/sakana-1314/mpanel/internal/tunnel"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/protocol"
+	"github.com/sakana-1314/mpanel/core/tunnel"
 )
 
 // Transport is one way to reach an agent: direct HTTP, or a multiplexed tunnel

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/sakana-1314/mpanel/agent"
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 const (

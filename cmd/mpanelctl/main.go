@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 var services = map[string]string{

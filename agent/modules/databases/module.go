@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/sakana-1314/mpanel/agent"
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 // Module implements the database profile, statistics, handoff and

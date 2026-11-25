@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/protocol"
-	"github.com/sakana-1314/mpanel/internal/store"
+	"github.com/sakana-1314/mpanel/core/protocol"
+	"github.com/sakana-1314/mpanel/core/store"
 )
 
 // AuditEntry is one append-only audit line.

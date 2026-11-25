@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // maxJobs bounds the in-memory/persisted job history.

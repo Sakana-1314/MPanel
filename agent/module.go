@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/tunnel"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/tunnel"
 )
 
 // Module is one feature area (sites, databases, containers, files, terminal,

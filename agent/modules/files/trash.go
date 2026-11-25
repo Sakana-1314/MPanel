@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/httpapi"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/httpapi"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // trashMeta is stored next to the payload so the entry survives agent

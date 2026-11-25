@@ -1,6 +1,6 @@
 # MPanel REST API v1 契约
 
-状态：v1 冻结（2026-11-25）。**本文件是唯一事实源**，`web/panel/src/api/types.ts` 是浏览器侧的手写镜像，Go 结构体在 `internal/protocol` 与各模块内实现。
+状态：v1 冻结（2026-11-25）。**本文件是唯一事实源**，`web/panel/src/api/types.ts` 是浏览器侧的手写镜像，Go 结构体在 `core/protocol` 与各模块内实现。
 
 > 术语说明：本文档写于 TypeScript 版本时期，「worker」在 Go 实现中更名为 **agent**（对应 `mpanel-agent`、`agent/`、`MPANEL_AGENT_*`）。机器模型里的 `worker` 字段（`machine.worker`）与 `/system/info` 的 `role: "worker"` 是协议字段，保留原名。
 

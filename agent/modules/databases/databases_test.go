@@ -21,8 +21,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/sakana-1314/mpanel/agent"
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 /* ------------------------------- test harness ---------------------------- */
