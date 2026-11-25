@@ -1,29 +1,45 @@
-# dependencies
-node_modules/
+# 本地知识：契约、设计、运维笔记与服务器信息，只保留在本地
+notes/
+.zcode/
 
-# build output
+# Go 构建产物与测试输出
+/mpanel-core
+/mpanel-agent
+/mpanelctl
+*.exe
+*.test
+*.out
+coverage.out
+/dist/
+/public/
+
+# 前端与文档依赖、构建产物
+node_modules/
 dist/
 *.tsbuildinfo
+.vitepress/cache/
+.vitepress/dist/
 
-# runtime state and secrets
+# 锁文件必须提交，不要忽略（显式取消任何同名忽略规则）
+!web/panel/pnpm-lock.yaml
+!web/docs/pnpm-lock.yaml
+
+# 环境变量与密钥
 .env
 .env.*
 !.env.example
 .secrets/
-MPANEL_HOME/
+*.pem
+*.key
+
+# MPanel 运行时数据（生产为 /opt/mpanel；本地开发写仓库内目录）
+mpanel-data/
 mpanel-home/
 mpanel-core-home/
 test-home/
 *.log
 
-# local-only material
-notes/
-.zcode/
-
-# deploy output
-out/
-
-# editor / OS
+# 编辑器与操作系统
 .DS_Store
 Thumbs.db
 .idea/

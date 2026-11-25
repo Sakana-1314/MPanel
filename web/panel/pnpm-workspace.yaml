@@ -1,0 +1,6 @@
+minimumReleaseAgeExclude:
+  - '@types/node@24.19.3'
+  - '@types/react@18.3.32'
+  - '@uiw/codemirror-extensions-basic-setup@4.25.13'
+  - '@uiw/react-codemirror@4.25.13'
+  - lucide-react@1.80.0

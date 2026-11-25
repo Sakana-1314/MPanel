@@ -1,0 +1,87 @@
+name: 发布站点
+
+# main 更新或手动触发时，构建面板与文档并发布到 gh-pages：
+#   /            -> web/panel（SPA，404.html 作为深链兜底）
+#   /docs/       -> web/docs（VitePress）
+# 每次发布都是 force_orphan 生成的全新单提交，提交者固定为 github-actions[bot]。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 发布站点-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 构建并发布
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/panel/pnpm-lock.yaml
+
+      - name: 构建面板
+        working-directory: web/panel
+        env:
+          # vite.config.ts 读取 VITE_BASE_PATH；VITE_BASE 保留为发布约定中的别名。
+          VITE_BASE: /MPanel/
+          VITE_BASE_PATH: /MPanel/
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: 构建文档
+        working-directory: web/docs
+        env:
+          DOCS_BASE: /MPanel/docs/
+        run: |
+          if [ ! -f package.json ]; then
+            echo "::notice title=跳过文档构建::web/docs/package.json 尚未创建"
+            exit 0
+          fi
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: 组装发布目录
+        run: |
+          set -euo pipefail
+          rm -rf public
+          mkdir -p public
+          cp -R web/panel/dist/. public/
+          if [ -d web/docs/.vitepress/dist ]; then
+            mkdir -p public/docs
+            cp -R web/docs/.vitepress/dist/. public/docs/
+          else
+            echo "::warning::未找到 web/docs/.vitepress/dist，本次只发布面板"
+          fi
+          cp public/index.html public/404.html
+          echo "发布文件数：$(find public -type f | wc -l)"
+
+      - name: 发布到 gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./public
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          force_orphan: true
+          full_commit_message: "docs: 发布面板与文档站点"
