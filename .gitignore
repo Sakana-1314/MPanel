@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# runtime state and secrets
+.env
+.env.*
+!.env.example
+.secrets/
+MPANEL_HOME/
+mpanel-home/
+mpanel-core-home/
+test-home/
+*.log
+
+# local-only material
+notes/
+.zcode/
+
+# deploy output
+out/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

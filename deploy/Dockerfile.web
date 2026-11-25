@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1
+#
+# MPanel web image: static SPA served by nginx, with runtime config.json.
+# Build from the repository root:
+#   docker build -f deploy/Dockerfile.web -t mpanel-web:0.1.0 .
+#
+# Runtime configuration (no rebuild needed):
+#   MPANEL_APP_NAME                 default "MPanel"
+#   MPANEL_ALLOW_USER_CONNECTIONS   default "true"
+#   MPANEL_DBX_URL                  dbx iframe 地址（可为空）
+#   MPANEL_DEFAULT_BACKENDS         预置后端，必须是合法 JSON 数组，默认 []
+#   MPANEL_CONFIG_FILE              可选挂载文件，存在时原样使用，忽略上面四项
+#
+# 前端是纯静态产物：它可以在浏览器里连接任意 worker/core 后端，
+# 因此本镜像不代理 API，也不包含任何凭证。
+
+# ---------------------------------------------------------------------------
+# Build stage
+# ---------------------------------------------------------------------------
+FROM node:24-bookworm-slim AS build
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+RUN corepack enable && corepack prepare pnpm@12.10.1 --activate
+
+WORKDIR /src
+
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
+COPY server/shared/package.json server/shared/
+COPY server/worker/package.json server/worker/
+COPY server/core/package.json server/core/
+COPY web/package.json web/
+
+RUN pnpm install --frozen-lockfile
+
+COPY web/index.html web/vite.config.ts web/tsconfig.json web/tailwind.config.ts web/postcss.config.js web/package.json web/
+COPY web/public web/public
+COPY web/src web/src
+
+# Vite 构建期只注入非敏感默认值；token 永远由用户在 UI 中输入。
+RUN pnpm --filter @mpanel/web build
+
+# ---------------------------------------------------------------------------
+# Runtime stage
+# ---------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS runtime
+
+RUN apk add --no-cache gettext jq \
+ && rm -rf /usr/share/nginx/html/*
+
+COPY deploy/nginx.web.conf /etc/nginx/conf.d/default.conf
+COPY deploy/web/config.json.template /etc/mpanel/config.json.template
+COPY deploy/web/docker-entrypoint.sh /docker-entrypoint.d/40-mpanel-config.sh
+COPY --from=build /src/web/dist/ /usr/share/nginx/html/
+
+RUN chmod +x /docker-entrypoint.d/40-mpanel-config.sh
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
+
+STOPSIGNAL SIGTERM

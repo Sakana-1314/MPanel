@@ -1,0 +1,6 @@
+{
+  "appName": "${MPANEL_APP_NAME}",
+  "allowUserConnections": ${MPANEL_ALLOW_USER_CONNECTIONS},
+  "dbxUrl": "${MPANEL_DBX_URL}",
+  "backends": ${MPANEL_DEFAULT_BACKENDS}
+}

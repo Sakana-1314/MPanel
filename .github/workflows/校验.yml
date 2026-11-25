@@ -1,0 +1,56 @@
+name: 校验
+
+# PR 与 main 的每一次变更都必须通过：全仓类型检查 + web 生产构建 + 真实进程冒烟测试。
+# 这是 PR 合并前的唯一门禁（AGENTS.md「协作与提交」）。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 类型检查与冒烟测试
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查与前端构建
+        run: node scripts/check.mjs
+
+      - name: 冒烟测试
+        run: node scripts/smoke.mjs
+
+      - name: 失败时上传日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpanel-verify-logs
+          path: |
+            **/*.log
+            web/dist/**
+          retention-days: 7
+          if-no-files-found: ignore
