@@ -4,3 +4,5 @@ minimumReleaseAgeExclude:
   - '@uiw/codemirror-extensions-basic-setup@4.25.13'
   - '@uiw/react-codemirror@4.25.13'
   - lucide-react@1.80.0
+allowBuilds:
+  esbuild: true
