@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 // Store is a typed JSON document guarded by a mutex.

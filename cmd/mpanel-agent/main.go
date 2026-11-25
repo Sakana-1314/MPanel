@@ -13,7 +13,7 @@ import (
 
 	"github.com/sakana-1314/mpanel/agent"
 	"github.com/sakana-1314/mpanel/agent/modules"
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 func main() {

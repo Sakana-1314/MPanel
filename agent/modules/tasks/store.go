@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 func (m *Module) tasksPath() string {

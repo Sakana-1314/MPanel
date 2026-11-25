@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // handoffEntry is one unconsumed dbx ticket.

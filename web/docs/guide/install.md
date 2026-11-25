@@ -3,7 +3,7 @@
 本页描述把 MPanel 安装到一台 Linux 主机的目标流程：从源码构建 Go 二进制，放到 `/usr/local/bin`，用 systemd 托管 `mpanel-core` 与 `mpanel-agent`，完成首次初始化后通过浏览器访问。
 
 ::: warning 实现状态
-Go 重写仍在进行中。当前仓库已落地 `internal/config`、`internal/protocol`、`internal/store`；`cmd/`、`core/`、`agent/` 与业务模块仍在移植。下文的 `go build ./cmd/...`、`mpanel-core`、`mpanel-agent`、`mpanelctl` 与 systemd 单元属于目标形态，命令在对应代码落地后才可执行。已实现与规划中的完整清单见[首页](/index.md#实现状态)。
+Go 重写已落地：`cmd/`、`core/`、`agent/` 与全部业务模块均可构建，`go build ./...`、`go vet ./...`、`go test ./...` 在 CI 中作为合并门禁。以下命令均可直接执行。已实现与规划中的完整清单见[首页](/index.md#实现状态)。
 :::
 
 ## 1. 前置条件
@@ -28,7 +28,7 @@ Go 重写仍在进行中。当前仓库已落地 `internal/config`、`internal/p
 git clone https://github.com/sakana-1314/MPanel.git
 cd MPanel
 
-# 目标形态：cmd/ 落地后可用
+# 构建三个二进制
 go build ./cmd/...
 ```
 
@@ -40,11 +40,11 @@ go build ./cmd/...
 | `mpanel-agent` | 功能面：站点、证书、数据库、容器、镜像、编排、文件、终端、计划任务 |
 | `mpanelctl` | 控制命令：服务状态/启停辅助、账号与配置检查（子命令随 `cmd/mpanelctl` 落地补齐） |
 
-发布构建建议把版本写入二进制（`internal/config.Version` 支持 `-ldflags` 覆盖）：
+发布构建建议把版本写入二进制（`core/config.Version` 支持 `-ldflags` 覆盖）：
 
 ```bash
 VERSION=0.3.0
-go build -ldflags "-X github.com/sakana-1314/mpanel/internal/config.Version=${VERSION}" ./cmd/...
+go build -ldflags "-X github.com/sakana-1314/mpanel/core/config.Version=${VERSION}" ./cmd/...
 ```
 
 交叉编译到 Linux amd64：
@@ -93,7 +93,7 @@ sudo ln -sf /usr/local/bin/mpanelctl /usr/bin/mpanel
 └─ tmp/                   # 临时文件
 ```
 
-首次启动时 `internal/config` 会在配置缺失时按默认值创建 `conf/app.yaml` 与 `conf/agent.yaml`，权限 `0600`；`conf/` 目录权限为 `0700`。
+首次启动时 `core/config` 会在配置缺失时按默认值创建 `conf/app.yaml` 与 `conf/agent.yaml`，权限 `0600`；`conf/` 目录权限为 `0700`。
 
 ## 4. systemd 单元
 
@@ -211,7 +211,7 @@ core 首次启动时如果还没有管理员账号，会生成一次性 bootstra
    sudo cat /opt/mpanel/conf/bootstrap-token
    ```
 
-2. 调用初始化端点设置管理员账号（`POST /api/v1/auth/setup`，字段以 `internal/auth` 落地为准）：
+2. 调用初始化端点设置管理员账号（`POST /api/v1/auth/setup`，字段以 `core/auth` 落地为准）：
 
    ```bash
    curl -sS -X POST http://127.0.0.1:10086/api/v1/auth/setup \

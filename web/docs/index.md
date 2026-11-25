@@ -61,9 +61,9 @@ Go 重写仍在进行中。本站严格区分「已实现」与「规划中」�
 | 能力 | 状态 | 说明 |
 |---|---|---|
 | REST API v1 与隧道协议 v1 契约 | 已冻结 | 见 [REST API 契约](/api/contract) 与 [隧道协议](/api/protocol) |
-| 配置模型（`app.yaml` / `agent.yaml`、`MPANEL_*` 覆盖、目录创建、原子写） | 已实现 | `internal/config` |
-| 信封、错误码、分页、隧道帧模型 | 已实现 | `internal/protocol` |
-| 原子 JSON 存储 | 已实现 | `internal/store` |
+| 配置模型（`app.yaml` / `agent.yaml`、`MPANEL_*` 覆盖、目录创建、原子写） | 已实现 | `core/config` |
+| 信封、错误码、分页、隧道帧模型 | 已实现 | `core/protocol` |
+| 原子 JSON 存储 | 已实现 | `core/store` |
 | `mpanel-core` / `mpanel-agent` / `mpanelctl` 入口 | 规划中 | `cmd/` 尚在移植 |
 | 认证、隧道、机器代理、站点/数据库/容器/文件/终端/任务模块 | 规划中 | 按契约逐端点移植 |
 | web/panel 前端 | 已有源码 | 现有 React 应用，按冻结契约对接 Go 后端 |

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/sakana-1314/mpanel/agent"
-	"github.com/sakana-1314/mpanel/internal/httpapi"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/httpapi"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // Module implements /system/info, /system/snapshot and /system/metrics.

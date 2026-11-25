@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/httpapi"
-	"github.com/sakana-1314/mpanel/internal/protocol"
-	"github.com/sakana-1314/mpanel/internal/store"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/httpapi"
+	"github.com/sakana-1314/mpanel/core/protocol"
+	"github.com/sakana-1314/mpanel/core/store"
 )
 
 const (

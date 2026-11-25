@@ -20,7 +20,7 @@ MPanel 是 Go 重写后的服务器管理面板：`web/panel`（React SPA）、`
 根目录只允许：
 
 ```text
-cmd/  core/  agent/  internal/  web/  .github/  notes/
+cmd/  core/  agent/  web/  .github/  notes/
 go.mod  go.sum  README.md  LICENSE  AGENTS.md  CLAUDE.md  .gitignore
 ```
 
@@ -28,7 +28,7 @@ go.mod  go.sum  README.md  LICENSE  AGENTS.md  CLAUDE.md  .gitignore
 - `cmd/`：`mpanel-core`、`mpanel-agent`、`mpanelctl` 三个入口。
 - `core/`：认证、机器注册、三种传输、代理、边缘调度、审计、静态托管；不实现站点/Caddyfile/数据库/容器/文件/终端/任务逻辑。
 - `agent/`：模块注册、能力探测、命令执行与 `system/` 模块；功能只在 agent 实现。
-- `internal/`：配置、协议、存储、鉴权、HTTP 封装、隧道等共享实现；跨 core/agent 的类型只在这里定义。
+- `core/{protocol,config,store,auth,httpapi,tunnel}`：共享实现；跨 core/agent 的类型只在这里定义（agent 把它们当契约库引用，不依赖 core 应用）。
 - `web/panel`、`web/docs` 是两个独立 pnpm 包，各自有 `package.json` 与锁文件，不共享工作区。
 - `notes/` 只放本地知识（契约、设计、服务器信息），必须在 `.gitignore` 中忽略，不得提交或复制进其它目录。
 
@@ -50,7 +50,7 @@ go.mod  go.sum  README.md  LICENSE  AGENTS.md  CLAUDE.md  .gitignore
 - 二进制名固定：`mpanel-core`、`mpanel-agent`、`mpanelctl`；systemd 单元名固定：`mpanel-core.service`、`mpanel-agent.service`。
 - 默认端口：core `10086`、agent `10087`；所有配置可用 `MPANEL_*` 环境变量覆盖，保证容器与 CI 不写 `/opt`。
 - 网站管理只用 **Caddy**，不引入 nginx/OpenResty；agent 只写配置、执行 `caddy validate` 与 reload，不守护 Caddy 进程。
-- 不要新增与 1Panel 无关的根级安装目录或配置文件名；需要新路径时先改 `web/docs/guide/config.md` 与 `internal/config`。
+- 不要新增与 1Panel 无关的根级安装目录或配置文件名；需要新路径时先改 `web/docs/guide/config.md` 与 `core/config`。
 
 ## 开发与门禁
 

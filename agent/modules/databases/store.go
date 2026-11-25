@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // profileRecord is the on-disk profile. PasswordEnc is AES-256-GCM ciphertext

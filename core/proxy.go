@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sakana-1314/mpanel/internal/httpapi"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/httpapi"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // maxProxyBody caps request bodies forwarded through the proxy (uploads).

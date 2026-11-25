@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 func newTestService(t *testing.T) (*Service, *config.App) {

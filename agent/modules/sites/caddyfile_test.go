@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/sakana-1314/mpanel/agent"
-	"github.com/sakana-1314/mpanel/internal/config"
+	"github.com/sakana-1314/mpanel/core/config"
 )
 
 func boolPtr(value bool) *bool { return &value }

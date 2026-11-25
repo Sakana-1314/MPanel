@@ -153,7 +153,7 @@ MPanel/
 ├─ cmd/                  # mpanel-core / mpanel-agent / mpanelctl 入口
 ├─ core/                 # 控制面：认证、机器注册、代理、聚合、静态托管
 ├─ agent/                # 功能端：模块注册、能力探测、命令执行、systemd/终端支持
-├─ internal/             # 共享实现：配置、协议、存储、鉴权、HTTP 封装、隧道
+├─ core/                 # 控制面 + 共享包（protocol/config/store/auth/httpapi/tunnel）
 ├─ web/
 │  ├─ panel/             # React + Vite 面板（独立 pnpm 包）
 │  └─ docs/              # VitePress 文档（独立 pnpm 包）

@@ -17,7 +17,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/sakana-1314/mpanel/agent"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // postgresDSN builds a lib/pq URL DSN. The password only ever lives in the

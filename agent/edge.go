@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/auth"
-	"github.com/sakana-1314/mpanel/internal/config"
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/auth"
+	"github.com/sakana-1314/mpanel/core/config"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // Identity is the persisted reverse-ws / edge credential.

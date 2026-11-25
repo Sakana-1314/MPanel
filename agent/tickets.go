@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sakana-1314/mpanel/internal/protocol"
+	"github.com/sakana-1314/mpanel/core/protocol"
 )
 
 // ticketStore holds one-shot WebSocket tickets for direct browser connections.
