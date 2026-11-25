@@ -1,0 +1,73 @@
+# MPanel Caddy reverse proxy example.
+#
+# Caddy's reverse_proxy handles WebSocket upgrades automatically, so a single
+# reverse_proxy covers:
+#   /api/v1/*                        REST
+#   /ws/worker                       reverse-ws worker enrollment
+#   /api/v1/machines/:id/proxy/ws/*  proxied WebSockets (terminal/logs)
+#
+# Core already sets a CSP (including frame-src for MPANEL_DBX_ORIGIN),
+# X-Content-Type-Options and Referrer-Policy. Do NOT add a second CSP here:
+# multiple CSP headers intersect and can break the dbx iframe.
+
+panel.example.com {
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:8790 {
+		# Image pulls, backups and large uploads can take up to ~620s.
+		transport http {
+			read_timeout 620s
+			write_timeout 620s
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+
+	# Optional request-body cap for uploads. Worker default is 100 MiB.
+	# Caddy has no body limit by default; uncomment on Caddy 2.7+.
+	# request_body {
+	# 	max_size 128MB
+	# }
+}
+
+# ---------------------------------------------------------------------------
+# Single-machine mode (no core): serve web/dist and proxy /api + /ws to worker.
+# Uncomment and replace the core site above.
+# ---------------------------------------------------------------------------
+# panel.example.com {
+# 	encode zstd gzip
+#
+# 	handle /api/v1/* {
+# 		reverse_proxy 127.0.0.1:8787 {
+# 			transport http {
+# 				read_timeout 620s
+# 			}
+# 		}
+# 	}
+# 	handle /ws/* {
+# 		reverse_proxy 127.0.0.1:8787
+# 	}
+# 	handle {
+# 		root * /opt/mpanel/web
+# 		try_files {path} /index.html
+# 		file_server
+# 	}
+#
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 	}
+# }
+
+# ---------------------------------------------------------------------------
+# If Caddy itself is the managed site server, its service should use the
+# panel-generated root config (so a restart does not lose applied sites):
+#
+#   caddy run --config /var/lib/mpanel/worker/caddy/Caddyfile --adapter caddyfile
+#
+# Do not point this proxy example at the same instance that serves panel sites;
+# use a separate Caddy instance or listen addresses.
+# ---------------------------------------------------------------------------

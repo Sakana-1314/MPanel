@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 深色为默认主题；html.light 覆盖为浅色。变量值是 RGB 三元组，供 Tailwind 透明度语法使用。 */
+:root {
+  color-scheme: dark;
+  --app-bg: 9 13 22;
+  --app-surface: 15 22 35;
+  --app-elevated: 22 31 48;
+  --app-border: 36 48 69;
+  --app-text: 226 232 240;
+  --app-muted: 148 163 184;
+  --app-accent: 59 130 246;
+  --app-accent-strong: 37 99 235;
+  --app-accent-soft: 30 58 95;
+  --app-success: 52 211 153;
+  --app-warning: 251 191 36;
+  --app-danger: 244 113 133;
+  --app-info: 96 165 250;
+  --app-overlay: 2 6 23;
+}
+
+html.light {
+  color-scheme: light;
+  --app-bg: 244 246 250;
+  --app-surface: 255 255 255;
+  --app-elevated: 248 250 252;
+  --app-border: 219 226 236;
+  --app-text: 15 23 42;
+  --app-muted: 100 116 139;
+  --app-accent: 37 99 235;
+  --app-accent-strong: 29 78 216;
+  --app-accent-soft: 219 234 254;
+  --app-success: 5 150 105;
+  --app-warning: 180 83 9;
+  --app-danger: 220 38 38;
+  --app-info: 37 99 235;
+  --app-overlay: 148 163 184;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--app-bg));
+  color: rgb(var(--app-text));
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
+
+/* 细滚动条，深浅主题通用 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--app-border)) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--app-border));
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--app-accent));
+  outline-offset: 2px;
+}
+
+/* CodeMirror 跟随面板配色 */
+.cm-editor {
+  border-radius: 0.5rem;
+  font-size: 12.5px;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-scroller {
+  font-family:
+    JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.cm-gutters {
+  border-right: 1px solid rgb(var(--app-border)) !important;
+}
+
+/* 骨架屏 */
+@keyframes mpanel-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.skeleton {
+  animation: mpanel-pulse 1.4s ease-in-out infinite;
+  background-color: rgb(var(--app-elevated));
+  border-radius: 0.375rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,90 @@
+# syntax=docker/dockerfile:1
+#
+# MPanel core image (auth + machine registry + HTTP/WS proxy + static web).
+# Build from the repository root:
+#   docker build -f deploy/Dockerfile.core -t mpanel-core:0.1.0 .
+#
+# NOTE: This Dockerfile has NOT been built or run in this repository's local
+# environment (no Docker available). Treat it as a reviewed template, not a
+# verified image.
+
+# ---------------------------------------------------------------------------
+# Build stage: install the workspace, build shared/core/web, then `pnpm deploy`
+# so the runtime contains dist + production node_modules (not a dist-only copy).
+# ---------------------------------------------------------------------------
+FROM node:24-bookworm-slim AS build
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+RUN corepack enable && corepack prepare pnpm@12.10.1 --activate
+
+# node-pty (optional worker dependency, installed by the workspace install)
+# needs a native toolchain when no prebuilt binary is available.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Dependency manifests first so the install layer is cacheable.
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
+COPY server/shared/package.json server/shared/
+COPY server/worker/package.json server/worker/
+COPY server/core/package.json server/core/
+COPY web/package.json web/
+
+RUN pnpm install --frozen-lockfile
+
+# Sources (explicit paths: never copy host node_modules/dist into the image).
+COPY server/shared/src server/shared/src
+COPY server/shared/tsconfig.json server/shared/package.json server/shared/
+COPY server/core/src server/core/src
+COPY server/core/tsconfig.json server/core/package.json server/core/
+COPY web/index.html web/vite.config.ts web/tsconfig.json web/tailwind.config.ts web/postcss.config.js web/package.json web/
+COPY web/public web/public
+COPY web/src web/src
+
+RUN pnpm --filter @mpanel/shared build \
+ && pnpm --filter @mpanel/core build \
+ && pnpm --filter @mpanel/web build
+
+# Deployable package: dist + production dependencies (including @mpanel/shared).
+RUN pnpm --filter @mpanel/core deploy --prod /out/core
+
+# ---------------------------------------------------------------------------
+# Runtime stage: non-root, production dependencies only, health check.
+# ---------------------------------------------------------------------------
+FROM node:24-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    MPANEL_CORE_HOME=/var/lib/mpanel/core \
+    MPANEL_LISTEN=0.0.0.0:8790 \
+    MPANEL_WEB_DIST=/app/web \
+    MPANEL_LOG_LEVEL=info
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --gid 10001 mpanel \
+ && useradd --uid 10001 --gid mpanel --home-dir /var/lib/mpanel/core --no-create-home --shell /usr/sbin/nologin mpanel \
+ && mkdir -p /app /var/lib/mpanel/core \
+ && chown -R 10001:10001 /app /var/lib/mpanel
+
+WORKDIR /app
+
+COPY --from=build --chown=10001:10001 /out/core/ ./
+COPY --from=build --chown=10001:10001 /src/web/dist/ ./web/
+
+USER 10001:10001
+
+EXPOSE 8790
+
+# Works with the default port and with MPANEL_LISTEN / MPANEL_PORT /
+# MPANEL_CORE_PORT overrides. /healthz is unauthenticated.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "const p=(process.env.MPANEL_LISTEN||'').match(/:(\d+)$/)?.[1]||process.env.MPANEL_PORT||process.env.MPANEL_CORE_PORT||'8790';fetch('http://127.0.0.1:'+p+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+STOPSIGNAL SIGTERM
+
+CMD ["node", "dist/index.js", "serve"]

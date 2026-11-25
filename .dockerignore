@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+**/.vite
+out
+.git
+.github
+.zcode
+.worktrees
+*.log
+.env
+.env.*
+!.env.example
+notes
+web/.env
+web/.env.local
+coverage
