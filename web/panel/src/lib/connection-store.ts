@@ -1,195 +1,88 @@
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { computed, reactive } from 'vue';
 import type { BackendConnection } from '../api/types';
-import { clearAuth } from './auth-store';
-import { emitConnectionChange } from './connection-events';
-import { getSecret, removeSecret } from './connection-secrets';
 
-const PERSIST_KEY = 'mpanel.connections.v1';
-
-export interface ConnectionState {
-  connections: BackendConnection[];
-  activeId: string | null;
-  /** 机器选择按连接保存，不跨连接复用（core 代理）。 */
-  selectedMachineByConnection: Record<string, string | undefined>;
-  add(connection: BackendConnection): void;
-  update(id: string, patch: Partial<Omit<BackendConnection, 'id' | 'token'>>): void;
-  remove(id: string): void;
-  setActive(id: string): void;
-  setDefault(id: string): void;
-  rename(id: string, name: string): void;
-  selectMachine(connectionId: string, machineId?: string): void;
-}
+const PERSIST_KEY = 'mpanel.core-connections.v1';
+const LEGACY_KEY = 'mpanel.connections.v1';
 
 interface PersistedState {
   connections: BackendConnection[];
   activeId: string | null;
-  selectedMachineByConnection: Record<string, string | undefined>;
 }
 
-/** 只持久化连接元数据；token 永不进入 mpanel.connections.v1。 */
-export const useConnectionStore = create<ConnectionState>()(
-  persist<ConnectionState, [], [], PersistedState>(
-    (set, get) => ({
-      connections: [],
-      activeId: null,
-      selectedMachineByConnection: {},
+interface ConnectionState {
+  connections: BackendConnection[];
+  activeId: string | null;
+}
 
-      add: (connection) => {
-        const next = sanitizeConnection(connection);
-        const exists = get().connections.some((item) => item.id === next.id);
-        if (exists) {
-          get().update(next.id, next);
-          return;
-        }
-        set((state) => ({
-          connections: [...state.connections, next],
-          activeId: state.activeId ?? next.id,
-        }));
-        emitConnectionChange('update');
-      },
+/** 编译期/config.json 种子提供的 core token，只存在内存中。 */
+const memoryTokens = new Map<string, string>();
 
-      update: (id, patch) => {
-        set((state) => ({
-          connections: state.connections.map((connection) =>
-            connection.id === id
-              ? sanitizeConnection({ ...connection, ...patch, id } as BackendConnection)
-              : connection,
-          ),
-        }));
-        emitConnectionChange('update');
-      },
+function loadPersisted(): PersistedState {
+  const empty: PersistedState = { connections: [], activeId: null };
+  if (typeof localStorage === 'undefined') return empty;
+  const raw = localStorage.getItem(PERSIST_KEY) ?? localStorage.getItem(LEGACY_KEY);
+  if (raw === null) return empty;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return empty;
+    const value = parsed as Record<string, unknown>;
+    const entries = Array.isArray(value.connections) ? value.connections : [];
+    const connections: BackendConnection[] = [];
+    for (const item of entries) {
+      if (typeof item !== 'object' || item === null) continue;
+      const entry = item as Record<string, unknown>;
+      // 旧版本可能保存过 worker 直连连接；前端已不再支持，直接丢弃。
+      if (entry.kind !== undefined && entry.kind !== 'core') continue;
+      const rawUrl = typeof entry.baseUrl === 'string' ? entry.baseUrl : entry.url;
+      const name = typeof entry.name === 'string' ? entry.name : entry.label;
+      if (typeof rawUrl !== 'string' || typeof name !== 'string') continue;
+      const normalized = normalizeBaseUrl(rawUrl);
+      if (normalized.length === 0) continue;
+      connections.push({
+        id: typeof entry.id === 'string' ? entry.id : makeConnectionId(),
+        name,
+        baseUrl: normalized,
+        username: typeof entry.username === 'string' ? entry.username : undefined,
+        createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : undefined,
+      });
+    }
+    return {
+      connections,
+      activeId:
+        typeof value.activeId === 'string' && connections.some((item) => item.id === value.activeId)
+          ? value.activeId
+          : (connections[0]?.id ?? null),
+    };
+  } catch {
+    return empty;
+  }
+}
 
-      remove: (id) => {
-        removeSecret(id);
-        clearAuth(id);
-        set((state) => {
-          const connections = state.connections.filter((connection) => connection.id !== id);
-          const selected = { ...state.selectedMachineByConnection };
-          delete selected[id];
-          return {
-            connections,
-            selectedMachineByConnection: selected,
-            activeId: state.activeId === id ? (connections[0]?.id ?? null) : state.activeId,
-          };
-        });
-        emitConnectionChange('remove');
-      },
+const state = reactive<ConnectionState>(loadPersisted());
 
-      setActive: (id) => {
-        if (!get().connections.some((connection) => connection.id === id)) return;
-        if (get().activeId === id) return;
-        set({ activeId: id });
-        emitConnectionChange('activate');
-      },
-
-      setDefault: (id) => {
-        get().setActive(id);
-      },
-
-      rename: (id, name) => {
-        const trimmed = name.trim();
-        if (trimmed.length === 0) return;
-        set((state) => ({
-          connections: state.connections.map((connection) =>
-            connection.id === id ? { ...connection, name: trimmed } : connection,
-          ),
-        }));
-        emitConnectionChange('update');
-      },
-
-      selectMachine: (connectionId, machineId) => {
-        set((state) => {
-          const selected = { ...state.selectedMachineByConnection };
-          if (machineId === undefined || machineId.length === 0) delete selected[connectionId];
-          else selected[connectionId] = machineId;
-          return { selectedMachineByConnection: selected };
-        });
-        emitConnectionChange('machine');
-      },
-    }),
-    {
-      name: PERSIST_KEY,
-      version: 2,
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        connections: state.connections.map(stripToken),
-        activeId: state.activeId,
-        selectedMachineByConnection: state.selectedMachineByConnection,
-      }),
-      migrate: (persisted) => migratePersisted(persisted),
-      merge: (persisted, current) => {
-        const value = persisted as Partial<PersistedState> | undefined;
-        if (value === undefined) return current;
-        return {
-          ...current,
-          connections: (value.connections ?? []).map((item) =>
-            sanitizeConnection(stripToken(item as BackendConnection)),
-          ),
-          activeId: value.activeId ?? null,
-          selectedMachineByConnection: value.selectedMachineByConnection ?? {},
-        };
-      },
-    },
-  ),
-);
-
-/* ------------------------------- helpers ------------------------------- */
+function persist(): void {
+  if (typeof localStorage === 'undefined') return;
+  const payload: PersistedState = {
+    connections: state.connections.map(({ token: _token, ...rest }) => rest),
+    activeId: state.activeId,
+  };
+  try {
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(payload));
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // 隐私模式/配额不足时静默失败。
+  }
+}
 
 export function normalizeBaseUrl(raw: string): string {
   let url = raw.trim();
   if (url.length === 0) return '';
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   url = url.replace(/\/+$/, '');
-  // 用户常把完整 API 地址粘进来；去掉统一的 /api/v1 后缀，连接只保存服务根地址。
+  // 用户常把完整 API 地址粘进来；连接只保存服务根地址。
   url = url.replace(/\/api\/v1$/i, '');
+  url = url.replace(/\/machines\/[^/]+\/proxy$/i, '');
   return url;
-}
-
-function sanitizeConnection(connection: BackendConnection): BackendConnection {
-  return {
-    ...connection,
-    name: connection.name.trim(),
-    baseUrl: normalizeBaseUrl(connection.baseUrl),
-    token: undefined,
-  };
-}
-
-function stripToken(connection: BackendConnection): BackendConnection {
-  const { token: _token, ...rest } = connection;
-  return rest;
-}
-
-function migratePersisted(raw: unknown): PersistedState {
-  const value = (raw ?? {}) as Record<string, unknown>;
-  const legacy = Array.isArray(value.connections) ? value.connections : [];
-  const connections: BackendConnection[] = [];
-  for (const item of legacy) {
-    if (typeof item !== 'object' || item === null) continue;
-    const entry = item as Record<string, unknown>;
-    const urlValue = typeof entry.baseUrl === 'string' ? entry.baseUrl : entry.url;
-    const nameValue = typeof entry.name === 'string' ? entry.name : entry.label;
-    if (typeof urlValue !== 'string' || typeof nameValue !== 'string') continue;
-    const kind = entry.kind === 'core' ? 'core' : 'worker';
-    connections.push(
-      sanitizeConnection({
-        id: typeof entry.id === 'string' ? entry.id : makeConnectionId(),
-        name: nameValue,
-        kind,
-        baseUrl: urlValue,
-        createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : undefined,
-      }),
-    );
-  }
-  return {
-    connections,
-    activeId: typeof value.activeId === 'string' ? value.activeId : (connections[0]?.id ?? null),
-    selectedMachineByConnection:
-      typeof value.selectedMachineByConnection === 'object' &&
-      value.selectedMachineByConnection !== null
-        ? (value.selectedMachineByConnection as Record<string, string | undefined>)
-        : {},
-  };
 }
 
 export function makeConnectionId(): string {
@@ -199,87 +92,91 @@ export function makeConnectionId(): string {
   return `conn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+export function listConnections(): BackendConnection[] {
+  return state.connections;
+}
+
 export function getConnectionById(id: string | null | undefined): BackendConnection | undefined {
   if (id === null || id === undefined) return undefined;
-  return useConnectionStore.getState().connections.find((connection) => connection.id === id);
+  return state.connections.find((connection) => connection.id === id);
 }
 
-/** 在内存中合并 secret；连接对象本身永远不含 token。 */
+/** 在内存中合并 token；持久化对象永远不含 token。 */
 export function getActiveConnection(): BackendConnection | undefined {
-  const state = useConnectionStore.getState();
   const connection = state.connections.find((item) => item.id === state.activeId);
   if (connection === undefined) return undefined;
-  const token = getSecret(connection.id);
+  const token = memoryTokens.get(connection.id);
   return token === undefined ? connection : { ...connection, token };
 }
 
-export function getSelectedMachineId(connectionId?: string): string | undefined {
-  const state = useConnectionStore.getState();
-  const id = connectionId ?? state.activeId;
-  if (id === null) return undefined;
-  return state.selectedMachineByConnection[id];
+export const activeConnection = computed<BackendConnection | undefined>(() => getActiveConnection());
+export const activeConnectionId = computed<string | null>(() => state.activeId);
+
+export function setConnectionToken(id: string, token: string | undefined): void {
+  if (token === undefined || token.length === 0) memoryTokens.delete(id);
+  else memoryTokens.set(id, token);
 }
 
-/** 页面只使用该 basePath；worker = /api/v1，core 已选机器 = /proxy。 */
-export function buildBasePath(
-  connection: BackendConnection | undefined,
-  machineId: string | undefined,
-): string {
-  if (connection === undefined) return '';
-  const root = normalizeBaseUrl(connection.baseUrl);
-  if (connection.kind === 'worker') return `${root}/api/v1`;
-  if (machineId === undefined || machineId.length === 0) return `${root}/api/v1`;
-  return `${root}/api/v1/machines/${encodeURIComponent(machineId)}/proxy`;
+export function addConnection(input: {
+  id?: string;
+  name: string;
+  baseUrl: string;
+  username?: string;
+  token?: string;
+}): BackendConnection {
+  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  if (baseUrl.length === 0) throw new Error('core 地址不能为空');
+  const id = input.id ?? makeConnectionId();
+  const connection: BackendConnection = {
+    id,
+    name: input.name.trim().length > 0 ? input.name.trim() : baseUrl,
+    baseUrl,
+    username: input.username,
+    createdAt: new Date().toISOString(),
+  };
+  const existingIndex = state.connections.findIndex((item) => item.id === id);
+  if (existingIndex >= 0) state.connections.splice(existingIndex, 1, connection);
+  else state.connections.push(connection);
+  if (input.token !== undefined) setConnectionToken(id, input.token);
+  if (state.activeId === null) state.activeId = id;
+  persist();
+  return connection;
 }
 
-export function getBasePath(): string {
-  const connection = getActiveConnection();
-  if (connection === undefined) return '';
-  return buildBasePath(connection, getSelectedMachineId(connection.id));
+export function updateConnection(
+  id: string,
+  patch: Partial<Pick<BackendConnection, 'name' | 'baseUrl' | 'username' | 'token'>>,
+): void {
+  const index = state.connections.findIndex((item) => item.id === id);
+  if (index < 0) return;
+  const current = state.connections[index]!;
+  const next: BackendConnection = {
+    ...current,
+    name: patch.name !== undefined ? patch.name.trim() || current.name : current.name,
+    baseUrl: patch.baseUrl !== undefined ? normalizeBaseUrl(patch.baseUrl) : current.baseUrl,
+    username: patch.username !== undefined ? patch.username : current.username,
+  };
+  if (patch.token !== undefined) setConnectionToken(id, patch.token);
+  state.connections.splice(index, 1, next);
+  persist();
 }
 
-export function getWsBasePath(): string {
-  const connection = getActiveConnection();
-  if (connection === undefined) return '';
-  const wsUrl = toWs(connection.baseUrl);
-  if (connection.kind === 'worker') return `${wsUrl}/ws`;
-  const machineId = getSelectedMachineId(connection.id);
-  return machineId === undefined
-    ? wsUrl
-    : `${wsUrl}/api/v1/machines/${encodeURIComponent(machineId)}/proxy/ws`;
+export function removeConnection(id: string): void {
+  const index = state.connections.findIndex((item) => item.id === id);
+  if (index < 0) return;
+  state.connections.splice(index, 1);
+  memoryTokens.delete(id);
+  if (state.activeId === id) state.activeId = state.connections[0]?.id ?? null;
+  persist();
 }
 
-function toWs(url: string): string {
-  if (url.startsWith('https://')) return `wss://${url.slice('https://'.length)}`;
-  if (url.startsWith('http://')) return `ws://${url.slice('http://'.length)}`;
-  return url;
+export function setActiveConnection(id: string): void {
+  if (!state.connections.some((connection) => connection.id === id)) return;
+  if (state.activeId === id) return;
+  state.activeId = id;
+  persist();
 }
 
-/* -------------------------------- hooks -------------------------------- */
-
-export function useActiveConnection(): BackendConnection | undefined {
-  const connections = useConnectionStore((state) => state.connections);
-  const activeId = useConnectionStore((state) => state.activeId);
-  const connection = connections.find((item) => item.id === activeId);
-  if (connection === undefined) return undefined;
-  // 订阅 connections，token 通过 getSecret 读取（其变化由 connection-events 触发重渲染的页面刷新）。
-  const token = getSecret(connection.id);
-  return token === undefined ? connection : { ...connection, token };
-}
-
-export function useSelectedMachineId(): string | undefined {
-  const activeId = useConnectionStore((state) => state.activeId);
-  return useConnectionStore((state) =>
-    activeId === null ? undefined : state.selectedMachineByConnection[activeId],
-  );
-}
-
-export function useBasePath(): string {
-  const connection = useActiveConnection();
-  const machineId = useSelectedMachineId();
-  return buildBasePath(connection, machineId);
-}
-
-export function useIsCore(): boolean {
-  return useActiveConnection()?.kind === 'core';
+export function renameConnection(id: string, name: string): void {
+  updateConnection(id, { name });
 }

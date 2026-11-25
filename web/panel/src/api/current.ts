@@ -3,7 +3,7 @@ import { AppError } from './errors';
 
 let supplier: (() => ApiClient) | null = null;
 
-/** client.ts 在模块初始化时注册；资源模块通过 currentClient() 走“当前连接”。 */
+/** client.ts 在模块初始化时注册；资源模块通过 currentClient() 走 core 根。 */
 export function setCurrentClientSupplier(fn: () => ApiClient): void {
   supplier = fn;
 }

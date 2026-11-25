@@ -26,7 +26,7 @@ features:
 
 ## 一句话定位
 
-MPanel 是一个三端分离的服务器管理面板：`web/panel` 是 React 单页前端，`core` 是控制面（登录、机器注册、健康检查、隧道与 REST/WS 代理），`agent` 是功能面（在每台被管主机上执行站点、证书、数据库、容器、文件、终端与计划任务）；前端既可以直连单台 agent，也可以经 core 管理多台机器。
+MPanel 是一个三端分离的服务器管理面板：`web/panel` 是 Vue 3 + Vite + Vue Router + Naive UI 单页前端，`core` 是控制面（登录、机器注册、健康检查、隧道与 REST/WS 代理），`agent` 是功能面（在每台被管主机上执行站点、证书、数据库、容器、文件、终端与计划任务）。**面板只连接 core**，不直连 agent；每台机器的页面以独立标签页打开，多台机器的页面可以同时混合管理工作。
 
 ## 与 1Panel 的取舍
 
@@ -64,9 +64,9 @@ Go 重写仍在进行中。本站严格区分「已实现」与「规划中」�
 | 配置模型（`app.yaml` / `agent.yaml`、`MPANEL_*` 覆盖、目录创建、原子写） | 已实现 | `core/config` |
 | 信封、错误码、分页、隧道帧模型 | 已实现 | `core/protocol` |
 | 原子 JSON 存储 | 已实现 | `core/store` |
-| `mpanel-core` / `mpanel-agent` / `mpanelctl` 入口 | 规划中 | `cmd/` 尚在移植 |
-| 认证、隧道、机器代理、站点/数据库/容器/文件/终端/任务模块 | 规划中 | 按契约逐端点移植 |
-| web/panel 前端 | 已有源码 | 现有 React 应用，按冻结契约对接 Go 后端 |
+| `mpanel-core` / `mpanel-agent` / `mpanelctl` 入口 | 已实现 | `cmd/` |
+| 认证、隧道、机器代理、站点/数据库/容器/文件/终端/任务模块 | 已实现 | 按契约实现，能力缺失时降级 |
+| web/panel 前端 | 已有源码 | Vue 3 + Vite + Vue Router + Naive UI；只连 core，多机标签工作台 |
 
 安装步骤按目标形态书写；涉及尚未落地的二进制时，页面会明确标注，不要据此认为该步骤已经可执行。
 

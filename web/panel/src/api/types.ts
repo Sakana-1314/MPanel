@@ -1,5 +1,5 @@
 /**
- * Hand-written mirror of docs/api-contract.md §15.
+ * Hand-written mirror of web/docs/api/contract.md §15.
  * The web bundle must never import @mpanel/shared; keep this file in sync with
  * the API contract (scripts/check.mjs verifies every `// TypeName` exists here).
  */
@@ -955,12 +955,16 @@ export interface WsTicket {
 
 /* ------------------------------- Connections ----------------------------- */
 
-/** 一条前端可切换的后端连接；`token`/`username` 只在内存中合并，绝不写入连接持久化。 */
+/**
+ * 一条前端可切换的 core 连接。
+ * 前端只允许连接 core，不提供 agent 直连；`token`/`username` 只在内存中合并，
+ * 绝不写入连接持久化。
+ */
 export interface BackendConnection {
   id: string;
   name: string;
-  kind: 'worker' | 'core';
   baseUrl: string;
+  /** 仅来自编译期环境变量，用于无 cookie 的脚本式访问。 */
   token?: string;
   username?: string;
   createdAt?: string;
@@ -975,8 +979,9 @@ export interface ConnectionSecret {
 export interface RuntimeConfig {
   appName?: string;
   dbxUrl?: string;
-  defaultBackend?: { url: string; kind: 'worker' | 'core'; label?: string };
-  backends?: { id?: string; url: string; kind: 'worker' | 'core'; label?: string }[];
+  /** 默认 core 地址；kind 字段仅为兼容旧 config.json，前端忽略。 */
+  defaultBackend?: { url: string; kind?: 'core'; label?: string };
+  backends?: { id?: string; url: string; kind?: 'core'; label?: string }[];
   allowUserConnections?: boolean;
   /**
    * 由编译期 VITE_* 与 config.json 合并得到的连接种子。
@@ -988,7 +993,6 @@ export interface RuntimeConfig {
 export interface RuntimeBackendSeed {
   id: string;
   name: string;
-  kind: 'worker' | 'core';
   baseUrl: string;
   /** 仅来自 VITE_DEFAULT_BACKEND_TOKEN 等编译期变量。 */
   token?: string;

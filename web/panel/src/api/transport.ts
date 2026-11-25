@@ -18,22 +18,23 @@ export interface ApiRequestOptions {
 
 /**
  * 页面/资源模块只依赖该接口：
- * - `request` 走“特性 API 基路径”（worker /api/v1 或 core 的 /proxy 前缀）；
- * - `requestRoot` 走连接根 /api/v1（auth/*、machines/*、system/overview 必须用它，
- *   否则选中机器后会被代理到 worker 而 404）。
+ * - `request` 走“机器特性基路径”（core 的 /machines/:id/proxy）；
+ * - `requestRoot` 走 core 根 /api/v1（auth/*、machines/*、edge/*、system/overview）。
  */
 export interface ApiTransport {
+  /** 特性基路径；没有绑定机器时等于 core 根。 */
   readonly baseUrl: string;
+  /** core 根 /api/v1。 */
   readonly apiBaseUrl: string;
   readonly token?: string;
   readonly machineId?: string;
-  readonly kind: 'worker' | 'core';
   url(path: string, query?: QueryParams): string;
   rootUrl(path: string, query?: QueryParams): string;
   raw(path: string, opts?: ApiRequestOptions): Promise<Response>;
   rawRoot(path: string, opts?: ApiRequestOptions): Promise<Response>;
   request<T>(path: string, opts?: ApiRequestOptions): Promise<T>;
   requestRoot<T>(path: string, opts?: ApiRequestOptions): Promise<T>;
+  /** `/ws/terminal/x` → `/api/v1/machines/<id>/proxy/ws/terminal/x`。 */
   wsPathFor(featurePath: string): string;
   wsUrl(featurePath: string, ticket: string): string;
   getWsTicket(featurePath: string): Promise<WsTicket>;

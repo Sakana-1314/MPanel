@@ -1,57 +1,39 @@
-import { create } from 'zustand';
+import { computed, reactive } from 'vue';
 import type { AuthUser } from '../api/types';
 
 export interface AuthState {
   authenticated: boolean;
   authType: 'session' | 'token' | null;
-  role: 'core' | 'worker' | null;
+  role: 'core' | null;
   user: AuthUser | null;
 }
 
-const initialState: AuthState = {
+export const EMPTY_AUTH: AuthState = {
   authenticated: false,
   authType: null,
   role: null,
   user: null,
 };
 
-interface AuthStoreState {
-  byConnection: Record<string, AuthState>;
-  set(connectionId: string, state: AuthState): void;
-  clear(connectionId?: string): void;
+const state = reactive<{ byConnection: Record<string, AuthState> }>({ byConnection: {} });
+
+export function getAuthState(connectionId: string | null | undefined): AuthState {
+  if (connectionId === null || connectionId === undefined) return EMPTY_AUTH;
+  return state.byConnection[connectionId] ?? EMPTY_AUTH;
 }
 
-/** 登录态按连接 id 记录；只存用户信息，绝不存密码。 */
-export const useAuthStore = create<AuthStoreState>()((set) => ({
-  byConnection: {},
-  set: (connectionId, state) =>
-    set((current) => ({ byConnection: { ...current.byConnection, [connectionId]: state } })),
-  clear: (connectionId) =>
-    set((current) => {
-      if (connectionId === undefined) return { byConnection: {} };
-      const next = { ...current.byConnection };
-      delete next[connectionId];
-      return { byConnection: next };
-    }),
-}));
-
-export function getAuthState(connectionId: string): AuthState {
-  return useAuthStore.getState().byConnection[connectionId] ?? initialState;
-}
-
-export function setAuthState(connectionId: string, state: AuthState): void {
-  useAuthStore.getState().set(connectionId, state);
+export function setAuthState(connectionId: string, next: AuthState): void {
+  state.byConnection[connectionId] = next;
 }
 
 export function clearAuth(connectionId?: string): void {
-  useAuthStore.getState().clear(connectionId);
+  if (connectionId === undefined) {
+    for (const key of Object.keys(state.byConnection)) delete state.byConnection[key];
+    return;
+  }
+  delete state.byConnection[connectionId];
 }
 
-/** React 订阅版本。 */
-export function useAuthState(connectionId: string | null | undefined): AuthState {
-  return useAuthStore((state) =>
-    connectionId === null || connectionId === undefined
-      ? initialState
-      : (state.byConnection[connectionId] ?? initialState),
-  );
+export function useAuthState(connectionId: () => string | null | undefined) {
+  return computed(() => getAuthState(connectionId()));
 }

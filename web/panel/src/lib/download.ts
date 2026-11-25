@@ -1,6 +1,6 @@
-import { apiRaw } from '../api/client';
+import type { ApiClient } from '../api/client';
 
-/** 用 Blob 触发浏览器下载（cookie / Bearer 已由 apiRaw 携带）。 */
+/** 用 Blob 触发浏览器下载（cookie / Bearer 已由 API 客户端携带）。 */
 export function saveBlob(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob);
   try {
@@ -17,10 +17,15 @@ export function saveBlob(blob: Blob, filename: string): void {
   }
 }
 
-export async function downloadRaw(path: string, filename?: string): Promise<void> {
-  const response = await apiRaw(path);
+/** 从机器代理路径下载裸流（文件、备份）。 */
+export async function downloadFrom(
+  client: ApiClient,
+  path: string,
+  filename?: string,
+): Promise<void> {
+  const response = await client.raw(path);
   const blob = await response.blob();
-  saveBlob(blob, filename ?? path.split('/').pop() ?? 'download');
+  saveBlob(blob, filename ?? path.split('?')[0]?.split('/').pop() ?? 'download');
 }
 
 /** 前端生成文本文件（导出站点包等）。 */
