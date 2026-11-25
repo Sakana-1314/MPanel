@@ -158,6 +158,7 @@ wss://core/api/v1/machines/m_1/proxy/ws/terminal/term_abc?ticket=...
 
 - 浏览器无法设置 WS header；前端调用 `connectWs(featurePath)`（如 `/terminal/term_abc`），`api/ws.ts` 用 `wsPathFor()` 生成完整 ticket path 与 wss URL，同一业务 query 取票后追加 ticket。
 - `?token=` 供脚本使用，会进入访问日志；生产优先 ticket。
+- 上面的 worker 直连示例仅用于脚本/第三方客户端；`web/panel` 只通过 core 代理取 ticket 与建连。
 
 ### 2.3 列表、可用性与分页
 
@@ -219,21 +220,20 @@ interface ListResult<T> {
 - 大文件请求/响应流式转发，不整段缓冲。
 - core 代理 WS 校验用户 ticket/token 后，从 query 移除 `ticket`/`token`，只保留业务参数，再连 worker；worker 用机器凭据认证。
 
-### 2.6 前端 basePath
+### 2.6 前端连接模型（`web/panel`）
+
+`web/panel` **只连接 core**，不提供 agent 直连。浏览器不保存任何 agent token / machine secret；所有特性请求都经 core 的机器代理。
 
 ```ts
-const selectedMachineId = getSelectedMachineId(); // 按 active connection 保存
-const basePath =
-  connection.kind === 'worker'
-    ? `${connection.url}/api/v1`
-    : selectedMachineId
-      ? `${connection.url}/api/v1/machines/${selectedMachineId}/proxy`
-      : `${connection.url}/api/v1`;
+// 每个工作台标签页独立绑定一台机器，不存在全局“当前机器”切换。
+const machineId = route.params.machineId;
+const basePath = `${connection.url}/api/v1/machines/${machineId}/proxy`;
 ```
 
-- 页面只使用 `basePath + '/sites'` 等相对路径。
-- WS 不直接用 basePath：`getWsBasePath()` 返回 worker `<ws-url>/ws`、core 代理 `<ws-url>/api/v1/machines/<machineId>/proxy/ws`；`api/ws.ts` 在其后拼 `/terminal/...`、`/containers/.../logs`。页面不自行拼 WS URL。
-- core 未选机器时特性页只显示“选择机器”，不请求 `/proxy`；worker 连接没有机器选择步骤。
+- 页面只使用 `basePath + '/sites'` 等相对路径；auth、machines、edge、system/overview 固定走 core 根 `${connection.url}/api/v1`。
+- WS 不直接用 basePath：core 代理 `<ws-url>/api/v1/machines/<machineId>/proxy/ws`；`api/ws.ts` 在其后拼 `/terminal/...`、`/containers/.../logs`。页面不自行拼 WS URL。
+- 多机工作台：标签页保存 `machineId + 路由`，可以同时混合打开多台机器的不同页面；切换机器不会替换其它标签。
+- `/api/v1` 的 agent 直连能力仍保留给脚本与第三方客户端（§2.1、§2.2），但 `web/panel` 不使用。
 
 ### 2.7 请求限制与超时
 
@@ -1472,8 +1472,9 @@ interface TaskCreateInput {
 interface RuntimeConfig {
   appName?: string;
   dbxUrl?: string;
-  defaultBackend?: { url: string; kind: 'worker' | 'core'; label?: string };
-  backends?: { id?: string; url: string; kind: 'worker' | 'core'; label?: string }[];
+  /** kind 仅为兼容旧 config.json；面板忽略非 core 条目。 */
+  defaultBackend?: { url: string; kind?: 'core'; label?: string };
+  backends?: { id?: string; url: string; kind?: 'core'; label?: string }[];
   allowUserConnections?: boolean;   // 默认 true
 }
 ```
@@ -1490,30 +1491,26 @@ interface RuntimeConfig {
 | `VITE_BASE_PATH` | 构建期静态基路径，默认 `/` |
 
 - `config.json` 是公开静态文件，**不得**包含 token/密码/secret。
-- 多连接存 `localStorage`（`mpanel.connections.v1`）；切换连接清空 Query 缓存、关闭 WS；机器选择按连接保存，不跨连接复用。
+- 面板只保存 core 连接（`localStorage: mpanel.core-connections.v1`）；切换连接清空 Query 缓存、关闭 WS 并重置工作台。
+- 工作台标签存 `localStorage: mpanel.workspace.v1`：每个标签独立绑定 `machineId + 路由`，支持同时混合打开多台机器的页面。
 
 ### 14.2 连接与 secret 分离
 
 ```ts
 interface BackendConnection {          // 仅此对象进入 localStorage
   id: string;
-  label: string;
-  url: string;
-  kind: 'worker' | 'core';
-  createdAt: string;
-}
-
-interface ConnectionSecret {           // 独立存储，绝不混入 connections
-  connectionId: string;
-  token: string;                       // 仅 worker
-  storage: 'session' | 'local';        // 默认 session；local 必须用户显式 opt-in
+  name: string;
+  baseUrl: string;                     // core 服务根地址
+  username?: string;
+  createdAt?: string;
 }
 ```
 
-- `useConnectionStore` 只持久化连接；`useConnectionSecrets` 单独存 worker token：默认 `sessionStorage`（`mpanel.secrets.session.v1`），用户勾选记住才 `localStorage`（`mpanel.secrets.local.v1`）并显示 XSS 警告。
-- `getActiveConnection()` 在内存中合并连接与 secret；移除连接时删除 secret。
-- core 使用 cookie，不存密码；core 登录态按 connection id 记录。
-- core 未选机器时特性页只显示选择提示，不发 `/proxy` 请求。
+- `useConnectionStore` 只持久化 core 连接元数据；**不持久化任何 token / 密码 / agent secret**。
+- core 使用 HttpOnly cookie 会话，不存密码；登录态按 connection id 记录在内存。
+- 可选的 core Bearer token 只来自编译期环境变量，存在内存中，供无 cookie 的脚本式访问。
+- 面板没有“选中机器”全局状态：机器由路由 `:machineId` 绑定到具体标签页，多机页面可同时存在。
+- `config.json` / 环境变量里的旧 `kind: "worker"` 条目会被面板忽略。
 
 ### 14.3 dbx iframe
 

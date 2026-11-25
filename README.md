@@ -17,11 +17,11 @@
 
 MPanel 把「一台机器」和「一片机器」拆成三个独立的部分：
 
-- **`web/panel`**：React + Vite 静态 SPA，既能直连单台机器，也能连 core 管理多台机器；
+- **`web/panel`**：Vue 3 + Vite + Vue Router + Naive UI 静态 SPA；**只连接 core**，不直连 agent，多机页面以标签页混合打开；
 - **`core`**：Go 控制面，只做登录认证、机器注册、REST/WS 代理与聚合，不碰 Caddy、Docker 和宿主文件；
 - **`agent`**：Go 功能端，网站、证书、数据库、容器、文件、终端、计划任务都在这里实现，通过 stdio、http 或 reverse-ws 接入 core。
 
-一套 `/api/v1` 契约、两种拓扑（单机直连 agent / core 多机）、三种传输。功能缺失不会让进程崩溃：能力探测失败时列表返回 `available:false`，写操作返回 `UNAVAILABLE` 并给出可执行的 `hint`。
+一套 `/api/v1` 契约、core 多机拓扑、三种传输（stdio / http / reverse-ws）。面板始终经 core 代理访问机器；`/api/v1` 的 agent 直连能力保留给脚本与第三方客户端。功能缺失不会让进程崩溃：能力探测失败时列表返回 `available:false`，写操作返回 `UNAVAILABLE` 并给出可执行的 `hint`。
 
 ## 与 1Panel 的取舍
 
@@ -151,11 +151,10 @@ agent 会先 `POST /api/v1/edge/enroll` 换取一次性机器身份，写入本�
 ```text
 MPanel/
 ├─ cmd/                  # mpanel-core / mpanel-agent / mpanelctl 入口
-├─ core/                 # 控制面：认证、机器注册、代理、聚合、静态托管
-├─ agent/                # 功能端：模块注册、能力探测、命令执行、systemd/终端支持
 ├─ core/                 # 控制面 + 共享包（protocol/config/store/auth/httpapi/tunnel）
+├─ agent/                # 功能端：模块注册、能力探测、命令执行、systemd/终端支持
 ├─ web/
-│  ├─ panel/             # React + Vite 面板（独立 pnpm 包）
+│  ├─ panel/             # Vue 3 + Vite + Naive UI 面板（独立 pnpm 包；只连 core）
 │  └─ docs/              # VitePress 文档（独立 pnpm 包）
 ├─ .github/workflows/    # 校验、发布站点
 ├─ go.mod / go.sum

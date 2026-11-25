@@ -103,15 +103,14 @@ export function deleteEdgeJob(id: string): Promise<{ deleted: true }> {
 
 /**
  * 作业的 run-task / apply-site 下拉需要目标机器上的任务与站点。
- * 边缘页面是 core 连接，当前选中机器可能为空或不是目标节点，因此按 machineId
- * 新建一个 core 代理客户端，而不是复用 getClient()。
+ * 边缘页面是 core 级页面，当前工作台标签可能不是目标节点，因此按 machineId
+ * 新建一个 core 代理客户端。
  */
 function edgeMachineClient(machineId: string): ApiClient {
   const connection = getActiveConnection();
   return createClient({
     baseUrl: connection?.baseUrl ?? '',
     token: connection?.token,
-    kind: 'core',
     machineId,
   });
 }

@@ -157,20 +157,22 @@ func (c *Core) handleWSTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := strings.TrimSpace(body.Path)
-	if !strings.HasPrefix(path, "/ws") {
-		httpapi.Fail(w, protocol.BadRequest("path 必须以 /ws 开头"))
-		return
-	}
 	machineID := strings.TrimSpace(body.MachineID)
 	if machineID == "" {
 		httpapi.Fail(w, protocol.BadRequest("machineId 必填"))
+		return
+	}
+	ticketPath, ok := normalizeWSTicketPath(machineID, path)
+	if !ok {
+		httpapi.Fail(w, protocol.BadRequest(
+			"path 必须是 /ws/... 或以 /api/v1/machines/<machineId>/proxy/ws/ 开头"))
 		return
 	}
 	if _, err := c.machines.Get(machineID); err != nil {
 		httpapi.Fail(w, err)
 		return
 	}
-	ticket, expiresAt := c.auth.IssueTicket(machineID, path)
+	ticket, expiresAt := c.auth.IssueTicket(machineID, ticketPath)
 	httpapi.OK(w, map[string]any{"ticket": ticket, "expiresAt": expiresAt})
 }
 
@@ -185,4 +187,23 @@ func (c *Core) setSessionCookie(w http.ResponseWriter, r *http.Request, session 
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(auth.SessionTTL.Seconds()),
 	})
+}
+
+// normalizeWSTicketPath accepts both the worker-style /ws/... path and the
+// contract-compliant core proxy path. The ticket is always bound to the agent
+// path (/ws/...), matching handleProxyWS and auth.RedeemTicket.
+func normalizeWSTicketPath(machineID, path string) (string, bool) {
+	path = strings.TrimSpace(path)
+	if strings.HasPrefix(path, "/ws/") {
+		return path, true
+	}
+	prefix := "/api/v1/machines/" + machineID + "/proxy/ws"
+	if path != prefix && !strings.HasPrefix(path, prefix+"/") {
+		return "", false
+	}
+	suffix := strings.TrimPrefix(path, prefix)
+	if suffix == "" {
+		return "", false
+	}
+	return "/ws" + suffix, true
 }

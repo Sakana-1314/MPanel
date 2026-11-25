@@ -1,7 +1,5 @@
 import type { ApiClient } from './client';
-import { getClient } from './client';
 import { AppError } from './errors';
-import { onConnectionChange } from '../lib/connection-events';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
 
@@ -14,7 +12,7 @@ export interface WsHandlers {
 
 export interface WsSession {
   readonly status: WsStatus;
-  /** 供页面幂等关闭（连接切换时外壳也会统一关闭）。 */
+  /** 供页面幂等关闭（标签页关闭/组件卸载时统一关闭）。 */
   readonly url: string;
   sendText(data: string): void;
   close(code?: number, reason?: string): void;
@@ -25,24 +23,11 @@ export interface ConnectWsOptions {
 }
 
 const openSockets = new Set<WebSocket>();
-let guardInstalled = false;
-
-/**
- * 连接/机器切换时统一关闭所有已建立的 WS。
- * 订阅式安装，避免 connection-store ↔ api/ws 的循环依赖。
- */
-export function installWsConnectionGuard(): void {
-  if (guardInstalled) return;
-  guardInstalled = true;
-  onConnectionChange((reason) => {
-    if (reason === 'activate' || reason === 'remove' || reason === 'machine') closeAllWs();
-  });
-}
 
 export function closeAllWs(): void {
   for (const socket of [...openSockets]) {
     try {
-      socket.close(1000, 'connection changed');
+      socket.close(1000, 'workspace changed');
     } catch {
       // 已关闭的 socket 忽略。
     }
@@ -50,29 +35,22 @@ export function closeAllWs(): void {
   openSockets.clear();
 }
 
-/** worker: /ws<path>; core 代理: /api/v1/machines/<id>/proxy/ws<path>。 */
-export function wsPathFor(featurePath: string): string {
-  return getClient().wsPathFor(featurePath);
-}
-
-export async function connectWs(
-  featurePath: string,
-  handlers: WsHandlers,
-  opts: ConnectWsOptions = {},
-): Promise<WsSession> {
-  return connectClientWs(getClient(), featurePath, handlers, opts);
-}
-
 /**
- * 取一次性 ticket 后建连；ticket 只出现在 WS URL query 中，60 秒有效。
- * Promise 在 open 后 resolve，升级失败/超时会 reject（便于 UI 展示原因）。
+ * 经 core 代理建立 WebSocket：先 POST /auth/ws-ticket 取一次性 ticket，
+ * 再连 `/api/v1/machines/<id>/proxy/ws<featurePath>?ticket=...`。
+ * 前端不保存任何 agent 地址；WS 与 REST 一样只经过 core。
  */
-export async function connectClientWs(
+export async function connectWs(
   client: ApiClient,
   featurePath: string,
   handlers: WsHandlers,
   opts: ConnectWsOptions = {},
 ): Promise<WsSession> {
+  if (client.machineId === undefined || client.machineId.length === 0) {
+    throw new AppError('UNAVAILABLE', '尚未绑定机器', 0, {
+      hint: '终端与日志只能从具体机器的页面打开。',
+    });
+  }
   const ticket = await client.getWsTicket(featurePath);
   const url = client.wsUrl(featurePath, ticket.ticket);
   const socket = new WebSocket(url);
@@ -104,7 +82,7 @@ export async function connectClientWs(
       }
       reject(
         new AppError('TIMEOUT', 'WebSocket 连接超时', 0, {
-          hint: '请确认后端在线，且反向代理允许 Upgrade/Connection 头。',
+          hint: '请确认 core 与目标机器在线，且反向代理允许 Upgrade/Connection 头。',
         }),
       );
     }, timeoutMs);
@@ -135,7 +113,7 @@ export async function connectClientWs(
         clearTimeout(timer);
         reject(
           new AppError('NETWORK', 'WebSocket 连接失败', 0, {
-            hint: '请检查后端地址、机器在线状态与反向代理的 WebSocket 配置。',
+            hint: '请检查 core 地址、机器在线状态与反向代理的 WebSocket 配置。',
           }),
         );
       }
@@ -173,7 +151,7 @@ function closeError(code: number, reason: string): AppError {
     return new AppError('UNAVAILABLE', '连接被限流或超过帧上限', 0, { hint: '请稍后重试。', reason });
   }
   return new AppError('UPSTREAM_ERROR', `WebSocket 已关闭（${code}）`, 0, {
-    hint: '请检查后端日志或重试。',
+    hint: '请检查 core 与 agent 日志或重试。',
     reason,
   });
 }
