@@ -195,6 +195,18 @@ func dockerCommandFailed(action string, res agent.Result) *protocol.PanelError {
 	if output == "" {
 		output = strings.TrimSpace(res.Stdout)
 	}
+	if isDockerDaemonUnavailable(res) {
+		reason := firstNonEmptyLine(res.Stderr, res.Stdout)
+		if reason == "" {
+			reason = "docker " + action + " 无法连接守护进程"
+		}
+		return &protocol.PanelError{
+			Code:    protocol.CodeUnavailable,
+			Message: "Docker 不可用",
+			Details: map[string]any{"reason": reason},
+			Hint:    dockerInstallHint,
+		}
+	}
 	return &protocol.PanelError{
 		Code:    protocol.CodeUpstreamError,
 		Message: "docker " + action + " 失败",
@@ -203,6 +215,28 @@ func dockerCommandFailed(action string, res agent.Result) *protocol.PanelError {
 			"output":   truncateTextString(output, dockerOutputDetails),
 		},
 	}
+}
+
+// isDockerDaemonUnavailable recognises both "CLI present but daemon is down"
+// and socket permission failures. The capability probe normally catches these
+// first, but a daemon can stop between the probe (15s cache) and the command.
+func isDockerDaemonUnavailable(res agent.Result) bool {
+	text := strings.ToLower(res.Stderr + "\n" + res.Stdout)
+	needles := []string{
+		"cannot connect to the docker daemon",
+		"is the docker daemon running",
+		"error during connect",
+		"docker daemon is not running",
+		"failed to connect to the docker api",
+		"permission denied while trying to connect",
+		"got permission denied while trying to connect",
+	}
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func composeUnavailable(res agent.Result) *protocol.PanelError {
@@ -957,10 +991,11 @@ func detailFromInspect(c inspectContainer) ContainerDetail {
 }
 
 func (d *dockerClient) listContainers(ctx context.Context, all bool, status string) ([]ContainerSummary, *protocol.PanelError) {
-	args := []string{"ps", "--no-trunc", "--format", "json"}
+	args := []string{"ps"}
 	if all {
 		args = append(args, "-a")
 	}
+	args = append(args, "--no-trunc", "--format", "json")
 	if status != "" {
 		args = append(args, "--filter", "status="+status)
 	}

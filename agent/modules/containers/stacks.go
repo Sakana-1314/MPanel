@@ -710,6 +710,9 @@ func (m *Module) validateComposeYAML(ctx context.Context, name, dir, content str
 		if isComposeMissing(res) {
 			return composeUnavailable(res)
 		}
+		if isDockerDaemonUnavailable(res) {
+			return m.docker.unavailable(firstNonEmptyLine(res.Stderr, res.Stdout))
+		}
 		output := strings.TrimSpace(res.Stdout)
 		if output == "" {
 			output = strings.TrimSpace(res.Stderr)

@@ -183,6 +183,11 @@ func (m *Module) handleContainerLogsWS(conn protocol.WSConn, r *http.Request) {
 			closeWSConn(conn, protocol.WSCloseNotFound, "container not found")
 			return
 		}
+		if isDockerDaemonUnavailable(res) {
+			writer.errorEvent(protocol.CodeUnavailable, "Docker 不可用："+firstNonEmptyLine(res.Stderr, res.Stdout))
+			closeWSConn(conn, protocol.WSCloseUpstreamDown, "docker unavailable")
+			return
+		}
 		reason := firstNonEmptyLine(res.Stderr, res.Stdout)
 		if reason == "" {
 			reason = "docker logs 非零退出"

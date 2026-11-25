@@ -297,10 +297,19 @@ func TestSmoke(t *testing.T) {
 		t.Fatal("task run id empty")
 	}
 
-	var containers envelope[map[string]any]
+	var containers envelope[struct {
+		Available bool   `json:"available"`
+		Reason    string `json:"reason"`
+		Items     []any  `json:"items"`
+	}]
 	client.ok(http.MethodGet, proxy("/containers"), nil, &containers)
-	if containers.Data["available"] != false {
-		t.Fatalf("containers without docker should be unavailable: %#v", containers.Data["available"])
+	// CI runners ship Docker, developer machines usually do not: both must
+	// produce a valid list result rather than an error.
+	if containers.Data.Available && containers.Data.Items == nil {
+		t.Fatal("containers available but items missing")
+	}
+	if !containers.Data.Available && containers.Data.Reason == "" {
+		t.Fatal("containers unavailable without a reason")
 	}
 
 	var profile envelope[struct {

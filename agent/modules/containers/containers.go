@@ -521,6 +521,12 @@ func (m *Module) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, pErr)
 		return
 	}
+	// Existence is checked with inspect (docker's own JSON), never by matching
+	// the command's stderr: a container command may legitimately print anything.
+	if _, pErr := m.docker.inspectContainer(r.Context(), id); pErr != nil {
+		httpapi.Fail(w, pErr)
+		return
+	}
 
 	args := []string{"exec"}
 	if workdir := strings.TrimSpace(request.Workdir); workdir != "" {
@@ -558,10 +564,6 @@ func (m *Module) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 			DurationMs: duration.Milliseconds(),
 			Truncated:  true,
 		})
-		return
-	}
-	if res.Code != 0 && isNoSuchContainerOutput(res) {
-		httpapi.Fail(w, protocol.NotFound("容器", id))
 		return
 	}
 	stdout, stdoutTruncated := truncateText(res.Stdout, maxExecStreamBytes)
