@@ -23,6 +23,7 @@ import {
 } from '@vicons/ionicons5';
 import type { DatabaseProfile } from '@/api/types';
 import { describeError } from '@/api/errors';
+import { waitForJob } from '@/lib/job';
 import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
 import {
@@ -329,7 +330,17 @@ async function deploy(): Promise<void> {
     }
 
     addStep('up', '启动容器');
-    await runStep('up', () => api.value.stacks.action(app.stack, 'up', {}));
+    await runStep('up', async () => {
+      const started = await api.value.stacks.actionAsync(app.stack, 'up', {});
+      setStep('up', 'running', '后台任务已启动，等待执行');
+      const job = await waitForJob(api.value, started.job.id, (current) => {
+        const detail = current.step ?? '执行中';
+        setStep('up', 'running', `${detail}（${current.progress}%）`);
+      });
+      if (job.status !== 'succeeded') {
+        throw new Error(job.error?.message ?? '编排启动失败');
+      }
+    });
 
     addStep('ready', '等待容器就绪');
     if (app.capability !== undefined) {

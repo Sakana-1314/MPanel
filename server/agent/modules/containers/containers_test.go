@@ -103,12 +103,14 @@ func newTestEnv(t *testing.T, handler func(args []string) (agent.Result, error))
 	dataDir := t.TempDir()
 	runner := &fakeRunner{handler: handler}
 	cfg := &config.Agent{Agent: config.AgentSystem{DockerBin: "docker", DataDir: dataDir}}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ctx := &agent.Context{
 		Mux:    http.NewServeMux(),
 		WS:     agent.NewWSRegistry(),
 		Cfg:    cfg,
 		Runner: runner,
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Jobs:   agent.NewJobManager(filepath.Join(dataDir, "jobs"), logger),
+		Logger: logger,
 	}
 	module := New()
 	if err := module.Register(ctx); err != nil {
@@ -1120,5 +1122,79 @@ func TestUnavailableListShapeForImagesAndStacks(t *testing.T) {
 		if list.Available || !strings.Contains(list.Reason, "docker") {
 			t.Fatalf("%s 不可用原因错误: %#v", path, list)
 		}
+	}
+}
+
+func asyncCall(t *testing.T, env *testEnv, method, path, body string) (int, testEnvelope) {
+	t.Helper()
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Prefer", "respond-async")
+	recorder := httptest.NewRecorder()
+	env.handler.ServeHTTP(recorder, request)
+	var envelope testEnvelope
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("response is not envelope JSON: %v\n%s", err, recorder.Body.String())
+	}
+	return recorder.Code, envelope
+}
+
+func waitContainerJob(t *testing.T, env *testEnv, id string) protocol.Job {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		job, ok := env.module.ctx.Jobs.Get(id)
+		if !ok {
+			t.Fatalf("job %s missing", id)
+		}
+		if job.Status == protocol.JobStatusSucceeded || job.Status == protocol.JobStatusFailed || job.Status == protocol.JobStatusCancelled {
+			return job
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("job %s did not finish", id)
+	return protocol.Job{}
+}
+
+func TestAsyncImagePullAndStackUp(t *testing.T) {
+	env := newTestEnv(t, func(args []string) (agent.Result, error) {
+		if len(args) > 0 && args[0] == "pull" {
+			return agent.Result{Stdout: "pulled nginx:latest"}, nil
+		}
+		return agent.Result{}, nil
+	})
+
+	status, envelope := asyncCall(t, env, http.MethodPost, "/api/v1/images/pull", `{"reference":"nginx:latest"}`)
+	if status != http.StatusAccepted {
+		t.Fatalf("async image pull status = %d: %s", status, string(envelope.Data))
+	}
+	var started struct {
+		Job protocol.Job `json:"job"`
+	}
+	if err := json.Unmarshal(envelope.Data, &started); err != nil {
+		t.Fatal(err)
+	}
+	job := waitContainerJob(t, env, started.Job.ID)
+	if job.Status != protocol.JobStatusSucceeded {
+		t.Fatalf("image pull job = %+v", job)
+	}
+
+	stackDir := filepath.Join(env.dataDir, "stacks", "demo")
+	if err := os.MkdirAll(stackDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stackDir, "compose.yaml"), []byte("services:\n  app:\n    image: nginx:latest\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, envelope = asyncCall(t, env, http.MethodPost, "/api/v1/stacks/demo/up", `{}`)
+	if status != http.StatusAccepted {
+		t.Fatalf("async stack up status = %d: %s", status, string(envelope.Data))
+	}
+	if err := json.Unmarshal(envelope.Data, &started); err != nil {
+		t.Fatal(err)
+	}
+	job = waitContainerJob(t, env, started.Job.ID)
+	if job.Status != protocol.JobStatusSucceeded {
+		t.Fatalf("stack up job = %+v", job)
 	}
 }

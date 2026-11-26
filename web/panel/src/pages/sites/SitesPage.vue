@@ -35,6 +35,7 @@ import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
 import { describeError } from '@/api/errors';
+import { openJobProgress } from '@/lib/job-center';
 import { formatDay } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ContainerRunModal, { type ContainerRunPreset } from '@/pages/containers/ContainerRunModal.vue';
@@ -168,12 +169,7 @@ function invalidates(): readonly (readonly unknown[])[] {
   ];
 }
 
-const applyAction = useAction(() => api.value.sites.apply({}), {
-  success: (result) => `已应用 ${result.sites.length} 个站点（apply #${result.revision}）`,
-  successDescription: (result) =>
-    result.rolledBack ? '已回滚到应用前配置。' : result.warnings.length > 0 ? `有 ${result.warnings.length} 条警告。` : undefined,
-  invalidate: invalidates(),
-});
+const applying = ref(false);
 
 const deleteAction = useAction((site: Site) => api.value.sites.delete(site.id), {
   success: (_result, site) => `已删除站点 ${site.name}`,
@@ -181,23 +177,38 @@ const deleteAction = useAction((site: Site) => api.value.sites.delete(site.id), 
   invalidate: [machineKey(machineId, 'sites')],
 });
 
+async function startApply(): Promise<void> {
+  applyError.value = null;
+  applying.value = true;
+  try {
+    const started = await api.value.sites.applyAsync({});
+    openJobProgress({
+      machineId,
+      jobId: started.job.id,
+      title: started.job.title,
+      invalidate: invalidates(),
+      onCompleted: (job) => {
+        if (job.result !== undefined && job.result !== null) {
+          applyResult.value = job.result as SiteApplyResult;
+          applyResultOpen.value = true;
+        }
+      },
+    });
+  } catch (error) {
+    applyError.value = error;
+  } finally {
+    applying.value = false;
+  }
+}
+
 function confirmApply(): void {
   dialog.info({
     title: '应用全部站点',
     content:
-      '将渲染所有启用站点到 staging，执行 caddy validate 后备份并 reload。失败会自动回滚，线上保持不变。',
+      '任务会在后台渲染所有启用站点、执行 caddy validate、备份并 reload；失败自动回滚。进度会显示在任务弹窗中。',
     positiveText: '开始应用',
     negativeText: '取消',
-    onPositiveClick: async () => {
-      applyError.value = null;
-      const result = await applyAction.run();
-      if (result !== undefined) {
-        applyResult.value = result;
-        applyResultOpen.value = true;
-      } else {
-        applyError.value = applyAction.error.value;
-      }
-    },
+    onPositiveClick: startApply,
   });
 }
 
@@ -292,7 +303,7 @@ const applyOutput = computed(() => {
         <n-button
           size="small"
           secondary
-          :loading="applyAction.pending.value"
+          :loading="applying"
           title="渲染全部启用站点并 caddy validate + reload"
           @click="confirmApply"
         >

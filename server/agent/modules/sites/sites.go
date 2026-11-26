@@ -4,6 +4,7 @@
 package sites
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -463,16 +464,37 @@ func (m *Module) handleApply(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
 	}
-	result, err := m.apply(r.Context(), applyPlan{
+	plan := applyPlan{
 		siteIDs: input.SiteIDs,
 		partial: input.SiteIDs != nil,
 		force:   input.Force,
-	})
+	}
+	if httpapi.WantsAsync(r) {
+		m.submitApplyJob(w, plan, "应用站点配置")
+		return
+	}
+	result, err := m.apply(r.Context(), plan)
 	if err != nil {
 		httpapi.Fail(w, err)
 		return
 	}
 	httpapi.OK(w, result)
+}
+
+// submitApplyJob starts site apply in the background and returns 202 + job.
+func (m *Module) submitApplyJob(w http.ResponseWriter, plan applyPlan, title string) {
+	job, err := m.ctx.Jobs.Submit(agent.JobSpec{
+		Kind:  "sites.apply",
+		Title: title,
+		Run: func(ctx context.Context, reporter agent.JobReporter) (any, error) {
+			return m.applyWithProgress(ctx, plan, reporter.SetProgress)
+		},
+	})
+	if err != nil {
+		httpapi.Fail(w, internalFailure("无法创建应用任务", err))
+		return
+	}
+	httpapi.Accepted(w, protocol.JobStarted{Job: job})
 }
 
 // handleApplyByID is the additive POST /sites/{id}/apply alias.
@@ -486,7 +508,16 @@ func (m *Module) handleApplyByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	result, err := m.apply(r.Context(), applyPlan{siteIDs: []string{id}, partial: true, force: input.Force})
+	plan := applyPlan{siteIDs: []string{id}, partial: true, force: input.Force}
+	if httpapi.WantsAsync(r) {
+		title := "应用站点配置"
+		if site, ok := m.store.Get(id); ok {
+			title = "应用站点 " + site.Name
+		}
+		m.submitApplyJob(w, plan, title)
+		return
+	}
+	result, err := m.apply(r.Context(), plan)
 	if err != nil {
 		httpapi.Fail(w, err)
 		return

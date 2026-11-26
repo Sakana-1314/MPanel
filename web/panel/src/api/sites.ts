@@ -8,6 +8,7 @@ import type {
   SiteExportBundle,
   SiteImportResult,
   SitePreviewResult,
+  JobStarted,
 } from './types';
 import type { ApiTransport } from './transport';
 import { currentClient } from './current';
@@ -56,6 +57,8 @@ export interface SitesApi {
   delete(id: string): Promise<{ deleted: true; pendingApply: boolean }>;
   preview(req: SitePreviewRequest): Promise<SitePreviewResult>;
   apply(req: SiteApplyRequest): Promise<SiteApplyResult>;
+  /** 202 + job；前端轮询 /jobs/{id} 展示进度。 */
+  applyAsync(req: SiteApplyRequest): Promise<JobStarted>;
   exportBundle(): Promise<SiteExportBundle>;
   importBundle(req: SiteImportRequest): Promise<SiteImportResult>;
 }
@@ -78,6 +81,12 @@ export function createSitesApi(http: ApiTransport): SitesApi {
       http.request<{ deleted: true; pendingApply: boolean }>(base(id), { method: 'DELETE' }),
     preview: (req) => http.request<SitePreviewResult>('/sites/preview', { method: 'POST', body: req }),
     apply: (req) => http.request<SiteApplyResult>('/sites/apply', { method: 'POST', body: req }),
+    applyAsync: (req) =>
+      http.request<JobStarted>('/sites/apply', {
+        method: 'POST',
+        body: req,
+        headers: { prefer: 'respond-async' },
+      }),
     exportBundle: () => http.request<SiteExportBundle>('/sites/export'),
     importBundle: (req) =>
       http.request<SiteImportResult>('/sites/import', { method: 'POST', body: req }),

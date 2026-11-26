@@ -399,6 +399,38 @@ export interface SiteImportResult {
   errors: { index: number; name?: string; message: string }[];
 }
 
+/* ---------------------------------- Jobs --------------------------------- */
+
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+export interface JobError {
+  code: ErrorCode;
+  message: string;
+  hint?: string;
+  details?: unknown;
+}
+
+export interface Job {
+  id: string;
+  kind: string;
+  title: string;
+  status: JobStatus;
+  progress: number;
+  indeterminate: boolean;
+  step?: string;
+  logs?: string;
+  result?: unknown;
+  error?: JobError | null;
+  cancellable: boolean;
+  createdAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
+export interface JobStarted {
+  job: Job;
+}
+
 /* ------------------------------ Certificates ----------------------------- */
 
 export type CertificateStatus = 'valid' | 'expiring' | 'expired' | 'unknown';

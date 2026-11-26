@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sakana-1314/mpanel/server/agent"
 	"github.com/sakana-1314/mpanel/server/core/httpapi"
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
@@ -316,22 +317,59 @@ func (m *Module) handlePullImage(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, pErr)
 		return
 	}
-	res, err := m.docker.run(r.Context(), 620*time.Second, "pull", body.Reference)
-	if err != nil {
-		httpapi.Fail(w, m.docker.unavailable("无法执行 docker pull："+err.Error()))
+	if httpapi.WantsAsync(r) {
+		job, err := m.ctx.Jobs.Submit(agent.JobSpec{
+			Kind:        "images.pull",
+			Title:       "拉取镜像 " + body.Reference,
+			Cancellable: true,
+			Run: func(ctx context.Context, reporter agent.JobReporter) (any, error) {
+				result, pErr := m.pullImage(ctx, body.Reference, reporter)
+				if pErr != nil {
+					return nil, pErr
+				}
+				return result, nil
+			},
+		})
+		if err != nil {
+			httpapi.Fail(w, internalPathError("无法创建镜像任务", err))
+			return
+		}
+		httpapi.Accepted(w, protocol.JobStarted{Job: job})
 		return
+	}
+	image, pErr := m.pullImage(r.Context(), body.Reference, nil)
+	if pErr != nil {
+		httpapi.Fail(w, pErr)
+		return
+	}
+	httpapi.OK(w, image)
+}
+
+func (m *Module) pullImage(ctx context.Context, reference string, reporter agent.JobReporter) (ImagePullResult, *protocol.PanelError) {
+	if reporter != nil {
+		reporter.SetIndeterminate(true)
+		reporter.SetProgress(5, "拉取镜像 "+reference)
+	}
+	res, err := m.docker.run(ctx, 620*time.Second, "pull", reference)
+	if err != nil {
+		return ImagePullResult{}, m.docker.unavailable("无法执行 docker pull：" + err.Error())
 	}
 	if res.Code != 0 {
-		httpapi.Fail(w, dockerCommandFailed("pull", res))
-		return
+		return ImagePullResult{}, dockerCommandFailed("pull", res)
 	}
-	image, pErr := m.docker.inspectImage(r.Context(), body.Reference)
+	if reporter != nil {
+		if output := strings.TrimSpace(res.Stdout + "\n" + res.Stderr); output != "" {
+			reporter.Log(output)
+		}
+		reporter.SetProgress(90, "读取镜像信息")
+	}
+	image, pErr := m.docker.inspectImage(ctx, reference)
 	if pErr != nil {
 		// Pull succeeded but inspect failed: still return a usable summary rather
 		// than reporting a failed pull.
 		image = ImageSummary{
 			ID:          "",
-			RepoTags:    []string{body.Reference},
+			RepoTags:    []string{reference},
 			RepoDigests: []string{},
 			SizeBytes:   0,
 			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
@@ -339,7 +377,7 @@ func (m *Module) handlePullImage(w http.ResponseWriter, r *http.Request) {
 			Dangling:    false,
 		}
 	}
-	httpapi.OK(w, ImagePullResult{Image: image})
+	return ImagePullResult{Image: image}, nil
 }
 
 type imageRemoveResult struct {

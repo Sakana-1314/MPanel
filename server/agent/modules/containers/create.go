@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"sort"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sakana-1314/mpanel/server/agent"
 	"github.com/sakana-1314/mpanel/server/core/httpapi"
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
@@ -71,26 +73,64 @@ func (m *Module) handleCreateContainer(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, pErr)
 		return
 	}
-
-	result, err := m.docker.run(r.Context(), runTimeout, args...)
-	if err != nil {
-		httpapi.Fail(w, err)
+	if httpapi.WantsAsync(r) {
+		job, err := m.ctx.Jobs.Submit(agent.JobSpec{
+			Kind:  "containers.create",
+			Title: "运行容器 " + input.Image,
+			Run: func(ctx context.Context, reporter agent.JobReporter) (any, error) {
+				reporter.SetIndeterminate(true)
+				reporter.SetProgress(5, "docker run "+input.Image)
+				result, pErr := m.createContainer(ctx, args, created, reporter)
+				if pErr != nil {
+					return nil, pErr
+				}
+				return result, nil
+			},
+		})
+		if err != nil {
+			httpapi.Fail(w, internalPathError("无法创建容器任务", err))
+			return
+		}
+		httpapi.Accepted(w, protocol.JobStarted{Job: job})
 		return
 	}
-	if result.Code != 0 {
-		httpapi.Fail(w, dockerCommandFailed("run", result))
+	result, pErr := m.createContainer(r.Context(), args, created, nil)
+	if pErr != nil {
+		httpapi.Fail(w, pErr)
 		return
+	}
+	httpapi.Created(w, result)
+}
+
+func (m *Module) createContainer(ctx context.Context, args []string, created *ContainerCreated, reporter agent.JobReporter) (ContainerCreated, *protocol.PanelError) {
+	result, err := m.docker.run(ctx, runTimeout, args...)
+	if err != nil {
+		return ContainerCreated{}, &protocol.PanelError{
+			Code:    protocol.CodeUnavailable,
+			Message: "无法执行 docker run",
+			Details: map[string]any{"reason": err.Error()},
+			Hint:    dockerInstallHint,
+		}
+	}
+	if result.Code != 0 {
+		return ContainerCreated{}, dockerCommandFailed("run", result)
+	}
+	if output := strings.TrimSpace(result.Stdout + "\n" + result.Stderr); reporter != nil && output != "" {
+		reporter.Log(output)
 	}
 	if id := strings.TrimSpace(result.Stdout); id != "" {
 		created.ID = id
-		if detail, pErr := m.docker.inspectContainer(r.Context(), id); pErr == nil {
+		if reporter != nil {
+			reporter.SetProgress(90, "读取容器信息")
+		}
+		if detail, pErr := m.docker.inspectContainer(ctx, id); pErr == nil {
 			created.Info = &detail
 			if name := firstContainerName(&detail); name != "" {
 				created.Name = name
 			}
 		}
 	}
-	httpapi.Created(w, created)
+	return *created, nil
 }
 
 // buildRunArgs 校验输入并拼出 docker run 的 argv。所有参数都是独立元素，

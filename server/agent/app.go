@@ -28,6 +28,7 @@ type App struct {
 	ws      *WSRegistry
 	runner  Runner
 	caps    *Prober
+	jobs    *JobManager
 	started time.Time
 	tickets *ticketStore
 	token   string
@@ -46,6 +47,7 @@ func New(cfg *config.Agent, logger *slog.Logger, modules ...Module) (*App, error
 		return nil, err
 	}
 	host, _ := os.Hostname()
+	jobs := NewJobManager(cfg.Agent.DataDir, logger)
 	app := &App{
 		cfg:     cfg,
 		log:     logger,
@@ -53,6 +55,7 @@ func New(cfg *config.Agent, logger *slog.Logger, modules ...Module) (*App, error
 		ws:      NewWSRegistry(),
 		runner:  NewRunner(),
 		caps:    NewProber(cfg, NewRunner()),
+		jobs:    jobs,
 		started: time.Now(),
 		tickets: newTicketStore(),
 		token:   cfg.Agent.Token,
@@ -83,6 +86,7 @@ func New(cfg *config.Agent, logger *slog.Logger, modules ...Module) (*App, error
 		Cfg:     cfg,
 		Runner:  app.runner,
 		Caps:    app.caps,
+		Jobs:    app.jobs,
 		Logger:  logger,
 		Started: app.started,
 		Version: cfg.Agent.Version,
@@ -306,7 +310,7 @@ func setCORS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token,X-Requested-With")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,Prefer,X-MPanel-Async,X-MPanel-Token,X-Requested-With,X-Request-Id")
 	w.Header().Set("Access-Control-Max-Age", "600")
 	w.Header().Add("Vary", "Origin")
 }
