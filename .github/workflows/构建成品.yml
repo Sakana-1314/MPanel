@@ -69,6 +69,8 @@ jobs:
                 -o "$staging/$cmd" "./server/cmd/$cmd"
             done
             cp -R web/panel/dist "$staging/web"
+            # 面板同源商店回退：/store 在离线的测试机上也可用。
+            cp -R web/store "$staging/web/store"
             cp LICENSE "$staging/LICENSE"
             tar -C dist -czf "dist/mpanel-linux-${arch}.tar.gz" "mpanel-linux-${arch}"
             rm -rf "$staging"
@@ -86,6 +88,7 @@ jobs:
           ./dist/mpanel-linux-amd64/mpanel-agent version
           ./dist/mpanel-linux-amd64/mpanelctl version || true
           test -f dist/mpanel-linux-amd64/web/index.html
+          test -f dist/mpanel-linux-amd64/web/store/index.json
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
