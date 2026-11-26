@@ -44,6 +44,21 @@ sudo chmod 0600 /opt/mpanel/conf/*.yaml
 - Caddy 若以独立用户运行，需要对 `caddy_config` 目录可读、对 `caddy_data` 目录可写（证书）。可以让 Caddy 与 agent 同组，或把 Caddy 的 `ExecStart` 指向 agent 的 Caddyfile 并由同一用户运行。
 - agent 需要写站点根、文件根、Caddy 配置目录与备份目录；这些目录不在 `/opt/mpanel` 时，必须加进 systemd 的 `ReadWritePaths=`。
 - 管理 Docker 时把运行用户加入 `docker` 组（`SupplementaryGroups=docker`），但这等价于给该用户宿主 root 能力；更稳妥的是 rootless Docker。
+- 容器配置页要写 `docker_config`（默认 `/etc/docker/daemon.json`）。`ProtectSystem=strict` 下需要 drop-in 放行目录，并给 agent 用户最小 ACL：
+
+  ```ini
+  # /etc/systemd/system/mpanel-agent.service.d/docker-config.conf
+  [Service]
+  ReadWritePaths=/etc/docker
+  ```
+
+  ```bash
+  sudo setfacl -m u:mpanel:rwx /etc/docker
+  sudo setfacl -m u:mpanel:rw /etc/docker/daemon.json
+  sudo systemctl daemon-reload && sudo systemctl restart mpanel-agent
+  ```
+
+  写入采用同目录 tmp + rename，目录必须可写。保存后需重启 Docker 才会生效；面板不会自动重启守护进程。
 
 ## 3. systemd 部署
 
@@ -152,6 +167,50 @@ server {
 ```
 
 如果面板静态文件由 nginx 托管，把 `location /` 换成 `root` + `try_files $uri $uri/ /index.html;`，并为 `/api/`、`/ws/` 单独配置同样的 `proxy_pass` 与 Upgrade 头。`/ws/worker` 必须能到达 core，reverse-ws agent 才能注册。
+
+### 4.4 无 80/443 时用高位端口转发
+
+部分云厂商只放行高位端口。此时不必把 core 改成监听 `0.0.0.0`，可以用 `systemd-socket-proxyd` 在高位端口转发，core 继续只监听 loopback：
+
+```ini
+# /etc/systemd/system/mpanel-web.socket
+[Unit]
+Description=MPanel 面板公网端口
+
+[Socket]
+ListenStream=0.0.0.0:24579
+Accept=no
+Backlog=512
+
+[Install]
+WantedBy=sockets.target
+```
+
+```ini
+# /etc/systemd/system/mpanel-web.service
+[Unit]
+Description=MPanel 面板端口转发到 core
+After=mpanel-core.service
+Requires=mpanel-core.service
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 127.0.0.1:10086
+PrivateTmp=yes
+TimeoutStopSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now mpanel-web.socket mpanel-web.service
+curl -fsS http://127.0.0.1:24579/healthz
+```
+
+- 这个转发同时承载静态面板、`/api/v1` 与 `/ws`，浏览器直接访问 `http://<服务器>:24579` 即可，无需额外反代。
+- 公网 http 会明文传输凭据；能配置 TLS 时仍应优先用 4.2/4.3 的方案。
+- 云安全组需要放行对应高位端口；core 的 `10086` 与 agent 的 `10087` 仍保持 loopback/内网。
 
 ## 5. 升级
 
