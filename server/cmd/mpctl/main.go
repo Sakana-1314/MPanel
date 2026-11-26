@@ -36,13 +36,13 @@ func main() {
 			fmt.Println("当前环境没有 systemd（Windows/容器内），请直接前台运行：mpanel-core / mpanel-agent。")
 			os.Exit(1)
 		}
-		runServiceCommand(command, target)
+		runServiceCommand(command, target, baseDir)
 	case "version":
 		fmt.Println("mpctl " + config.Version)
 	case "listen-ip":
-		cfg, err := config.LoadApp(baseDir)
+		cfg, err := loadExistingCoreConfig(baseDir)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "读取配置失败:", err)
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		bind := cfg.System.BindAddress
@@ -51,9 +51,9 @@ func main() {
 		}
 		fmt.Printf("core 监听：%s:%d\nconf：%s\n", bind, cfg.System.Port, config.CorePath(baseDir))
 	case "user-info":
-		cfg, err := config.LoadApp(baseDir)
+		cfg, err := loadExistingCoreConfig(baseDir)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "读取配置失败:", err)
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		username := cfg.System.Username
@@ -101,7 +101,7 @@ func printHelp() {
 `, name, name, name, name, name, name, name, name, name, name)
 }
 
-func runServiceCommand(command, target string) {
+func runServiceCommand(command, target, baseDir string) {
 	names := []string{}
 	switch target {
 	case "all":
@@ -123,6 +123,20 @@ func runServiceCommand(command, target string) {
 			fmt.Printf("面板地址：http://<本机 IP>:%s\n", strconv.Itoa(cfg.System.Port))
 		}
 	}
+}
+
+// loadExistingCoreConfig never creates a default config as a side effect of a
+// read-only command (especially on agent-only machines).
+func loadExistingCoreConfig(baseDir string) (*config.App, error) {
+	path := config.CorePath(baseDir)
+	if _, err := os.Stat(path); err != nil {
+		return nil, fmt.Errorf("面板尚未初始化：%s", path)
+	}
+	cfg, err := config.LoadApp(baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("读取配置失败: %w", err)
+	}
+	return cfg, nil
 }
 
 // resetPassword delegates to `mpanel-core reset-password` so the CLI matches
