@@ -3,7 +3,6 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NAlert, NButton, NIcon, NPopover } from 'naive-ui';
 import {
-  ChevronDownOutline,
   LockClosedOutline,
   MoonOutline,
   PersonOutline,
@@ -235,8 +234,6 @@ const canSubmit = computed(
             一处登录，<br />
             <span class="accent">管理所有服务器。</span>
           </h1>
-          <p class="lede">把重复的运维收进同一个工作台，把注意力留给真正重要的事。</p>
-
           <ul class="features">
             <li>
               <span class="feature-icon"><n-icon :component="ServerOutline" /></span>
@@ -291,7 +288,6 @@ const canSubmit = computed(
               @blur="syncUsernameFromServer"
               @keydown.enter="submit"
             >
-              <template #prefix><n-icon :component="ServerOutline" /></template>
               <template #suffix>
                 <n-popover
                   v-model:show="historyOpen"
@@ -308,7 +304,7 @@ const canSubmit = computed(
                       :class="{ open: historyOpen }"
                       title="最近登录"
                     >
-                      <n-icon :component="ChevronDownOutline" />
+                      最近
                     </button>
                   </template>
                   <div class="history-panel">
@@ -348,9 +344,7 @@ const canSubmit = computed(
               label="用户名"
               autocomplete="username"
               @keydown.enter="submit"
-            >
-              <template #prefix><n-icon :component="PersonOutline" /></template>
-            </floating-field>
+            />
 
             <floating-field
               v-model="password"
@@ -359,9 +353,7 @@ const canSubmit = computed(
               show-password-on="click"
               autocomplete="current-password"
               @keydown.enter="submit"
-            >
-              <template #prefix><n-icon :component="LockClosedOutline" /></template>
-            </floating-field>
+            />
           </div>
 
           <n-button
@@ -485,20 +477,13 @@ const canSubmit = computed(
   background-clip: text;
   color: transparent;
 }
-.lede {
-  margin: 14px 0 0;
-  max-width: 440px;
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: rgb(230 237 243 / 62%);
-}
 .features {
   list-style: none;
-  margin: 28px 0 0;
+  margin: 32px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
 }
 .features li {
   display: flex;
@@ -618,17 +603,19 @@ html.dark .login-card {
 .history-trigger {
   display: grid;
   place-items: center;
-  width: 24px;
   height: 24px;
+  padding: 0 7px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--mpanel-muted);
+  font-size: 11.5px;
   cursor: pointer;
-  transition: transform 0.16s ease, color 0.16s ease;
+  transition: background-color 0.16s ease, color 0.16s ease;
 }
 .history-trigger:hover {
   color: var(--mpanel-text);
+  background: var(--mpanel-surface-soft);
 }
 .history-trigger.open {
   transform: rotate(180deg);
