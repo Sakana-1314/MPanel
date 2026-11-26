@@ -15,8 +15,8 @@ MPanel 的数据库能力分两层：
 
 | 应用 | 镜像 | 默认端口 | 数据目录 | 认证 |
 |---|---|---|---|---|
-| PostgreSQL | `postgres:16-alpine` | `127.0.0.1:5432` | `${data_dir}/postgres` | 自动生成用户名/密码/库名 |
-| Redis | `redis:7-alpine` | `127.0.0.1:6379` | `${data_dir}/redis` | 自动生成密码 + AOF |
+| PostgreSQL | `postgres:16-alpine` | `127.0.0.1:5432` | `/opt/mpanel/data/apps/postgres` | 自动生成用户名/密码/库名 |
+| Redis | `redis:7-alpine` | `127.0.0.1:6379` | `/opt/mpanel/data/apps/redis` | 自动生成密码 + AOF |
 
 流程：
 

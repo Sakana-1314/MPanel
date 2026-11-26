@@ -397,7 +397,7 @@ func (m *Module) validateConfigFile(ctx context.Context, containerID, configPath
 }
 
 func (m *Module) backupCaddy(liveDir, rootPath string, at time.Time) (string, error) {
-	base := filepath.Join(m.ctx.DataDir(), "backups", "caddy")
+	base := filepath.Join(m.ctx.Cfg.BackupRoot(), "caddy")
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", err
 	}

@@ -33,7 +33,8 @@ sudo useradd --system --home /opt/mpanel --shell /usr/sbin/nologin mpanel
 sudo install -d -o mpanel -g mpanel -m 0700 /opt/mpanel
 sudo install -d -o mpanel -g mpanel -m 0700 \
   /opt/mpanel/conf /opt/mpanel/data /opt/mpanel/log \
-  /opt/mpanel/db /opt/mpanel/backup /opt/mpanel/tmp
+  /opt/mpanel/db /opt/mpanel/backup /opt/mpanel/tmp \
+  /opt/mpanel/runtime /opt/mpanel/web
 sudo chown -R mpanel:mpanel /opt/mpanel
 sudo chmod 0600 /opt/mpanel/conf/*.yaml
 ```
@@ -247,7 +248,7 @@ sudo systemctl start mpanel-agent
 ```bash
 STAMP=$(date +%F-%H%M)
 sudo mkdir -p /opt/mpanel/backup/bin-${STAMP}
-sudo cp /usr/local/bin/mpanel-core /usr/local/bin/mpanel-agent /usr/local/bin/mpanelctl \
+sudo cp /usr/local/bin/mpanel-core /usr/local/bin/mpanel-agent /usr/local/bin/mpctl \
   /opt/mpanel/backup/bin-${STAMP}/
 ```
 
@@ -269,8 +270,9 @@ sudo systemctl start mpanel-core mpanel-agent
 | 对象 | 是否必须 | 说明 |
 |---|---|---|
 | `/opt/mpanel/conf/` | 必须 | `app.yaml`、`agent.yaml`、bootstrap token（若仍存在）；含密钥与密码密文 |
-| `/opt/mpanel/data/` | 必须 | 站点草稿、数据库档案、任务、Caddy 配置与证书、文件/站点根 |
+| `/opt/mpanel/data/` | 必须 | agent 状态、一键应用数据、编排、文件/站点根与 Caddy 证书 |
 | `/opt/mpanel/db/` | 必须 | 控制面状态文档；丢失后机器列表、用户、会话等无法恢复 |
+| `/opt/mpanel/web/` | 可重建 | 面板前端产物；可由 CI 成品或源码重新构建 |
 | `/opt/mpanel/backup/` | 建议 | Caddy apply 回滚副本、数据库备份 |
 | `/opt/mpanel/log/` | 按需 | 合规或排障时需要 |
 

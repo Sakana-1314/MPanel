@@ -38,7 +38,7 @@ go build ./server/cmd/...
 |---|---|
 | `mpanel-core` | 控制面：登录、机器注册、健康检查、隧道与代理、静态托管 |
 | `mpanel-agent` | 功能面：站点、证书、数据库、容器、镜像、编排、文件、终端、计划任务 |
-| `mpanelctl` | 控制命令：服务状态/启停辅助、账号与配置检查（子命令随 `server/cmd/mpanelctl` 落地补齐） |
+| `mpctl` | 控制命令：`status/start/stop/restart`、`user-info`、`reset`、`listen-ip`、`uninstall`（对应 1Panel 的 `1pctl`） |
 
 发布构建建议把版本写入二进制（`server/core/config.Version` 支持 `-ldflags` 覆盖）：
 
@@ -67,7 +67,7 @@ main 每次更新后，`构建成品` 工作流会删除旧的 `dev` Release 并
 
 | 资产 | 内容 |
 |---|---|
-| `mpanel-linux-amd64.tar.gz` | `mpanel-core`、`mpanel-agent`、`mpanelctl`、`web/` 面板产物与同源 `store/`、`LICENSE` |
+| `mpanel-linux-amd64.tar.gz` | `mpanel-core`、`mpanel-agent`、`mpctl`、`web/` 面板产物与同源 `store/`、`LICENSE` |
 | `mpanel-linux-arm64.tar.gz` | 同上，ARM64 |
 | `SHA256SUMS` | 两个压缩包的 SHA-256 |
 
@@ -87,7 +87,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 tar -xzf "mpanel-linux-${arch}.tar.gz"
 
 sudo install -m 0755 "mpanel-linux-${arch}"/mpanel-core \
-  "mpanel-linux-${arch}"/mpanel-agent "mpanel-linux-${arch}"/mpanelctl /usr/local/bin/
+  "mpanel-linux-${arch}"/mpanel-agent "mpanel-linux-${arch}"/mpctl /usr/local/bin/
 sudo rm -rf /opt/mpanel/web
 sudo install -d -o mpanel -g mpanel -m 0755 /opt/mpanel/web
 sudo cp -R "mpanel-linux-${arch}/web/." /opt/mpanel/web/
@@ -112,13 +112,14 @@ sudo useradd --system --home /opt/mpanel --shell /usr/sbin/nologin mpanel
 sudo install -d -o mpanel -g mpanel -m 0700 /opt/mpanel
 sudo install -d -o mpanel -g mpanel -m 0700 \
   /opt/mpanel/conf /opt/mpanel/data /opt/mpanel/log \
-  /opt/mpanel/db /opt/mpanel/backup /opt/mpanel/tmp
+  /opt/mpanel/db /opt/mpanel/backup /opt/mpanel/tmp \
+  /opt/mpanel/runtime /opt/mpanel/web
 
 # 二进制
-sudo install -m 0755 mpanel-core mpanel-agent mpanelctl /usr/local/bin/
+sudo install -m 0755 mpanel-core mpanel-agent mpctl /usr/local/bin/
 
-# 1Panel 风格的短命令：/usr/bin/mpanel -> mpanelctl
-sudo ln -sf /usr/local/bin/mpanelctl /usr/bin/mpanel
+# 1Panel 风格：/usr/bin/mpctl -> /usr/local/bin/mpctl
+sudo ln -sf /usr/local/bin/mpctl /usr/bin/mpctl
 ```
 
 目录职责（完整说明见[配置文件与环境变量](/guide/config)）：
@@ -129,11 +130,18 @@ sudo ln -sf /usr/local/bin/mpanelctl /usr/bin/mpanel
 │  ├─ app.yaml            # core 配置
 │  ├─ agent.yaml          # agent 配置
 │  └─ bootstrap-token     # 首次初始化用，完成后删除
-├─ data/                  # core 数据；agent 默认在 data/agent
+├─ data/
+│  ├─ agent/              # agent 内部状态
+│  ├─ apps/               # 一键应用（caddy、postgres、redis）
+│  ├─ compose/            # Docker Compose 编排
+│  ├─ files/              # 文件管理根
+│  └─ sites/              # 站点根
+├─ db/                    # 控制面状态文档
 ├─ log/                   # 运行日志
-├─ db/                    # 状态文档
-├─ backup/                # 备份
-└─ tmp/                   # 临时文件
+├─ backup/                # 站点/数据库备份
+├─ runtime/               # 运行时文件
+├─ tmp/                   # 临时文件
+└─ web/                   # 面板前端产物
 ```
 
 首次启动时 `server/core/config` 会在配置缺失时按默认值创建 `conf/app.yaml` 与 `conf/agent.yaml`，权限 `0600`；`conf/` 目录权限为 `0700`。
@@ -306,7 +314,7 @@ journalctl -u mpanel-agent -f
 
 ```bash
 sudo systemctl stop mpanel-agent mpanel-core
-sudo install -m 0755 mpanel-core mpanel-agent mpanelctl /usr/local/bin/
+sudo install -m 0755 mpanel-core mpanel-agent mpctl /usr/local/bin/
 sudo systemctl daemon-reload
 sudo systemctl start mpanel-core
 sudo systemctl start mpanel-agent
@@ -320,6 +328,6 @@ sudo systemctl start mpanel-agent
 sudo systemctl disable --now mpanel-agent mpanel-core
 sudo rm -f /etc/systemd/system/mpanel-core.service /etc/systemd/system/mpanel-agent.service
 sudo systemctl daemon-reload
-sudo rm -f /usr/local/bin/mpanel-core /usr/local/bin/mpanel-agent /usr/local/bin/mpanelctl /usr/bin/mpanel
+sudo rm -f /usr/local/bin/mpanel-core /usr/local/bin/mpanel-agent /usr/local/bin/mpctl /usr/bin/mpctl /usr/bin/mpanel
 # /opt/mpanel 含配置与数据，确认不再需要后再删除
 ```

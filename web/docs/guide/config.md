@@ -16,30 +16,36 @@ Linux 上默认安装根为 `/opt/mpanel`；非 Linux 开发机回退到 `~/.mpa
 │  ├─ app.yaml            # core 配置（0600）
 │  ├─ agent.yaml          # agent 配置（0600）
 │  └─ bootstrap-token     # 首次初始化用，完成后删除
-├─ data/                  # core 数据根（system.data_dir）
-│  ├─ agent/              # agent 数据（agent.data_dir）
-│  │  ├─ caddy/           # 宿主 Caddy 配置，容器挂载到 /etc/caddy（可通过 caddy_config 改）
+├─ data/
+│  ├─ agent/              # agent 状态（sites.json、databases.json、jobs、tasks、trash）
+│  ├─ apps/               # 一键安装应用数据（对应 1Panel 的 data/apps）
+│  │  ├─ caddy/           # 宿主 Caddy 配置，容器挂载到 /etc/caddy
 │  │  │  ├─ Caddyfile
 │  │  │  ├─ sites.d/*.caddy
-│  │  │  └─ data/         # Caddy 证书与数据，容器挂载到 /data（可通过 caddy_data 改）
-│  │  ├─ sites/           # 默认站点根
-│  │  ├─ stacks/          # Docker Compose 编排（mpanel-caddy、mpanel-postgres…）
-│  │  ├─ backups/         # 数据库与站点回滚备份
-│  │  ├─ trash/           # 文件回收站
-│  │  └─ tasks/           # 计划任务输出
-│  └─ files/              # 默认文件管理根（files_roots 的默认项）
+│  │  │  └─ data/         # Caddy 证书与数据，容器挂载到 /data
+│  │  ├─ postgres/
+│  │  └─ redis/
+│  ├─ compose/            # Docker Compose 编排（mpanel-caddy、mpanel-postgres…）
+│  ├─ files/              # 默认文件管理根（files_roots 的默认项）
+│  └─ sites/              # 默认站点根
+├─ db/                    # 控制面状态文档（system.db_path）
 ├─ log/                   # 运行日志（system.log_path / agent.log_path）
-├─ db/                    # 状态文档（system.db_path）
-├─ backup/                # 备份根（system.backup）
-└─ tmp/                   # 临时文件（system.tmp_dir）
+├─ backup/                # 备份根（site/数据库/回滚副本）
+│  ├─ caddy/
+│  └─ databases/
+├─ runtime/               # 运行时文件（socket、pid、临时状态）
+├─ tmp/                   # 临时文件（system.tmp_dir）
+└─ web/                   # 面板前端产物（system.web_dir）
 ```
 
 说明：
 
-- `data/`、`log/`、`db/`、`backup/`、`tmp/` 在 `app.yaml` 中有独立字段，可以分别指向不同磁盘。
+- `data/`、`log/`、`db/`、`backup/`、`tmp/`、`web/` 在 `app.yaml` 中有独立字段，可以分别指向不同磁盘。
+- 默认布局对齐 1Panel：面板状态在 `db/`，应用数据在 `data/apps/`，编排在 `data/compose/`，站点根在 `data/sites/`，备份在 `backup/`。
 - `db/` 是 1Panel 同名目录。1Panel 在这里放 SQLite 的 `core.db`；MPanel 的控制面使用原子 JSON 文档（`server/core/store`），按 1Panel 习惯放在同一棵树里，备份时直接打包整个 `db/`。
-- agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${agent.data_dir}/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。两者分别挂载到容器 `/etc/caddy` 与 `/data`；`caddy_bin` 已弃用，Caddy 只以容器运行。
-- 目录创建权限：core 的 `conf/`、`data/`、`log/`、`db/`、`backup/`、`tmp/` 为 `0700`；agent 的目录为 `0755`（站点/文件根需要被 Web 服务器读取），配置文件统一 `0600`。
+- agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${base_dir}/data/apps/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。两者分别挂载到容器 `/etc/caddy` 与 `/data`；`caddy_bin` 已弃用，Caddy 只以容器运行。升级前的 `${agent.data_dir}/caddy` 仍会被识别。
+- 升级兼容：旧 `${agent.data_dir}/caddy`、`${agent.data_dir}/sites`、`${agent.data_dir}/stacks` 在新目录不存在时继续沿用，已有部署不会因目录调整失效。
+- 目录创建权限：core 的 `conf/`、`data/`、`log/`、`db/`、`backup/`、`tmp/`、`runtime/` 为 `0700`；agent 的目录为 `0755`（站点/文件根需要被 Web 服务器读取），配置文件统一 `0600`。
 
 ## 2. `conf/app.yaml`（core）
 
@@ -162,7 +168,7 @@ log:
 | `log_path` | string | `${base_dir}/log` | 日志目录 |
 | `version` | string | 构建版本 | 版本号 |
 | `caddy_bin` | string | `caddy` | **已弃用**：Caddy 只以容器运行，该字段保留仅为兼容旧配置，agent 不读取 |
-| `caddy_config` | string | `${data_dir}/caddy` | 宿主受管 Caddy 配置目录（`Caddyfile`、`sites.d/`），挂载到容器 `/etc/caddy` |
+| `caddy_config` | string | `${base_dir}/data/apps/caddy` | 宿主受管 Caddy 配置目录（`Caddyfile`、`sites.d/`），挂载到容器 `/etc/caddy`；旧 `${data_dir}/caddy` 仍兼容 |
 | `caddy_data` | string | `${caddy_config}/data` | 宿主 Caddy 数据目录（证书扫描来源），挂载到容器 `/data` |
 | `caddy_admin` | string | 空 | 写入主 Caddyfile 的 **容器内** admin 地址；留空用 `127.0.0.1:2019`，通配地址会收敛到回环 |
 | `docker_bin` | string | `docker` | Docker CLI 路径 |

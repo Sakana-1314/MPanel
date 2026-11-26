@@ -5,7 +5,7 @@ notes/
 # Go 构建产物与测试输出
 /mpanel-core
 /mpanel-agent
-/mpanelctl
+/mpctl
 *.exe
 *.test
 *.out

@@ -41,9 +41,9 @@ MPanel 刻意保持 1Panel 用户熟悉的路径与进程模型：
 | 安装根 | `/opt/1panel` | `/opt/mpanel` |
 | 配置 | `conf/app.yaml` | `conf/app.yaml`（core）、`conf/agent.yaml`（agent） |
 | 数据 / 日志 / 数据库 / 备份 | `data/`、`log/`、`db/`、`backup/` | `data/`、`log/`、`db/`、`backup/`，另有 `tmp/` |
-| 二进制 | `/usr/local/bin/1panel-core`、`1panel-agent` | `/usr/local/bin/mpanel-core`、`mpanel-agent`、`mpanelctl` |
+| 二进制 | `/usr/local/bin/1panel-core`、`1panel-agent` | `/usr/local/bin/mpanel-core`、`mpanel-agent`、`mpctl` |
 | systemd 服务 | `1panel-core.service`、`1panel-agent.service` | `mpanel-core.service`、`mpanel-agent.service` |
-| 控制命令 | `1pctl` | `mpanelctl`（`/usr/bin/mpanel` 软链） |
+| 控制命令 | `1pctl` | `mpctl`（`/usr/bin/mpctl` 软链） |
 
 这意味着备份、迁移、权限与 SELinux 的处理方式基本可以照搬 1Panel 的经验，运维不需要学习一套新目录。
 
@@ -66,7 +66,7 @@ Go 重写仍在进行中。本站严格区分「已实现」与「规划中」�
 | 配置模型（`app.yaml` / `agent.yaml`、`MPANEL_*` 覆盖、目录创建、原子写） | 已实现 | `server/core/config` |
 | 信封、错误码、分页、隧道帧模型 | 已实现 | `server/core/protocol` |
 | 原子 JSON 存储 | 已实现 | `server/core/store` |
-| `mpanel-core` / `mpanel-agent` / `mpanelctl` 入口 | 已实现 | `server/cmd/` |
+| `mpanel-core` / `mpanel-agent` / `mpctl` 入口 | 已实现 | `server/cmd/` |
 | 认证、隧道、机器代理、站点/数据库/容器/文件/终端/任务模块 | 已实现 | 按契约实现，能力缺失时降级 |
 | web/panel 前端 | 已有源码 | Vue 3 + Vite + Vue Router + Naive UI；只连 core，多机标签工作台 |
 

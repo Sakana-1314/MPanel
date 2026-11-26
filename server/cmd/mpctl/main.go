@@ -1,4 +1,4 @@
-// mpanelctl manages the MPanel systemd services, mirroring 1Panel's 1pctl.
+// mpctl manages the MPanel systemd services, mirroring 1Panel's 1pctl.
 package main
 
 import (
@@ -38,7 +38,7 @@ func main() {
 		}
 		runServiceCommand(command, target)
 	case "version":
-		fmt.Println("mpanelctl " + config.Version)
+		fmt.Println("mpctl " + config.Version)
 	case "listen-ip":
 		cfg, err := config.LoadApp(baseDir)
 		if err != nil {
@@ -65,11 +65,13 @@ func main() {
 			state = "已设置"
 		}
 		fmt.Printf("用户名：%s\n密码：%s\n配置文件：%s\n", username, state, config.CorePath(baseDir))
+	case "reset":
+		resetPassword(baseDir)
 	case "uninstall":
 		fmt.Println("卸载步骤：")
 		fmt.Println("  1. systemctl disable --now mpanel-core.service mpanel-agent.service")
 		fmt.Println("  2. rm -f /etc/systemd/system/mpanel-core.service /etc/systemd/system/mpanel-agent.service")
-		fmt.Println("  3. rm -f /usr/local/bin/mpanel-core /usr/local/bin/mpanel-agent /usr/local/bin/mpanelctl /usr/bin/mpanel")
+		fmt.Println("  3. rm -f /usr/local/bin/mpanel-core /usr/local/bin/mpanel-agent /usr/local/bin/mpctl /usr/bin/mpctl /usr/bin/mpanel")
 		fmt.Printf("  4. 如需彻底删除数据：rm -rf %s\n", baseDir)
 	case "help", "-h", "--help":
 		printHelp()
@@ -80,7 +82,7 @@ func main() {
 }
 
 func printHelp() {
-	name := "mpanelctl"
+	name := "mpctl"
 	fmt.Printf(`%s — MPanel 服务管理（对应 1Panel 的 1pctl）
 
 用法：
@@ -91,11 +93,12 @@ func printHelp() {
   %s version                      查看版本
   %s listen-ip                    查看监听地址
   %s user-info                    查看面板账号
+  %s reset                        重置面板密码（生成 bootstrap token）
   %s uninstall                    显示卸载步骤
 
 服务单元：mpanel-core.service / mpanel-agent.service
-默认安装根：/opt/mpanel（配置 conf/app.yaml，数据 data/，日志 log/，数据库 db/，备份 backup/）
-`, name, name, name, name, name, name, name, name, name)
+默认安装根：/opt/mpanel（1Panel 布局：conf/ data/ db/ log/ backup/ tmp/ runtime/ web/）
+`, name, name, name, name, name, name, name, name, name, name)
 }
 
 func runServiceCommand(command, target string) {
@@ -119,6 +122,23 @@ func runServiceCommand(command, target string) {
 		if err == nil {
 			fmt.Printf("面板地址：http://<本机 IP>:%s\n", strconv.Itoa(cfg.System.Port))
 		}
+	}
+}
+
+// resetPassword delegates to `mpanel-core reset-password` so the CLI matches
+// 1Panel's `1pctl reset` workflow.
+func resetPassword(baseDir string) {
+	bin, err := exec.LookPath("mpanel-core")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "未找到 mpanel-core，请确认已安装到 PATH。")
+		os.Exit(1)
+	}
+	cmd := exec.Command(bin, "reset-password", "--base-dir", baseDir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "重置密码失败:", err)
+		os.Exit(1)
 	}
 }
 

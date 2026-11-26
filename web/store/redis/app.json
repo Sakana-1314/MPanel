@@ -21,7 +21,7 @@
     {
       "key": "MPANEL_DATA_DIR",
       "label": "数据根目录",
-      "default": "/opt/mpanel/data",
+      "default": "/opt/mpanel/data/apps",
       "description": "宿主机数据目录；Redis 数据写入其 redis 子目录。"
     },
     {

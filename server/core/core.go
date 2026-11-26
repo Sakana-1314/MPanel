@@ -108,7 +108,7 @@ func (c *Core) Close() {
 	})
 }
 
-// Auth exposes the credential service (used by mpanelctl reset-password).
+// Auth exposes the credential service (used by mpctl reset).
 func (c *Core) Auth() *auth.Service { return c.auth }
 
 func (c *Core) registerRoutes() {

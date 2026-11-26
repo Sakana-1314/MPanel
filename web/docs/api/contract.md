@@ -916,7 +916,7 @@ interface SiteBootstrapResult {
   configDir: string;          // 宿主 caddy_config
   dataDir: string;            // 宿主 caddy_data，挂载到容器 /data
   caddyfilePath: string;      // 宿主受管 Caddyfile
-  sitesRoot: string;          // 默认站点根 ${agent.data_dir}/sites
+  sitesRoot: string;          // 默认站点根 ${base_dir}/data/sites
   mounts: SiteBootstrapMount[]; // 商店模板必须复现的挂载
   ready: boolean;             // 当前 capabilities.caddy.available
 }
