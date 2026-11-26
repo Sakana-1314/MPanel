@@ -92,7 +92,7 @@ log:
 | `username` | string | 空 | — | 可选的管理员种子用户名；当前只加载/持久化，初始化请用 bootstrap token |
 | `password` | string | 空 | — | 可选的管理员种子密码；同上 |
 | `secret` | string | 随机 32 字节 | — | core 内部密钥，URL-safe base64；为空时自动生成 |
-| `version` | string | 构建版本 | — | 版本号，可用 `-ldflags` 注入 |
+| `version` | string | 构建版本 | — | 版本号，可用 `-ldflags` 注入；启动时以二进制版本为准，配置里的旧值会被覆盖 |
 | `entrance` | string | 空 | `system.entrance` | 预留的安全入口字段，当前只加载/持久化 |
 | `language` | string | `zh` | — | 默认语言 |
 | `cors_origins` | string | 空（允许任意来源） | — | 收紧跨域来源时填写逗号分隔白名单（`https://panel.example.com,https://ui.example.com`）。留空或 `*` 表示允许任意来源 |
@@ -166,7 +166,7 @@ log:
 | `base_dir` | string | `/opt/mpanel` | 安装根 |
 | `data_dir` | string | `${base_dir}/data/agent` | agent 数据根 |
 | `log_path` | string | `${base_dir}/log` | 日志目录 |
-| `version` | string | 构建版本 | 版本号 |
+| `version` | string | 构建版本 | 版本号；启动时以二进制版本为准，配置里的旧值会被覆盖 |
 | `caddy_bin` | string | `caddy` | **已弃用**：Caddy 只以容器运行，该字段保留仅为兼容旧配置，agent 不读取 |
 | `caddy_config` | string | `${base_dir}/data/apps/caddy` | 宿主受管 Caddy 配置目录（`Caddyfile`、`sites.d/`），挂载到容器 `/etc/caddy`；旧 `${data_dir}/caddy` 仍兼容 |
 | `caddy_data` | string | `${caddy_config}/data` | 宿主 Caddy 数据目录（证书扫描来源），挂载到容器 `/data` |

@@ -284,9 +284,8 @@ func (cfg *App) normalize() {
 	if s.Secret == "" {
 		s.Secret = RandomToken(32)
 	}
-	if s.Version == "" {
-		s.Version = Version
-	}
+	// 二进制版本是事实源：升级后不能继续上报首次安装时写入配置的旧版本。
+	s.Version = Version
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
 	}
@@ -330,9 +329,8 @@ func (cfg *Agent) normalize() {
 	if len(a.FilesRoots) == 0 {
 		a.FilesRoots = []Root{{Name: "files", Path: filepath.Join(a.BaseDir, "data", "files")}}
 	}
-	if a.Version == "" {
-		a.Version = Version
-	}
+	// 同 core：agent 版本跟随二进制，而不是首次安装时落盘的配置值。
+	a.Version = Version
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
 	}
