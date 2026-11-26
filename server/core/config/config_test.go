@@ -71,3 +71,33 @@ func TestAgentLayoutKeepsLegacyDirs(t *testing.T) {
 		t.Fatalf("旧编排目录未兼容: %q", got)
 	}
 }
+
+func TestLoadUsesBinaryVersion(t *testing.T) {
+	base := t.TempDir()
+
+	app := NewApp(base)
+	app.System.Version = "stale"
+	if err := SaveApp(app); err != nil {
+		t.Fatal(err)
+	}
+	loadedApp, err := LoadApp(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedApp.System.Version != Version {
+		t.Fatalf("core 版本 = %q，期望 %q", loadedApp.System.Version, Version)
+	}
+
+	agent := NewAgent(base)
+	agent.Agent.Version = "stale"
+	if err := SaveAgent(agent); err != nil {
+		t.Fatal(err)
+	}
+	loadedAgent, err := LoadAgent(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedAgent.Agent.Version != Version {
+		t.Fatalf("agent 版本 = %q，期望 %q", loadedAgent.Agent.Version, Version)
+	}
+}
