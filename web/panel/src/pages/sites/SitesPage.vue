@@ -215,7 +215,7 @@ const applyOutput = computed(() => {
           <template #trigger>
             <n-tag size="small" type="warning" round :bordered="false">Caddy 不可用</n-tag>
           </template>
-          {{ caddy?.reason ?? 'capabilities.caddy.available=false' }}
+          {{ caddy?.reason ?? 'Caddy 能力不可用' }}
         </n-tooltip>
       </template>
       <template #actions>
@@ -242,7 +242,7 @@ const applyOutput = computed(() => {
     </PageHeader>
 
     <n-alert v-if="sitesQuery.data.value?.available === false" type="error" :bordered="true" title="站点存储不可用">
-      {{ sitesQuery.data.value.reason ?? '后端返回 available=false。' }}
+      {{ sitesQuery.data.value.reason ?? '服务返回不可用。' }}
     </n-alert>
 
     <n-alert

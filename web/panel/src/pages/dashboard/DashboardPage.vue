@@ -72,7 +72,7 @@ function openMachine(id: string): void {
     <error-state
       v-if="overviewQuery.isError.value"
       :error="overviewQuery.error.value"
-      title="无法读取 core 概览"
+      title="无法读取面板概览"
       @retry="overviewQuery.refetch()"
     />
 
@@ -86,7 +86,7 @@ function openMachine(id: string): void {
           <div class="hero-left">
             <div class="hero-title">
               <span class="core-dot" />
-              <strong>core v{{ coreInfo?.version }}</strong>
+              <strong>MPanel v{{ coreInfo?.version }}</strong>
               <n-tag size="tiny" type="success" round :bordered="false">已连接</n-tag>
             </div>
             <div class="tiny muted">

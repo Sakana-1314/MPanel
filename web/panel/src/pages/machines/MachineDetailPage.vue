@@ -15,7 +15,7 @@ import { useMachineQuery } from '@/lib/machines';
 import { useCoreApi } from '@/lib/api';
 import { useAction } from '@/composables/use-action';
 import { coreKey } from '@/lib/query-keys';
-import { formatBytes, formatDate, formatUptime } from '@/lib/format';
+import { formatBytes, formatDate, formatUptime, machineAddressLabel, transportLabel } from '@/lib/format';
 import { MACHINE_NAV_ITEMS, openMachineNavItem, openMachinePage } from '@/lib/navigation';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -48,11 +48,20 @@ async function test(): Promise<void> {
   }
 }
 
+const CAPABILITY_LABELS: Record<string, string> = {
+  caddy: 'Caddy',
+  docker: 'Docker',
+  postgres: 'PostgreSQL',
+  redis: 'Redis',
+  pty: '终端',
+};
+
 const capabilities = computed(() => {
   const caps = machine.value?.capabilities;
   if (caps === null || caps === undefined) return [];
   return (Object.keys(caps) as Array<keyof typeof caps>).map((key) => ({
     key,
+    label: CAPABILITY_LABELS[key] ?? key,
     status: caps[key],
   }));
 });
@@ -92,12 +101,12 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
             <div class="title-row">
               <strong class="name">{{ machine.name }}</strong>
               <MachineStatusTag :status="machine.status" />
-              <n-tag size="tiny" round :bordered="false">{{ machine.transport }}</n-tag>
-              <n-tag v-if="machine.edge" size="tiny" type="info" round :bordered="false">edge</n-tag>
+              <n-tag size="tiny" round :bordered="false">{{ transportLabel(machine.transport) }}</n-tag>
+              <n-tag v-if="machine.edge" size="tiny" type="info" round :bordered="false">边缘</n-tag>
               <n-tag v-if="machine.group" size="tiny" round :bordered="false">{{ machine.group }}</n-tag>
             </div>
             <div class="tiny muted" style="margin-top: 4px">
-              {{ machine.endpoint ?? 'stdio 本地进程' }} · 心跳 <RelativeTime :value="machine.lastSeenAt" />
+              {{ machineAddressLabel(machine) }} · 心跳 <RelativeTime :value="machine.lastSeenAt" />
             </div>
           </div>
           <div class="toolbar">
@@ -128,16 +137,15 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
         <div class="descriptions">
           <n-descriptions label-placement="left" bordered size="small" :column="2">
             <n-descriptions-item label="机器 ID"><span class="mono">{{ machine.id }}</span></n-descriptions-item>
-            <n-descriptions-item label="传输">{{ machine.transport }}</n-descriptions-item>
+            <n-descriptions-item label="接入方式">{{ transportLabel(machine.transport) }}</n-descriptions-item>
             <n-descriptions-item label="启用">{{ machine.enabled ? '是' : '否' }}</n-descriptions-item>
             <n-descriptions-item label="期望状态">{{ machine.desiredState }}</n-descriptions-item>
             <n-descriptions-item label="创建时间">{{ formatDate(machine.createdAt) }}</n-descriptions-item>
             <n-descriptions-item label="更新时间">{{ formatDate(machine.updatedAt) }}</n-descriptions-item>
-            <n-descriptions-item label="agent" :span="2">
+            <n-descriptions-item label="节点信息" :span="2">
               <template v-if="machine.worker">
-                {{ machine.worker.name }} v{{ machine.worker.version }} ·
-                {{ machine.worker.platform }}/{{ machine.worker.arch }} ·
-                API v{{ machine.worker.apiVersion }} · 协议 v{{ machine.worker.protocolVersion }}
+                版本 v{{ machine.worker.version }} ·
+                {{ machine.worker.platform }}/{{ machine.worker.arch }}
               </template>
               <span v-else class="muted">尚未上报</span>
             </n-descriptions-item>
@@ -158,9 +166,9 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
             :type="cap.status.available ? 'success' : 'default'"
             :title="cap.status.reason"
           >
-            {{ cap.key }}<template v-if="cap.status.version"> {{ cap.status.version }}</template>
+            {{ cap.label }}<template v-if="cap.status.version"> {{ cap.status.version }}</template>
           </n-tag>
-          <span v-if="capabilities.length === 0" class="tiny muted">capabilities 尚未上报</span>
+          <span v-if="capabilities.length === 0" class="tiny muted">能力尚未上报</span>
         </div>
       </n-card>
 
@@ -192,7 +200,7 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
             </n-descriptions>
           </template>
           <n-alert v-else type="info" :bordered="false">
-            core 尚未采集到该机器的节点快照；机器在线后会自动刷新。
+            尚未采集到该机器的节点快照；机器在线后会自动刷新。
           </n-alert>
         </n-card>
 

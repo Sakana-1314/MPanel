@@ -20,7 +20,7 @@ import type {
 import { useCoreApi } from '@/lib/api';
 import { useAction } from '@/composables/use-action';
 import { coreKey } from '@/lib/query-keys';
-import { formatDate } from '@/lib/format';
+import { formatDate, transportLabel } from '@/lib/format';
 
 const props = defineProps<{
   show: boolean;
@@ -74,9 +74,9 @@ watch(
 );
 
 const transportOptions = [
-  { label: 'http · 直连 agent URL', value: 'http' },
-  { label: 'stdio · core 拉起本地进程', value: 'stdio' },
-  { label: 'reverse-ws · agent 主动连回 core', value: 'reverse-ws' },
+  { label: '直连 · 通过地址访问服务', value: 'http' },
+  { label: '本机 · 由面板拉起本机进程', value: 'stdio' },
+  { label: '隧道 · 节点主动连接面板', value: 'reverse-ws' },
 ];
 
 function parseEnvText(text: string): { value?: Record<string, string>; error?: string } {
@@ -91,7 +91,7 @@ function parseEnvText(text: string): { value?: Record<string, string>; error?: s
     const value = line.slice(separator + 1);
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return { error: `环境变量名不合法：${key}` };
     if (RESERVED_ENV_KEYS.has(key)) {
-      return { error: `${key} 是 core 注入的保留键，不能在这里填写。` };
+      return { error: `${key} 是系统保留键，不能在这里填写。` };
     }
     result[key] = value;
   }
@@ -121,7 +121,7 @@ const createAction = useAction(
   {
     success: (result) => `已创建机器 ${result.machine.name}`,
     successDescription: (result) =>
-      result.enrollment === undefined ? 'core 已开始连接该机器。' : '请立即保存一次性注册信息。',
+      result.enrollment === undefined ? '已开始连接该机器。' : '请立即保存一次性接入信息。',
     invalidate: invalidate.value,
   },
 );
@@ -146,14 +146,14 @@ function validate(): string | null {
   if (name.value.trim().length === 0) return '请填写机器名称。';
   if (transport.value === 'http') {
     const normalized = normalizeUrl(url.value);
-    if (normalized.length === 0) return '请填写 agent 的 HTTP URL。';
+    if (normalized.length === 0) return '请填写服务地址。';
     try {
       const parsed = new URL(normalized);
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return 'agent URL 必须是 http:// 或 https:// 开头。';
+        return '服务地址必须是 http:// 或 https:// 开头。';
       }
     } catch {
-      return 'agent URL 格式不正确，例如 http://127.0.0.1:10087。';
+      return '服务地址格式不正确，例如 http://127.0.0.1:10087。';
     }
   }
   if (transport.value === 'stdio' && envParsed.value.error !== undefined) {
@@ -163,8 +163,8 @@ function validate(): string | null {
     const requiresNew = !isEdit.value || !hasToken.value;
     if (requiresNew && token.value.trim().length === 0) {
       return transport.value === 'http'
-        ? 'http 机器需要 agent 的 MPANEL_TOKEN。'
-        : 'stdio 机器需要注入给 agent 的 MPANEL_TOKEN。';
+        ? '直连机器需要访问令牌。'
+        : '本机进程需要访问令牌。';
     }
   }
   return null;
@@ -240,10 +240,10 @@ async function submit(): Promise<void> {
   >
     <div class="form">
       <div v-if="isEdit && machine" class="toolbar">
-        <n-tag size="small" type="info" round :bordered="false">{{ machine.transport }}</n-tag>
+        <n-tag size="small" type="info" round :bordered="false">{{ transportLabel(machine.transport) }}</n-tag>
         <span class="tiny muted">创建于 {{ formatDate(machine.createdAt) }}</span>
         <span class="tiny muted">· 更新于 {{ formatDate(machine.updatedAt) }}</span>
-        <n-tag v-if="hasToken" size="small" type="success" round :bordered="false">已保存 token</n-tag>
+        <n-tag v-if="hasToken" size="small" type="success" round :bordered="false">已保存访问令牌</n-tag>
       </div>
 
       <div class="two">
@@ -256,7 +256,7 @@ async function submit(): Promise<void> {
         </n-form-item>
       </div>
 
-      <n-form-item label="传输类型（创建后不可修改）" required>
+      <n-form-item label="接入方式（创建后不可修改）" required>
         <n-select
           v-model:value="transport"
           :disabled="isEdit"
@@ -265,25 +265,25 @@ async function submit(): Promise<void> {
       </n-form-item>
 
       <template v-if="transport === 'http'">
-        <n-form-item label="agent URL" required>
+        <n-form-item label="服务地址" required>
           <n-input v-model:value="url" placeholder="http://127.0.0.1:10087" />
         </n-form-item>
       </template>
 
       <template v-if="transport === 'stdio'">
-        <n-alert type="warning" :bordered="true" title="stdio 传输需要显式开启">
-          core 会拉起本地 agent 进程（等同宿主命令执行能力），需要 MPANEL_ALLOW_STDIO=1。
+        <n-alert type="warning" :bordered="true" title="本机进程接入需要显式开启">
+          由面板在本机拉起进程，等同宿主命令执行权限；请确认服务器端已开启该能力。
         </n-alert>
-        <n-form-item label="命令">
-          <n-input v-model:value="command" placeholder="mpanel-agent" />
+        <n-form-item label="启动命令">
+          <n-input v-model:value="command" placeholder="留空使用默认命令" />
         </n-form-item>
-        <n-form-item label="参数（每行一个）">
+        <n-form-item label="启动参数（每行一个）">
           <n-input
             v-model:value="argsText"
             type="textarea"
             :rows="3"
             class="mono"
-            :placeholder="isEdit ? '留空表示保持不变' : '--config\n/opt/mpanel/conf/agent.yaml'"
+            :placeholder="isEdit ? '留空表示保持不变' : '每行一个参数'"
           />
         </n-form-item>
         <n-form-item label="环境变量（每行 KEY=VALUE）" :feedback="envParsed.error">
@@ -292,21 +292,21 @@ async function submit(): Promise<void> {
             type="textarea"
             :rows="4"
             class="mono"
-            :placeholder="isEdit ? '留空表示保持不变' : 'NODE_OPTIONS=--max-old-space-size=512'"
+            :placeholder="isEdit ? '留空表示保持不变' : 'KEY=VALUE'"
           />
         </n-form-item>
       </template>
 
       <n-form-item
         v-if="transport === 'http' || transport === 'stdio'"
-        label="agent token"
+        label="访问令牌"
         :required="!isEdit || !hasToken"
       >
         <n-input
           v-model:value="token"
           type="password"
           show-password-on="click"
-          :placeholder="isEdit && hasToken ? '••••••（保持不变）' : 'MPANEL_TOKEN'"
+          :placeholder="isEdit && hasToken ? '••••••（保持不变）' : '访问令牌'"
         />
       </n-form-item>
 

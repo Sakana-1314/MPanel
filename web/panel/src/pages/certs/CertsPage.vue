@@ -108,8 +108,8 @@ function displayDomains(cert: CertificateInfo): string[] {
     </PageHeader>
 
     <n-alert v-if="!available" type="warning" :bordered="true" title="Caddy 数据目录不可用">
-      {{ certsQuery.data.value?.reason ?? '后端返回 available=false，无法扫描证书。' }}
-      请在 agent 上设置 MPANEL_CADDY_DATA_DIR 指向 Caddy data 目录后刷新。
+      {{ certsQuery.data.value?.reason ?? '服务返回不可用，无法扫描证书。' }}
+      请确认服务器上的 Caddy 数据目录可读后刷新。
     </n-alert>
 
     <error-state v-if="certsQuery.isError.value" :error="certsQuery.error.value" @retry="certsQuery.refetch()" />

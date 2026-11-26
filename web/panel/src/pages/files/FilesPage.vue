@@ -538,7 +538,7 @@ function typeIcon(item: FileItem): typeof DocumentOutline {
     <n-empty v-if="roots.length === 0 && !rootsQuery.isLoading.value" description="没有可用的文件根">
       <template #icon><n-icon :component="FolderOutline" size="36" /></template>
       <template #extra>
-        <p class="small muted">请检查 agent 的 MPANEL_FILES_ROOTS 配置与目录权限。</p>
+        <p class="small muted">请检查服务器上的文件根目录配置与目录权限。</p>
       </template>
     </n-empty>
 

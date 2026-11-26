@@ -3,7 +3,7 @@
 MPanel 的配置完全沿用 1Panel 的目录与文件名：安装根默认 `/opt/mpanel`，core 读 `conf/app.yaml`，agent 读 `conf/agent.yaml`。所有字段都可以用 `MPANEL_*` 环境变量覆盖，便于容器、CI 与 systemd 部署。
 
 ::: tip 实现状态
-配置加载、默认值、目录创建、原子写回与环境变量覆盖由 `core/config` 实现（已实现）。本文列出的字段与该包的结构体一一对应；`ssl`、`entrance`、`username`、`password` 等字段目前只做加载与持久化，具体生效逻辑随 core 启动流程落地。
+配置加载、默认值、目录创建、原子写回与环境变量覆盖由 `server/core/config` 实现（已实现）。本文列出的字段与该包的结构体一一对应；`ssl`、`entrance`、`username`、`password` 等字段目前只做加载与持久化，具体生效逻辑随 core 启动流程落地。
 :::
 
 ## 1. 目录树
@@ -37,7 +37,7 @@ Linux 上默认安装根为 `/opt/mpanel`；非 Linux 开发机回退到 `~/.mpa
 说明：
 
 - `data/`、`log/`、`db/`、`backup/`、`tmp/` 在 `app.yaml` 中有独立字段，可以分别指向不同磁盘。
-- `db/` 是 1Panel 同名目录。1Panel 在这里放 SQLite 的 `core.db`；MPanel 的控制面使用原子 JSON 文档（`core/store`），按 1Panel 习惯放在同一棵树里，备份时直接打包整个 `db/`。
+- `db/` 是 1Panel 同名目录。1Panel 在这里放 SQLite 的 `core.db`；MPanel 的控制面使用原子 JSON 文档（`server/core/store`），按 1Panel 习惯放在同一棵树里，备份时直接打包整个 `db/`。
 - agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${agent.data_dir}/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。
 - 目录创建权限：core 的 `conf/`、`data/`、`log/`、`db/`、`backup/`、`tmp/` 为 `0700`；agent 的目录为 `0755`（站点/文件根需要被 Web 服务器读取），配置文件统一 `0600`。
 
@@ -114,6 +114,7 @@ agent:
   caddy_data: ""
   caddy_admin: ""
   docker_bin: docker
+  docker_config: /etc/docker/daemon.json
   pg_dump_bin: pg_dump
   psql_bin: psql
   redis_cli_bin: redis-cli
@@ -144,6 +145,7 @@ log:
 | `caddy_data` | string | `${caddy_config}/data` | Caddy 数据目录（证书扫描来源） |
 | `caddy_admin` | string | 空 | Caddy admin API 地址；留空时按 Caddy 默认 `127.0.0.1:2019` |
 | `docker_bin` | string | `docker` | Docker CLI 路径 |
+| `docker_config` | string | `/etc/docker/daemon.json` | Docker daemon 配置路径；容器配置页读取/写入该文件，rootless 部署改为 `~/.config/docker/daemon.json` |
 | `pg_dump_bin` | string | `pg_dump` | PostgreSQL 备份工具 |
 | `psql_bin` | string | `psql` | PostgreSQL 恢复/查询工具 |
 | `redis_cli_bin` | string | `redis-cli` | Redis CLI，用于 `rdb` 备份 |
@@ -221,6 +223,7 @@ export MPANEL_FILES_ROOTS='files=/opt/mpanel/data/files,www=/var/www'
 | `MPANEL_CADDY_DATA` | `agent.caddy_data` | |
 | `MPANEL_CADDY_ADMIN` | `agent.caddy_admin` | |
 | `MPANEL_DOCKER_BIN` | `agent.docker_bin` | |
+| `MPANEL_DOCKER_CONFIG` | `agent.docker_config` | |
 | `MPANEL_PG_DUMP_BIN` | `agent.pg_dump_bin` | |
 | `MPANEL_PSQL_BIN` | `agent.psql_bin` | |
 | `MPANEL_REDIS_CLI_BIN` | `agent.redis_cli_bin` | |

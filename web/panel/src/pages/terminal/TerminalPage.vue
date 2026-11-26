@@ -242,7 +242,7 @@ const shellOptions = computed(() =>
     </PageHeader>
 
     <n-alert v-if="sessionsQuery.data.value?.available === false" type="warning" :bordered="true" title="终端不可用">
-      {{ sessionsQuery.data.value.reason ?? 'agent 无法 spawn 进程。' }}
+      {{ sessionsQuery.data.value.reason ?? '服务器无法启动进程。' }}
     </n-alert>
 
     <error-state v-if="sessionsQuery.isError.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.refetch()" />

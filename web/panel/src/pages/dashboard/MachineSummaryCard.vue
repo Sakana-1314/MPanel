@@ -9,7 +9,7 @@ import {
   TerminalOutline,
 } from '@vicons/ionicons5';
 import type { Machine } from '@/api/types';
-import { formatBytes, formatUptime } from '@/lib/format';
+import { formatBytes, formatUptime, machineAddressLabel, transportLabel } from '@/lib/format';
 import { openMachineDetail, openMachinePage } from '@/lib/navigation';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
@@ -37,9 +37,9 @@ const capabilities = computed(() => {
   return [
     { label: 'Caddy', available: caps.caddy.available },
     { label: 'Docker', available: caps.docker.available },
-    { label: 'PG', available: caps.postgres.available },
+    { label: 'PostgreSQL', available: caps.postgres.available },
     { label: 'Redis', available: caps.redis.available },
-    { label: 'PTY', available: caps.pty.available },
+    { label: '终端', available: caps.pty.available },
   ];
 });
 
@@ -63,15 +63,15 @@ const diskText = computed(() => {
       <div class="title-row">
         <span class="name truncate" :title="machine.name">{{ machine.name }}</span>
         <MachineStatusTag :status="machine.status" />
-        <n-tag v-if="machine.edge" size="tiny" type="info" round :bordered="false">edge</n-tag>
+        <n-tag v-if="machine.edge" size="tiny" type="info" round :bordered="false">边缘</n-tag>
         <n-tag v-if="machine.group" size="tiny" round :bordered="false">{{ machine.group }}</n-tag>
       </div>
       <div class="sub tiny muted truncate">
-        {{ machine.transport }} · {{ machine.endpoint ?? 'stdio 本地进程' }}
+        {{ transportLabel(machine.transport) }} · {{ machineAddressLabel(machine) }}
       </div>
       <div class="sub tiny muted">
         心跳 <RelativeTime :value="machine.lastSeenAt" />
-        <span v-if="machine.worker"> · agent v{{ machine.worker.version }}</span>
+        <span v-if="machine.worker"> · v{{ machine.worker.version }}</span>
         <span v-if="machine.worker"> · {{ machine.worker.platform }}/{{ machine.worker.arch }}</span>
       </div>
     </div>

@@ -120,7 +120,7 @@ const pendingCount = computed(() => jobs.value.filter((job) => job.status === 'p
 const machineOptions = computed(() => [
   { label: '全部机器', value: 'all' },
   ...machines.value.map((machine) => ({
-    label: `${machine.name}${machine.edge ? '（edge）' : ''}`,
+    label: `${machine.name}${machine.edge ? '（边缘）' : ''}`,
     value: machine.id,
   })),
 ]);
@@ -198,7 +198,7 @@ const createKeyAction = useAction(
     createEdgeKey(input),
   {
     success: (result) => `已创建入网密钥 ${result.key.name}`,
-    successDescription: 'secret 只显示一次，请立即保存。',
+    successDescription: '接入密钥只显示一次，请立即保存。',
     invalidate: [coreKey('edge', 'keys')],
   },
 );
@@ -222,17 +222,7 @@ async function submitKey(): Promise<void> {
   }
 }
 
-const enrolledCommand = computed(() => {
-  const key = createdKey.value?.secret;
-  if (key === undefined) return '';
-  return [
-    '# 在目标机器上使用 core 地址 + 入网密钥启动 agent',
-    `export MPANEL_TRANSPORT=reverse-ws`,
-    `export MPANEL_CORE_URL=${window.location.origin.replace(/^http/, 'ws')}`,
-    `export MPANEL_EDGE_KEY=${key}`,
-    'mpanel-agent serve',
-  ].join('\n');
-});
+const panelAddress = computed(() => window.location.origin);
 
 /* ------------------------------- key revoke ------------------------------- */
 
@@ -467,7 +457,7 @@ const resultText = computed(() => {
             <span class="flow-arrow">→</span>
             <div class="flow-step">
               <span class="flow-icon"><n-icon :component="TerminalOutline" /></span>
-              <span>启动 agent</span>
+              <span>接入节点</span>
             </div>
             <span class="flow-arrow">→</span>
             <div class="flow-step">
@@ -505,13 +495,13 @@ const resultText = computed(() => {
                 <td>
                   <div class="cell">
                     <span class="small">{{ node.group ?? '未分组' }}</span>
-                    <span class="tiny muted">key {{ node.edgeKeyId ?? '—' }}</span>
+                    <span class="tiny muted">密钥 {{ node.edgeKeyId ?? '—' }}</span>
                   </div>
                 </td>
                 <td>
                   <div class="cell">
                     <RelativeTime :value="node.lastSeenAt" />
-                    <span v-if="node.worker" class="tiny muted">agent v{{ node.worker.version }}</span>
+                    <span v-if="node.worker" class="tiny muted">v{{ node.worker.version }}</span>
                   </div>
                 </td>
                 <td>
@@ -542,7 +532,7 @@ const resultText = computed(() => {
       <n-tab-pane name="keys" :tab="`入网密钥 ${keys.length}`">
         <n-card size="small">
           <div class="toolbar">
-            <span class="small muted">共 {{ keys.length }} 个密钥 · 共享密钥让 agent 自助注册，secret 只在创建时显示。</span>
+            <span class="small muted">共 {{ keys.length }} 个密钥 · 共享密钥让节点自助接入，密钥只在创建时显示。</span>
             <div class="spacer" />
             <n-button size="small" type="primary" @click="keyModal = true">
               <template #icon><n-icon :component="KeyOutline" /></template>
@@ -662,7 +652,7 @@ const resultText = computed(() => {
                     <n-tag size="tiny" :type="edgeJobStatusType(job.status)" round :bordered="false">
                       {{ edgeJobStatusLabel(job.status) }}
                     </n-tag>
-                    <span class="tiny muted">HTTP {{ job.httpStatus ?? '—' }}</span>
+                    <span class="tiny muted">状态码 {{ job.httpStatus ?? '—' }}</span>
                   </div>
                 </td>
                 <td>
@@ -707,7 +697,7 @@ const resultText = computed(() => {
           <n-input v-model:value="keyName" placeholder="例如：华东 NAT 节点" />
         </n-form-item>
         <n-form-item label="分组（可选）">
-          <n-input v-model:value="keyGroup" placeholder="例如：edge-hk" />
+          <n-input v-model:value="keyGroup" placeholder="例如：香港节点" />
         </n-form-item>
         <div class="two">
           <n-form-item label="有效期">
@@ -731,20 +721,23 @@ const resultText = computed(() => {
     <n-modal
       v-model:show="keySecretOpen"
       preset="card"
-      title="入网密钥 secret（只显示一次）"
+      title="入网密钥（只显示一次）"
       style="width: 660px; max-width: calc(100vw - 24px)"
     >
       <div v-if="createdKey" class="form">
         <n-alert type="warning" :bordered="true" title="请立即保存">
-          secret 关闭后无法再次查看；只能吊销并重新创建。
+          接入密钥关闭后无法再次查看；只能吊销并重新创建。
         </n-alert>
         <div class="field">
-          <span class="tiny muted">secret</span>
+          <span class="tiny muted">接入密钥</span>
           <SecretReveal :value="createdKey.secret" />
         </div>
         <div class="field">
-          <span class="tiny muted">agent 启动示例</span>
-          <code-block :text="enrolledCommand" max-height="180px" />
+          <span class="tiny muted">服务器地址</span>
+          <div class="copy-line">
+            <code class="mono truncate">{{ panelAddress }}</code>
+            <CopyButton :text="panelAddress" />
+          </div>
         </div>
       </div>
       <template #footer>
@@ -763,7 +756,7 @@ const resultText = computed(() => {
     >
       <div class="form">
         <n-alert v-if="edgeNodes.length === 0" type="warning" :bordered="true" title="没有可选的边缘节点">
-          请先创建入网密钥并让 agent 接入。
+          请先创建入网密钥并让节点接入。
         </n-alert>
         <n-form-item label="目标机器" required>
           <n-select v-model:value="jobMachineId" :options="edgeMachineOptions" :disabled="edgeNodes.length === 0" />
@@ -772,7 +765,7 @@ const resultText = computed(() => {
           <n-select v-model:value="jobKind" :options="jobKindOptions" @update:value="jobTaskId = ''; jobSiteId = ''" />
         </n-form-item>
         <n-alert v-if="jobKind === 'snapshot'" type="info" :bordered="true" title="快照作业">
-          执行时调用目标节点的 GET /system/snapshot，并刷新 core 上的节点快照。
+          执行时会读取目标节点的运行快照，并刷新面板上的节点信息。
         </n-alert>
         <n-form-item v-if="jobKind === 'run-task'" label="任务" required>
           <n-select
@@ -814,7 +807,7 @@ const resultText = computed(() => {
             <dt>类型</dt><dd>{{ jobKindLabel[selectedJob.kind] }}</dd>
             <dt>机器</dt><dd>{{ machineName(selectedJob.machineId) }} · <code>{{ selectedJob.machineId }}</code></dd>
             <dt>状态</dt><dd><n-tag size="small" :type="edgeJobStatusType(selectedJob.status)" :bordered="false">{{ edgeJobStatusLabel(selectedJob.status) }}</n-tag></dd>
-            <dt>HTTP</dt><dd>{{ selectedJob.httpStatus ?? '—' }}</dd>
+            <dt>状态码</dt><dd>{{ selectedJob.httpStatus ?? '—' }}</dd>
             <dt>创建</dt><dd>{{ formatDate(selectedJob.createdAt) }}</dd>
             <dt>开始</dt><dd>{{ formatDate(selectedJob.startedAt) }}</dd>
             <dt>结束</dt><dd>{{ formatDate(selectedJob.finishedAt) }}</dd>
@@ -822,14 +815,14 @@ const resultText = computed(() => {
             <dt>作业 ID</dt><dd class="mono">{{ selectedJob.id }}</dd>
           </div>
           <div class="field">
-            <span class="tiny muted">payload</span>
+            <span class="tiny muted">请求参数</span>
             <code-block :text="JSON.stringify(selectedJob.payload, null, 2)" max-height="140px" />
           </div>
           <n-alert v-if="selectedJob.error" type="error" :bordered="true" title="错误">
             {{ selectedJob.error }}
           </n-alert>
           <div class="field">
-            <span class="tiny muted">result</span>
+            <span class="tiny muted">执行结果</span>
             <code-block :text="resultText" max-height="360px" />
           </div>
         </div>
@@ -859,6 +852,12 @@ const resultText = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.copy-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .two {
   display: grid;

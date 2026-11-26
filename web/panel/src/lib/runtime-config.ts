@@ -43,7 +43,7 @@ export function envBackendSeeds(env: ImportMetaEnv): RuntimeBackendSeed[] {
     if (env.VITE_DEFAULT_BACKEND_KIND === 'worker') return [];
     seeds.push({
       id: backendSeedId(baseUrl),
-      name: env.VITE_DEFAULT_BACKEND_NAME ?? env.VITE_DEFAULT_BACKEND_LABEL ?? '默认 core',
+      name: env.VITE_DEFAULT_BACKEND_NAME ?? env.VITE_DEFAULT_BACKEND_LABEL ?? '默认服务器',
       baseUrl,
       token: env.VITE_DEFAULT_BACKEND_TOKEN,
     });
@@ -58,7 +58,7 @@ function seedFromEntry(item: RawBackendEntry): RuntimeBackendSeed | undefined {
   if (item.kind !== undefined && item.kind !== 'core') return undefined;
   return {
     id: item.id !== undefined && item.id.length > 0 ? item.id : backendSeedId(baseUrl),
-    name: item.name ?? item.label ?? 'core',
+    name: item.name ?? item.label ?? '服务器',
     baseUrl,
     token: item.token,
     username: item.username,

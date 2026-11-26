@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  base: process.env.DOCS_BASE ?? '/MPanel/docs/',
+  base: process.env.DOCS_BASE ?? '/docs/',
   lang: 'zh-CN',
   title: 'MPanel 文档',
   description:

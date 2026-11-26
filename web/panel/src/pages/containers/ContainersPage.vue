@@ -161,7 +161,7 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
           <template #trigger>
             <n-tag size="small" type="warning" round :bordered="false">Docker 不可用</n-tag>
           </template>
-          {{ listQuery.data.value?.reason ?? 'agent 返回 available=false' }}
+          {{ listQuery.data.value?.reason ?? '服务返回不可用' }}
         </n-tooltip>
       </template>
       <template #actions>

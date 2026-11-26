@@ -218,11 +218,11 @@ function submit(): void {
         />
       </n-form-item>
       <p class="tiny muted" style="margin: -8px 0 8px">
-        命令由 agent 的 shell 执行（POSIX sh -c / PowerShell），面板凭据会在运行时被移除。
+        命令由服务器的 shell 执行（POSIX sh -c / PowerShell），面板凭据会在运行时被移除。
       </p>
       <div class="two">
         <n-form-item label="工作目录" :feedback="submitted ? errors.cwd : undefined">
-          <n-input v-model:value="props.draft.cwd" class="mono" placeholder="/opt/app（留空使用 agent 默认）" />
+          <n-input v-model:value="props.draft.cwd" class="mono" placeholder="/opt/app（留空使用服务器默认）" />
         </n-form-item>
         <n-form-item label="超时（秒）" :feedback="submitted ? errors.timeoutSec : undefined">
           <n-input-number

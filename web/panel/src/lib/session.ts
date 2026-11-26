@@ -60,8 +60,8 @@ export async function ensureSession(force = false): Promise<void> {
     try {
       const me = await getCoreClient().auth.me();
       if (me.role !== 'core') {
-        throw new AppError('INTERNAL', '连接的不是 core', 0, {
-          hint: '前端只连接 core；请把连接地址改为 core 服务（默认端口 10086）。',
+        throw new AppError('INTERNAL', '连接的不是 MPanel 面板服务', 0, {
+          hint: '请填写正确的面板服务地址。',
         });
       }
       session.me = me;
@@ -99,8 +99,8 @@ export async function ensureSession(force = false): Promise<void> {
 export async function login(username: string, password: string): Promise<void> {
   const connection = getActiveConnection();
   if (connection === undefined) {
-    throw new AppError('UNAVAILABLE', '请先添加 core 连接', 0, {
-      hint: '在登录页点击“新增连接”填写 core 地址。',
+    throw new AppError('UNAVAILABLE', '请先填写服务器地址', 0, {
+      hint: '在登录页填写服务器、用户名与密码。',
     });
   }
   const result = await getCoreClient().auth.login({ username: username.trim(), password });

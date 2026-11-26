@@ -1,5 +1,6 @@
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import type { Machine } from '../api/types';
 
 export function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0 B';
@@ -89,3 +90,27 @@ function safeParse(iso: string): Date | null {
     return null;
   }
 }
+
+/** 面向用户的接入方式标签；传输实现细节不出现在界面。 */
+export function transportLabel(transport: Machine['transport'] | string): string {
+  switch (transport) {
+    case 'http':
+      return '直连';
+    case 'stdio':
+      return '本机';
+    case 'reverse-ws':
+      return '隧道';
+    default:
+      return transport;
+  }
+}
+
+/** 机器地址的可展示形式：不暴露隧道地址或内部进程参数。 */
+export function machineAddressLabel(
+  machine: Pick<Machine, 'transport' | 'endpoint'>,
+): string {
+  if (machine.transport === 'stdio') return '本机进程';
+  if (machine.transport === 'reverse-ws') return '隧道接入';
+  return machine.endpoint ?? '—';
+}
+
