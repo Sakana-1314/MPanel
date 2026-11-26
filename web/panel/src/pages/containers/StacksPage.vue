@@ -123,7 +123,7 @@ function openDetail(stack: StackSummary): void {
           <template #trigger>
             <n-tag size="small" type="warning" round :bordered="false">Compose 不可用</n-tag>
           </template>
-          {{ stacksQuery.data.value?.reason ?? 'agent 返回 available=false' }}
+          {{ stacksQuery.data.value?.reason ?? '服务返回不可用' }}
         </n-tooltip>
       </template>
       <template #actions>

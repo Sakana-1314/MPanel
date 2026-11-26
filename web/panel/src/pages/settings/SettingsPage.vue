@@ -109,7 +109,7 @@ async function save(): Promise<void> {
   const name = formName.value.trim();
   const url = formUrl.value.trim();
   if (name.length === 0 || url.length === 0) {
-    formError.value = '请填写名称与 core 地址。';
+    formError.value = '请填写名称与服务器地址。';
     return;
   }
   const probe = await probeConnection({ baseUrl: url });
@@ -121,7 +121,7 @@ async function save(): Promise<void> {
   try {
     if (editingId.value === null) {
       const created = addConnection({ name, baseUrl: url });
-      message.success(`已添加 core 连接 ${created.name}`);
+      message.success(`已添加服务器 ${created.name}`);
       if (activeConnectionId.value === null) setActiveConnection(created.id);
     } else {
       updateConnection(editingId.value, { name, baseUrl: url });
@@ -143,8 +143,8 @@ function confirmRemove(id: string): void {
   const item = connections.value.find((entry) => entry.id === id);
   if (item === undefined) return;
   dialog.warning({
-    title: '删除 core 连接',
-    content: `确定删除“${item.name}”？只清理浏览器里的连接配置，不影响 core 服务。`,
+    title: '删除服务器',
+    content: `确定删除“${item.name}”？只清理浏览器里的连接配置，不影响服务器本身。`,
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: () => {
@@ -158,7 +158,7 @@ function confirmRemove(id: string): void {
 function switchConnection(id: string): void {
   if (id === activeConnectionId.value) return;
   dialog.info({
-    title: '切换 core 连接',
+    title: '切换服务器',
     content: '切换后工作台标签会清空，并重新校验登录会话。是否继续？',
     positiveText: '切换',
     negativeText: '取消',
@@ -209,6 +209,7 @@ async function changePassword(): Promise<void> {
 
 const coreInfo = computed(() => coreInfoQuery.data.value);
 const isTokenAuth = computed(() => session.me?.authType === 'token');
+const authLabel = computed(() => (isTokenAuth.value ? '访问令牌' : '账号密码'));
 </script>
 
 <template>
@@ -225,17 +226,17 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
     </PageHeader>
 
     <n-tabs type="line" animated>
-      <n-tab-pane name="connections" tab="连接">
+      <n-tab-pane name="connections" tab="服务器">
         <n-card size="small">
           <div class="toolbar" style="margin-bottom: 10px">
             <span class="small muted">
-              当前会话：{{ session.user?.displayName ?? session.user?.username ?? '—' }}
-              · {{ session.me?.authType ?? '—' }} · 角色 {{ session.user?.role ?? '—' }}
+              当前账号：{{ session.user?.displayName ?? session.user?.username ?? '—' }}
+              · {{ authLabel }}
             </span>
             <div class="spacer" />
             <n-button size="small" type="primary" @click="openAdd">
               <template #icon><n-icon :component="AddOutline" /></template>
-              新增 core
+              新增服务器
             </n-button>
           </div>
 
@@ -284,8 +285,8 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
 
       <n-tab-pane name="password" tab="修改密码">
         <n-card size="small" style="max-width: 560px">
-          <n-alert v-if="isTokenAuth" type="warning" :bordered="false" title="当前是 core token 认证">
-            静态 core token 没有用户密码；请使用用户名/密码登录后再修改密码。
+          <n-alert v-if="isTokenAuth" type="warning" :bordered="false" title="当前使用访问令牌登录">
+            访问令牌没有用户密码；请使用用户名/密码登录后再修改密码。
           </n-alert>
           <div v-else class="form">
             <n-form-item label="当前密码">
@@ -310,31 +311,25 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
 
       <n-tab-pane name="about" tab="关于">
         <div class="about-grid">
-          <n-card size="small" title="core">
+          <n-card size="small" title="服务器信息">
             <error-state
               v-if="coreInfoQuery.isError.value"
               :error="coreInfoQuery.error.value"
               @retry="coreInfoQuery.refetch()"
             />
             <n-descriptions v-else-if="coreInfo" label-placement="left" bordered size="small" :column="1">
-              <n-descriptions-item label="名称">{{ coreInfo.name }}</n-descriptions-item>
               <n-descriptions-item label="版本">{{ coreInfo.version }}</n-descriptions-item>
               <n-descriptions-item label="主机名">{{ coreInfo.hostname }}</n-descriptions-item>
               <n-descriptions-item label="平台">{{ coreInfo.platform }}/{{ coreInfo.arch }}</n-descriptions-item>
-              <n-descriptions-item label="运行时">{{ coreInfo.nodeVersion }}</n-descriptions-item>
-              <n-descriptions-item label="API / 协议">v{{ coreInfo.apiVersion }} / v{{ coreInfo.protocolVersion }}</n-descriptions-item>
               <n-descriptions-item label="启动时间">{{ formatDate(coreInfo.startedAt) }}</n-descriptions-item>
               <n-descriptions-item label="运行时长">{{ formatUptime(coreInfo.uptimeSec) }}</n-descriptions-item>
               <n-descriptions-item label="地址">{{ connection?.baseUrl ?? '—' }}</n-descriptions-item>
             </n-descriptions>
-            <n-alert v-else type="info" :bordered="false">正在读取 core 信息…</n-alert>
+            <n-alert v-else type="info" :bordered="false">正在读取服务器信息…</n-alert>
           </n-card>
 
-          <n-card size="small" title="前端">
+          <n-card size="small" title="版本与文档">
             <n-descriptions label-placement="left" bordered size="small" :column="1">
-              <n-descriptions-item label="技术栈">Vue 3 · Vite · Vue Router · Naive UI</n-descriptions-item>
-              <n-descriptions-item label="连接模型">只连接 core，经机器代理访问 agent</n-descriptions-item>
-              <n-descriptions-item label="多机工作台">标签页绑定机器，可混合打开多台机器</n-descriptions-item>
               <n-descriptions-item label="面板版本">0.3.0</n-descriptions-item>
               <n-descriptions-item label="文档">
                 <a href="https://sakana-1314.github.io/MPanel/docs/" target="_blank" rel="noopener">
@@ -350,14 +345,14 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
     <n-modal
       v-model:show="formOpen"
       preset="card"
-      :title="editingId === null ? '新增 core 连接' : '编辑 core 连接'"
+      :title="editingId === null ? '新增服务器' : '编辑服务器'"
       style="width: 620px; max-width: calc(100vw - 24px)"
     >
       <div class="form">
         <n-form-item label="名称">
-          <n-input v-model:value="formName" placeholder="例如：生产 core" />
+          <n-input v-model:value="formName" placeholder="例如：生产服务器" />
         </n-form-item>
-        <n-form-item label="core 地址">
+        <n-form-item label="服务器地址">
           <n-input v-model:value="formUrl" placeholder="https://panel.example.com 或 http://127.0.0.1:10086" />
         </n-form-item>
         <n-alert v-if="formError" type="error" :bordered="true">{{ formError }}</n-alert>

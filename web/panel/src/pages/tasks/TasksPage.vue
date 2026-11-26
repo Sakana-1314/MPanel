@@ -153,7 +153,7 @@ const runningCount = computed(() => tasks.value.filter((task) => task.lastRun?.s
     </PageHeader>
 
     <n-alert v-if="tasksQuery.data.value?.available === false" type="warning" :bordered="true" title="任务能力不可用">
-      {{ tasksQuery.data.value.reason ?? 'agent 返回 available=false。' }}
+      {{ tasksQuery.data.value.reason ?? '服务返回不可用。' }}
     </n-alert>
 
     <error-state v-if="tasksQuery.isError.value" :error="tasksQuery.error.value" @retry="tasksQuery.refetch()" />

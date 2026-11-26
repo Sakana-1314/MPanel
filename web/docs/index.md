@@ -61,10 +61,10 @@ Go 重写仍在进行中。本站严格区分「已实现」与「规划中」�
 | 能力 | 状态 | 说明 |
 |---|---|---|
 | REST API v1 与隧道协议 v1 契约 | 已冻结 | 见 [REST API 契约](/api/contract) 与 [隧道协议](/api/protocol) |
-| 配置模型（`app.yaml` / `agent.yaml`、`MPANEL_*` 覆盖、目录创建、原子写） | 已实现 | `core/config` |
-| 信封、错误码、分页、隧道帧模型 | 已实现 | `core/protocol` |
-| 原子 JSON 存储 | 已实现 | `core/store` |
-| `mpanel-core` / `mpanel-agent` / `mpanelctl` 入口 | 已实现 | `cmd/` |
+| 配置模型（`app.yaml` / `agent.yaml`、`MPANEL_*` 覆盖、目录创建、原子写） | 已实现 | `server/core/config` |
+| 信封、错误码、分页、隧道帧模型 | 已实现 | `server/core/protocol` |
+| 原子 JSON 存储 | 已实现 | `server/core/store` |
+| `mpanel-core` / `mpanel-agent` / `mpanelctl` 入口 | 已实现 | `server/cmd/` |
 | 认证、隧道、机器代理、站点/数据库/容器/文件/终端/任务模块 | 已实现 | 按契约实现，能力缺失时降级 |
 | web/panel 前端 | 已有源码 | Vue 3 + Vite + Vue Router + Naive UI；只连 core，多机标签工作台 |
 

@@ -31,7 +31,7 @@ const CODE_LABEL: Record<AppErrorCode, string> = {
   NOT_FOUND: '资源不存在',
   CONFLICT: '状态冲突',
   UNAVAILABLE: '能力不可用',
-  UPSTREAM_ERROR: '上游执行失败',
+  UPSTREAM_ERROR: '执行失败',
   INTERNAL: '服务器内部错误',
   NETWORK: '网络错误',
   TIMEOUT: '请求超时',
@@ -40,7 +40,7 @@ const CODE_LABEL: Record<AppErrorCode, string> = {
 
 const DEFAULT_HINT: Record<AppErrorCode, string> = {
   BAD_REQUEST: '请检查表单内容与参数格式后重试。',
-  UNAUTHORIZED: '登录凭据无效或已过期，请重新登录或重新填写 token。',
+  UNAUTHORIZED: '登录凭据无效或已过期，请重新登录或检查访问令牌。',
   FORBIDDEN: '当前账号没有执行该操作的权限，请联系管理员。',
   NOT_FOUND: '资源不存在或已被删除，请刷新列表。',
   CONFLICT: '后端状态已变化，请刷新后重试；若有并发操作请稍候。',
@@ -166,7 +166,7 @@ export interface ErrorDescription {
 export function describeError(error: unknown, fallbackTitle = '操作失败'): ErrorDescription {
   if (error instanceof AppError) {
     return {
-      title: `${error.label}（${error.code}）`,
+      title: error.label,
       description: error.message,
       hint: error.hint,
       code: error.code,

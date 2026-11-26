@@ -120,8 +120,8 @@ async function execute(
   defaultTimeoutMs: number,
 ): Promise<Response> {
   if (url.length === 0) {
-    throw new AppError('UNAVAILABLE', '尚未选择 core 连接', 0, {
-      hint: '请先在设置或登录页添加 core 地址。',
+    throw new AppError('UNAVAILABLE', '尚未选择服务器', 0, {
+      hint: '请先填写服务器地址并登录。',
     });
   }
   if (opts.signal?.aborted === true) {
@@ -177,14 +177,14 @@ async function execute(
     if (error instanceof AppError) throw error;
     if (timedOut) {
       throw new AppError('TIMEOUT', `请求超时（${Math.round(timeoutMs / 1000)} 秒）`, 0, {
-        hint: '请确认 core 在线、目标机器是否可用、任务是否耗时过长，然后重试。',
+        hint: '请确认服务器在线、目标机器可用、任务耗时是否过长，然后重试。',
       });
     }
     if (isAborted(opts.signal) || controller.signal.aborted) {
       throw new AppError('ABORTED', '请求已被取消', 0);
     }
-    throw new AppError('NETWORK', '无法连接 core', 0, {
-      hint: '请确认 core 地址可访问、网络连通，以及跨域（CORS）配置正确。',
+    throw new AppError('NETWORK', '无法连接服务器', 0, {
+      hint: '请确认服务器地址可访问、网络连通，以及跨域（CORS）配置正确。',
       reason: error instanceof Error ? error.message : String(error),
     });
   } finally {
@@ -202,7 +202,7 @@ async function readEnvelope<T>(response: Response): Promise<T> {
     payload = JSON.parse(text);
   } catch {
     throw new AppError('INTERNAL', '响应不是合法的 JSON', response.status, {
-      hint: 'core 或反向代理可能返回了 HTML 错误页。',
+      hint: '服务器或反向代理可能返回了 HTML 错误页。',
       reason: text.slice(0, 200),
     });
   }
@@ -292,8 +292,8 @@ export function createClient(options: CreateClientOptions): ApiClient {
     },
     wsUrl: (featurePath, ticket) => {
       if (apiRoot.length === 0) {
-        throw new AppError('UNAVAILABLE', '尚未选择 core 连接', 0, {
-          hint: '请先添加 core 地址并登录。',
+        throw new AppError('UNAVAILABLE', '尚未选择服务器', 0, {
+          hint: '请先填写服务器地址并登录。',
         });
       }
       const mid = transport.machineId;
@@ -422,7 +422,7 @@ export async function probeConnection(input: {
     return {
       ok: false,
       latencyMs: 0,
-      error: new AppError('BAD_REQUEST', '请填写 core 地址', 0, {
+      error: new AppError('BAD_REQUEST', '请填写服务器地址', 0, {
         hint: '例如 https://panel.example.com 或 http://127.0.0.1:10086。',
       }),
     };
@@ -436,7 +436,7 @@ export async function probeConnection(input: {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw errorFromStatus(response.status, `core /healthz 返回 HTTP ${response.status}`);
+      throw errorFromStatus(response.status, `服务器 /healthz 返回 HTTP ${response.status}`);
     }
     const payload = (await response.json()) as {
       status?: string;
@@ -450,8 +450,8 @@ export async function probeConnection(input: {
       return {
         ok: false,
         latencyMs: Math.round(nowMs() - started),
-        error: new AppError('BAD_REQUEST', '该地址不是 core', 0, {
-          hint: `返回角色为 ${body.role ?? '未知'}；MPanel 前端只连接 core，不直连 agent。`,
+        error: new AppError('BAD_REQUEST', '该地址不是 MPanel 面板', 0, {
+          hint: `返回类型为 ${body.role ?? '未知'}；请填写 MPanel 面板服务地址。`,
         }),
       };
     }
@@ -464,8 +464,8 @@ export async function probeConnection(input: {
     const appError =
       error instanceof AppError
         ? error
-        : new AppError('NETWORK', '无法连接 core', 0, {
-            hint: '请确认地址、网络与 CORS 配置；core 默认端口 10086。',
+        : new AppError('NETWORK', '无法连接服务器', 0, {
+            hint: '请确认地址、网络与 CORS 配置；面板服务默认端口 10086。',
             reason: error instanceof Error ? error.message : String(error),
           });
     return { ok: false, latencyMs: Math.round(nowMs() - started), error: appError };

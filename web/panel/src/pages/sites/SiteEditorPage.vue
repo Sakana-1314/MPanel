@@ -203,7 +203,7 @@ const applyOutput = computed(() => {
           <template #trigger>
             <n-tag size="small" type="warning" round :bordered="false">Caddy 不可用</n-tag>
           </template>
-          {{ caddy?.reason ?? 'capabilities.caddy.available=false' }}
+          {{ caddy?.reason ?? 'Caddy 能力不可用' }}
         </n-tooltip>
       </template>
       <template #actions>

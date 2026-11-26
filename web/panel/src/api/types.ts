@@ -585,6 +585,58 @@ export interface ContainerActionInput {
   timeoutSec?: number;
 }
 
+/* -------------------------- Networks & daemon config ---------------------- */
+
+export interface ContainerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  internal: boolean;
+  attachable: boolean;
+  ipv6: boolean;
+  labels: Record<string, string>;
+  createdAt?: string | null;
+}
+
+export interface ContainerNetworkMember {
+  id: string;
+  name: string;
+  ipv4Address?: string;
+  ipv6Address?: string;
+}
+
+export interface ContainerNetworkDetail extends ContainerNetwork {
+  subnet?: string | null;
+  gateway?: string | null;
+  ipRange?: string | null;
+  containers: ContainerNetworkMember[];
+}
+
+export interface ContainerNetworkCreateInput {
+  name: string;
+  driver?: 'bridge' | 'overlay' | 'macvlan' | 'ipvlan';
+  subnet?: string;
+  gateway?: string;
+  internal?: boolean;
+  attachable?: boolean;
+}
+
+export interface RegistryAuth {
+  registry: string;
+  username: string;
+}
+
+export interface ContainerDaemonConfig {
+  daemonPath: string;
+  daemonJson: string;
+  registryMirrors: string[];
+  insecureRegistries: string[];
+  auths: RegistryAuth[];
+  dockerConfigPath?: string | null;
+  credentialStore?: string | null;
+}
+
 export interface ExecRequest {
   command: string[];
   timeoutMs?: number;
@@ -968,6 +1020,8 @@ export interface BackendConnection {
   token?: string;
   username?: string;
   createdAt?: string;
+  /** 最近一次成功登录时间，用于登录页的服务器记录排序。 */
+  lastUsedAt?: string;
 }
 
 export interface ConnectionSecret {

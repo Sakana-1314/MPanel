@@ -38,20 +38,31 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/panel/pnpm-lock.yaml
 
-      - name: 构建面板
+      - name: 构建面板（根路径）
         working-directory: web/panel
         env:
-          # vite.config.ts 读取 VITE_BASE_PATH；VITE_BASE 保留为发布约定中的别名。
-          VITE_BASE: /MPanel/
-          VITE_BASE_PATH: /MPanel/
+          # 自定义域名部署在根路径，资源必须用 /assets/... 而不是 /MPanel/assets/...
+          VITE_BASE_PATH: /
         run: |
+          set -euo pipefail
           pnpm install --frozen-lockfile
           pnpm build
+          rm -rf dist-root
+          cp -R dist dist-root
 
-      - name: 构建文档
+      - name: 构建面板（/MPanel/ 子路径）
+        working-directory: web/panel
+        env:
+          # GitHub Pages 项目页在 /MPanel/，同一份产物供项目页使用。
+          VITE_BASE_PATH: /MPanel/
+        run: |
+          set -euo pipefail
+          pnpm build
+
+      - name: 构建文档（根路径与子路径各一份）
         working-directory: web/docs
         env:
-          DOCS_BASE: /MPanel/docs/
+          DOCS_BASE: /docs/
         run: |
           set -euo pipefail
           if [ ! -f package.json ]; then
@@ -60,20 +71,30 @@ jobs:
           fi
           pnpm install --frozen-lockfile
           pnpm build
+          rm -rf .vitepress/dist-root
+          cp -R .vitepress/dist .vitepress/dist-root
+          DOCS_BASE=/MPanel/docs/ pnpm build
 
       - name: 组装发布目录
         run: |
           set -euo pipefail
           rm -rf public
           mkdir -p public
-          cp -R web/panel/dist/. public/
+          # 根路径：自定义域名 https://panel.example.com/
+          cp -R web/panel/dist-root/. public/
+          # 子路径：https://sakana-1314.github.io/MPanel/
+          mkdir -p public/MPanel
+          cp -R web/panel/dist/. public/MPanel/
           if [ -d web/docs/.vitepress/dist ]; then
-            mkdir -p public/docs
-            cp -R web/docs/.vitepress/dist/. public/docs/
+            mkdir -p public/docs public/MPanel/docs
+            cp -R web/docs/.vitepress/dist-root/. public/docs/
+            cp -R web/docs/.vitepress/dist/. public/MPanel/docs/
           else
             echo "::warning::未找到 web/docs/.vitepress/dist，本次只发布面板"
           fi
           cp public/index.html public/404.html
+          # GitHub Pages 项目页的深链兜底必须用子路径产物，否则 router base 不匹配。
+          cp public/MPanel/index.html public/MPanel/404.html
           echo "发布文件数：$(find public -type f | wc -l)"
 
       - name: 发布到 gh-pages

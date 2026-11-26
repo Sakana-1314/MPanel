@@ -346,7 +346,7 @@ const indexNamesText = computed({
                 @update:value="(value: string) => handler.type === 'file_server' && (handler.root = value)"
               />
             </n-form-item>
-            <p class="tiny muted">必须是 agent 上 MPANEL_SITES_ROOTS 白名单内的绝对路径。</p>
+            <p class="tiny muted">必须是服务器允许的站点根目录内的绝对路径。</p>
             <div class="two">
               <n-form-item label="索引文件（可选）">
                 <n-input v-model:value="indexNamesText" placeholder="index.html, index.htm" />

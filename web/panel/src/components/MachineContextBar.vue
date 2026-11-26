@@ -19,6 +19,7 @@ import {
   openMachineNavItem,
 } from '@/lib/navigation';
 import { machineStatusType } from '@/lib/status';
+import { transportLabel } from '@/lib/format';
 import MachineStatusTag from './common/MachineStatusTag.vue';
 import RelativeTime from './common/RelativeTime.vue';
 
@@ -36,7 +37,7 @@ const capabilities = computed<Array<{ key: keyof Capabilities; label: string; av
     docker: 'Docker',
     postgres: 'PostgreSQL',
     redis: 'Redis',
-    pty: 'PTY',
+    pty: '终端',
   };
   return (Object.keys(labels) as Array<keyof Capabilities>).map((key) => ({
     key,
@@ -71,10 +72,10 @@ function onPageSelect(key: string): void {
       <div class="identity">
         <span class="machine-name truncate">{{ machine.name }}</span>
         <MachineStatusTag :status="machine.status" />
-        <span class="tiny muted">{{ machine.transport }}</span>
+        <span class="tiny muted">{{ transportLabel(machine.transport) }}</span>
         <span class="tiny muted">心跳 <RelativeTime :value="machine.lastSeenAt" /></span>
         <span v-if="machine.worker" class="tiny muted">
-          agent v{{ machine.worker.version }} · {{ machine.worker.platform }}/{{ machine.worker.arch }}
+          v{{ machine.worker.version }} · {{ machine.worker.platform }}/{{ machine.worker.arch }}
         </span>
       </div>
 
@@ -130,7 +131,7 @@ function onPageSelect(key: string): void {
     style="margin: 0 16px 8px"
     :title="`机器当前为“${machine.status}”`"
   >
-    页面请求经 core 代理发往该机器，离线时可能失败。
+    页面请求会转发到该机器，离线时可能失败。
     <span v-if="machine.lastError" class="tiny muted">最近错误：{{ machine.lastError }}</span>
   </n-alert>
 </template>

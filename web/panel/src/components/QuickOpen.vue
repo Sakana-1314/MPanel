@@ -9,6 +9,7 @@ import {
 import { useMachinesQuery } from '@/lib/machines';
 import { activeTab } from '@/lib/workspace';
 import { machineStatusLabel, machineStatusType } from '@/lib/status';
+import { machineAddressLabel, transportLabel } from '@/lib/format';
 
 const props = defineProps<{ show: boolean }>();
 const emit = defineEmits<{ 'update:show': [value: boolean] }>();
@@ -22,7 +23,7 @@ const machines = computed(() => machinesQuery.data.value?.items ?? []);
 
 const machineOptions = computed(() =>
   machines.value.map((machine) => ({
-    label: `${machine.name} · ${machineStatusLabel(machine.status)} · ${machine.transport}`,
+    label: `${machine.name} · ${machineStatusLabel(machine.status)}`,
     value: machine.id,
   })),
 );
@@ -99,7 +100,9 @@ const selectedMachine = computed(() =>
           >
             {{ machineStatusLabel(selectedMachine.status) }}
           </n-tag>
-          <span class="tiny muted">{{ selectedMachine.transport }} · {{ selectedMachine.endpoint ?? 'stdio' }}</span>
+          <span class="tiny muted">
+            {{ transportLabel(selectedMachine.transport) }} · {{ machineAddressLabel(selectedMachine) }}
+          </span>
         </div>
       </div>
 

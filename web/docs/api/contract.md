@@ -1,8 +1,8 @@
 # MPanel REST API v1 契约
 
-状态：v1 冻结（2026-11-25）。**本文件是唯一事实源**，`web/panel/src/api/types.ts` 是浏览器侧的手写镜像，Go 结构体在 `core/protocol` 与各模块内实现。
+状态：v1 冻结（2026-11-25）。**本文件是唯一事实源**，`web/panel/src/api/types.ts` 是浏览器侧的手写镜像，Go 结构体在 `server/core/protocol` 与各模块内实现。
 
-> 术语说明：本文档写于 TypeScript 版本时期，「worker」在 Go 实现中更名为 **agent**（对应 `mpanel-agent`、`agent/`、`MPANEL_AGENT_*`）。机器模型里的 `worker` 字段（`machine.worker`）与 `/system/info` 的 `role: "worker"` 是协议字段，保留原名。
+> 术语说明：本文档写于 TypeScript 版本时期，「worker」在 Go 实现中更名为 **agent**（对应 `mpanel-agent`、`server/agent/`、`MPANEL_AGENT_*`）。机器模型里的 `worker` 字段（`machine.worker`）与 `/system/info` 的 `role: "worker"` 是协议字段，保留原名。
 
 - 基础路径：worker 与 core 都是 `/api/v1`；core 另有 `/api/v1/machines/:machineId/proxy/*`。
 - 内容类型：JSON 为 `application/json; charset=utf-8`；上传 `multipart/form-data`；下载为二进制流（§2.8）。
@@ -179,7 +179,8 @@ interface ListResult<T> {
 | `/sites` | 站点 JSON 存储可读 | `apply`/`validate` 需 caddy；`preview` 仍生成片段（validation=null） |
 | `/certs` | Caddy data 目录可读 | 只读 |
 | `/databases/profiles` | 档案存储可读 | test/stats 需驱动+目标可达；backup/restore 需工具 |
-| `/containers`、`/images`、`/stacks` | docker CLI + daemon 可用 | 全部写操作 `UNAVAILABLE` |
+| `/containers`、`/containers/networks`、`/images`、`/stacks` | docker CLI + daemon 可用 | 全部写操作 `UNAVAILABLE` |
+| `/containers/config` | daemon 配置文件可读 | 写操作需文件可写；不依赖 docker daemon |
 | `/files/*` | 至少一个文件根通过 realpath 校验 | 全部写操作 `UNAVAILABLE` |
 | `/terminal/sessions` | 进程可 spawn（pty 可选） | `pty=false` 仍可创建管道会话 |
 | `/tasks` | 内置 croner 可加载 | 无 |
@@ -1223,6 +1224,75 @@ interface ExecResult {
 - 运行中的栈删除需先 down 或 `force=true`（force 只删文件不停止容器）。
 - Compose YAML 是可信属主功能（可挂载宿主/privileged），不向非属主开放。
 
+### 9.5 网络与守护进程配置
+
+```ts
+interface ContainerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  internal: boolean;
+  attachable: boolean;
+  ipv6: boolean;
+  labels: Record<string, string>;
+  createdAt?: string | null;
+}
+
+interface ContainerNetworkMember {
+  id: string;
+  name: string;
+  ipv4Address?: string;
+  ipv6Address?: string;
+}
+
+interface ContainerNetworkDetail extends ContainerNetwork {
+  subnet?: string | null;
+  gateway?: string | null;
+  ipRange?: string | null;
+  containers: ContainerNetworkMember[];
+}
+
+interface RegistryAuth {
+  registry: string;      // 如 https://index.docker.io/v1/
+  username: string;      // 只回显用户名，绝不返回凭据
+}
+
+interface ContainerDaemonConfig {
+  daemonPath: string;            // 默认 /etc/docker/daemon.json
+  daemonJson: string;            // 文件原文；不存在时为 "{}"
+  registryMirrors: string[];     // daemon.json 的 registry-mirrors
+  insecureRegistries: string[];  // daemon.json 的 insecure-registries
+  auths: RegistryAuth[];         // 运行用户 docker config 中的登录项
+  dockerConfigPath?: string | null;
+  credentialStore?: string | null;
+}
+```
+
+| 方法 | 路径 | Query / Body | data |
+|---|---|---|---|
+| GET | `/containers/networks` | 分页 | `ListResult<ContainerNetwork>`，默认 `name asc` |
+| POST | `/containers/networks` | `{ name, driver?, subnet?, gateway?, internal?, attachable? }` | `ContainerNetworkDetail`，201 |
+| GET | `/containers/networks/:name/inspect` | — | `ContainerNetworkDetail` |
+| DELETE | `/containers/networks/:name` | — | `{ deleted:true, name }` |
+| GET | `/containers/config` | — | `ContainerDaemonConfig` |
+| PUT | `/containers/config` | `{ daemonJson }` | `ContainerDaemonConfig` |
+
+- 网络名称沿用容器引用正则 `^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`；`driver` 只允许
+  `bridge|overlay|macvlan|ipvlan`（缺省 `bridge`）；`subnet` 必须是 CIDR，`gateway` 必须落在
+  `subnet` 内。预定义网络 `bridge|host|none` 不可删除；仍有容器接入时删除 → `CONFLICT`，
+  `details.hint` 提示先断开容器。
+- 网络列表与写操作依赖 docker daemon：列表不可用返回 `{available:false,reason,items:[]}`，
+  写操作 → `503 UNAVAILABLE`。
+- daemon 配置路径由 agent 配置 `docker_config`（`MPANEL_DOCKER_CONFIG`）指定，默认
+  `/etc/docker/daemon.json`。文件不存在视为 `{}`；读失败 → `UNAVAILABLE`。
+- `PUT /containers/config`：`daemonJson` 上限 1 MiB，必须是 JSON 对象；对已知键做类型校验
+  （`registry-mirrors`/`insecure-registries` 为字符串数组，`data-root`/`log-driver`/`storage-driver`
+  为字符串），不合法 → `BAD_REQUEST`。写入用同目录 tmp + rename，权限 `0644`，拒绝符号链接目标；
+  不重启 Docker，需在守护进程重启后生效。
+- `auths` 读取运行用户的 `$DOCKER_CONFIG/config.json` 或 `~/.docker/config.json`，只返回
+  registry 与用户名；凭据本身永不进入响应、日志或审计。
+
 ## 10. 文件
 
 ### 10.1 模型
@@ -1669,6 +1739,8 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 | `/databases/profiles/:id/backup`、`/restore` | `CONFLICT`、`BAD_REQUEST`、`UNAVAILABLE`、`NOT_FOUND` |
 | `/databases/backups/:id`、`/download`、`/jobs*` | `NOT_FOUND`、`UPSTREAM_ERROR`（下载） |
 | `/containers*` | `UNAVAILABLE`、`NOT_FOUND`、`BAD_REQUEST`、`UPSTREAM_ERROR` |
+| `/containers/networks*` | `UNAVAILABLE`、`NOT_FOUND`、`BAD_REQUEST`、`CONFLICT` |
+| `/containers/config` | `BAD_REQUEST`（JSON/已知键）、`UNAVAILABLE`（读写失败） |
 | `/containers/:id/logs`、WS logs | `UNAVAILABLE`、`NOT_FOUND`、`4502`/`4404` |
 | `/images*` | `UNAVAILABLE`、`NOT_FOUND`、`BAD_REQUEST`、`UPSTREAM_ERROR` |
 | `/stacks*` | `UNAVAILABLE`、`NOT_FOUND`、`CONFLICT`、`BAD_REQUEST`、`UPSTREAM_ERROR` |
@@ -1692,6 +1764,7 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 | `/certs` | §7 |
 | `/databases/profiles`（test/handoff/backup/restore/pg+redis stats） | §8 |
 | `/containers`（logs 流/stats/exec/start/stop/restart/remove） | §9.2 |
+| `/containers/networks`、`/containers/config` | §9.5 |
 | `/stacks`、`/images` | §9.3、§9.4 |
 | `/files`（list/stat/read/write/mkdir/rename/copy/chmod/delete/trash/upload/download/archive/extract/search） | §10 |
 | `/terminal/sessions`、`WS /ws/terminal/:id` | §11 |

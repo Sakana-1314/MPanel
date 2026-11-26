@@ -43,6 +43,7 @@ import { machineStatusType } from '@/lib/status';
 import { activeConnection } from '@/lib/connection-store';
 import { logout, sessionSnapshot } from '@/lib/session';
 import { useTheme } from '@/lib/theme';
+import logoMark from '@/assets/logo-mark.png';
 
 const emit = defineEmits<{ quickOpen: [] }>();
 
@@ -141,10 +142,10 @@ async function onAccountSelect(key: string): Promise<void> {
 <template>
   <div class="sidebar">
     <div class="brand">
-      <span class="logo">M</span>
+      <span class="logo"><img :src="logoMark" alt="MPanel" /></span>
       <div class="brand-text">
         <strong>MPanel</strong>
-        <span class="tiny muted">core 多机工作台</span>
+        <span class="tiny muted">服务器管理面板</span>
       </div>
     </div>
 
@@ -185,7 +186,7 @@ async function onAccountSelect(key: string): Promise<void> {
           >
             <span class="status-dot" :class="`dot-${machineStatusType(machine.status)}`" />
             <span class="machine-name truncate">{{ machine.name }}</span>
-            <span v-if="machine.transport === 'reverse-ws'" class="tiny muted">edge</span>
+            <span v-if="machine.edge || machine.transport === 'reverse-ws'" class="tiny muted">边缘</span>
           </button>
         </div>
       </div>
@@ -251,15 +252,22 @@ async function onAccountSelect(key: string): Promise<void> {
   padding: 10px 14px 4px;
 }
 .logo {
-  width: 34px;
+  width: 46px;
   height: 34px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #4f7cff, #7a5cff);
-  color: #fff;
-  font-weight: 800;
-  font-size: 17px;
+  padding: 3px 5px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--mpanel-border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+  flex: 0 0 auto;
+}
+.logo img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 .brand-text {
   display: flex;

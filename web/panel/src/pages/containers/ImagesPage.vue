@@ -127,7 +127,7 @@ function confirmPrune(): void {
           <template #trigger>
             <n-tag size="small" type="warning" round :bordered="false">Docker 不可用</n-tag>
           </template>
-          {{ imagesQuery.data.value?.reason ?? 'agent 返回 available=false' }}
+          {{ imagesQuery.data.value?.reason ?? '服务返回不可用' }}
         </n-tooltip>
       </template>
       <template #actions>

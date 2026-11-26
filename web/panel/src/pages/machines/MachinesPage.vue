@@ -35,6 +35,7 @@ import { coreKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
 import { openMachineDetail, openMachinePage } from '@/lib/navigation';
 import { machineStatusType } from '@/lib/status';
+import { machineAddressLabel, transportLabel } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
@@ -91,10 +92,10 @@ const statusOptions = [
   { label: '错误', value: 'error' },
 ];
 const transportOptions = [
-  { label: '全部传输', value: 'all' },
-  { label: 'http', value: 'http' },
-  { label: 'stdio', value: 'stdio' },
-  { label: 'reverse-ws', value: 'reverse-ws' },
+  { label: '全部接入方式', value: 'all' },
+  { label: '直连', value: 'http' },
+  { label: '本机', value: 'stdio' },
+  { label: '隧道', value: 'reverse-ws' },
 ];
 
 const invalidate = computed(() => [
@@ -105,7 +106,7 @@ const invalidate = computed(() => [
 const connectAction = useAction((machine: Machine) => api.value.machines.connect(machine.id), {
   success: (machine) => `已请求连接 ${machine.name}`,
   successDescription: (machine) =>
-    machine.transport === 'reverse-ws' ? '等待 agent 主动连回 core。' : 'core 正在建立到 agent 的连接。',
+    machine.transport === 'reverse-ws' ? '等待节点主动连回。' : '正在建立到节点的连接。',
   invalidate: invalidate.value,
 });
 
@@ -117,14 +118,14 @@ const disconnectAction = useAction((machine: Machine) => api.value.machines.disc
 
 const deleteAction = useAction((machine: Machine) => api.value.machines.delete(machine.id), {
   success: (_result, machine) => `已删除机器 ${machine.name}`,
-  successDescription: '机器配置与凭据已移除；agent 进程本身不受影响。',
+  successDescription: '机器配置与凭据已移除；目标服务器上的服务不受影响。',
   invalidate: invalidate.value,
 });
 
 const rotateAction = useAction(
   (machine: Machine) => api.value.machines.rotateSecret(machine.id),
   {
-    success: (result, machine) => `已轮换 ${machine.name} 的 secret`,
+    success: (result, machine) => `已轮换 ${machine.name} 的接入密钥`,
     successDescription: '请保存新的注册信息。',
     invalidate: invalidate.value,
   },
@@ -151,7 +152,7 @@ function openEdit(machine: Machine): void {
 function confirmDelete(machine: Machine): void {
   dialog.warning({
     title: '删除机器',
-    content: `确定删除“${machine.name}”？将移除机器配置与凭据，所有经 core 代理的请求会立即失效；agent 进程本身不受影响。`,
+    content: `确定删除“${machine.name}”？将移除机器配置与凭据，所有经面板转发的请求会立即失效；目标服务器上的服务不受影响。`,
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: () => {
@@ -176,7 +177,7 @@ function rowMenuOptions(machine: Machine): Array<{ label: string; key: string }>
   return [
     { label: '详情与健康', key: 'detail' },
     { label: '编辑机器', key: 'edit' },
-    ...(machine.transport === 'reverse-ws' ? [{ label: '轮换 machine secret', key: 'rotate' }] : []),
+    ...(machine.transport === 'reverse-ws' ? [{ label: '轮换接入密钥', key: 'rotate' }] : []),
     { label: '删除机器', key: 'delete' },
   ];
 }
@@ -228,7 +229,7 @@ const isBusy = computed(
       :bordered="true"
       title="机器存储不可用"
     >
-      {{ machinesQuery.data.value.reason ?? 'core 返回 available=false。' }}
+      {{ machinesQuery.data.value.reason ?? '服务返回不可用。' }}
     </n-alert>
 
     <error-state
@@ -241,7 +242,7 @@ const isBusy = computed(
       <div class="toolbar">
         <n-input
           v-model:value="search"
-          placeholder="搜索机器名 / id / 端点…"
+          placeholder="搜索机器名 / ID / 地址…"
           clearable
           style="max-width: 280px"
         />
@@ -268,7 +269,7 @@ const isBusy = computed(
           <tr>
             <th style="min-width: 180px">机器</th>
             <th style="width: 130px">状态</th>
-            <th style="min-width: 170px">传输 / 端点</th>
+            <th style="min-width: 170px">接入方式 / 地址</th>
             <th style="min-width: 150px">最近心跳</th>
             <th style="width: 170px">操作</th>
           </tr>
@@ -282,7 +283,7 @@ const isBusy = computed(
                 </button>
                 <span class="mono tiny muted">{{ machine.id }}</span>
                 <div class="tags">
-                  <n-tag v-if="machine.edge" size="tiny" type="info" round :bordered="false">edge</n-tag>
+                  <n-tag v-if="machine.edge" size="tiny" type="info" round :bordered="false">边缘</n-tag>
                   <n-tag v-if="machine.group" size="tiny" round :bordered="false">{{ machine.group }}</n-tag>
                 </div>
               </div>
@@ -299,10 +300,10 @@ const isBusy = computed(
             <td>
               <div class="stack-tight">
                 <n-tag size="tiny" :type="machine.transport === 'reverse-ws' ? 'info' : 'default'" round :bordered="false">
-                  {{ machine.transport }}
+                  {{ transportLabel(machine.transport) }}
                 </n-tag>
-                <span class="mono tiny muted truncate" :title="machine.endpoint ?? 'stdio 本地进程'">
-                  {{ machine.endpoint ?? 'stdio 本地进程' }}
+                <span class="mono tiny muted truncate" :title="machineAddressLabel(machine)">
+                  {{ machineAddressLabel(machine) }}
                 </span>
               </div>
             </td>
@@ -310,7 +311,7 @@ const isBusy = computed(
               <div class="stack-tight">
                 <RelativeTime :value="machine.lastSeenAt" />
                 <span class="tiny muted">
-                  {{ machine.worker === null ? 'agent 未上报' : `${machine.worker.name} v${machine.worker.version}` }}
+                  {{ machine.worker === null ? '未上报' : `v${machine.worker.version}` }}
                 </span>
               </div>
             </td>

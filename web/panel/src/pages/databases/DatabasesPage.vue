@@ -428,7 +428,7 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
     </PageHeader>
 
     <n-alert v-if="profilesQuery.data.value?.available === false" type="warning" :bordered="true" title="数据库档案存储不可用">
-      {{ profilesQuery.data.value.reason ?? '后端返回 available=false。' }}
+      {{ profilesQuery.data.value.reason ?? '服务返回不可用。' }}
     </n-alert>
 
     <error-state v-if="profilesQuery.isError.value" :error="profilesQuery.error.value" @retry="profilesQuery.refetch()" />

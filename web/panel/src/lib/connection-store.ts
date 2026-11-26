@@ -44,6 +44,7 @@ function loadPersisted(): PersistedState {
         baseUrl: normalized,
         username: typeof entry.username === 'string' ? entry.username : undefined,
         createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : undefined,
+        lastUsedAt: typeof entry.lastUsedAt === 'string' ? entry.lastUsedAt : undefined,
       });
     }
     return {
@@ -125,7 +126,7 @@ export function addConnection(input: {
   token?: string;
 }): BackendConnection {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
-  if (baseUrl.length === 0) throw new Error('core 地址不能为空');
+  if (baseUrl.length === 0) throw new Error('服务器地址不能为空');
   const id = input.id ?? makeConnectionId();
   const connection: BackendConnection = {
     id,
@@ -174,6 +175,17 @@ export function setActiveConnection(id: string): void {
   if (!state.connections.some((connection) => connection.id === id)) return;
   if (state.activeId === id) return;
   state.activeId = id;
+  persist();
+}
+
+/** 成功登录后把服务器移到记录顶部，作为“最近登录”排序。 */
+export function touchConnection(id: string): void {
+  const index = state.connections.findIndex((connection) => connection.id === id);
+  if (index < 0) return;
+  const [connection] = state.connections.splice(index, 1);
+  if (connection === undefined) return;
+  connection.lastUsedAt = new Date().toISOString();
+  state.connections.unshift(connection);
   persist();
 }
 

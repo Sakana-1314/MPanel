@@ -1,86 +1,48 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { NAlert, NButton, NIcon, NPopover } from 'naive-ui';
 import {
-  NAlert,
-  NButton,
-  NCard,
-  NEmpty,
-  NForm,
-  NFormItem,
-  NIcon,
-  NInput,
-  NModal,
-  NSpin,
-  NTag,
-  NTooltip,
-  useDialog,
-  useMessage,
-  NSelect,
-} from 'naive-ui';
-import {
-  AddOutline,
-  CheckmarkCircleOutline,
-  CreateOutline,
-  KeyOutline,
+  ChevronDownOutline,
   LockClosedOutline,
   MoonOutline,
   PersonOutline,
-  RefreshOutline,
-  SettingsOutline,
+  ServerOutline,
   SunnyOutline,
   TrashOutline,
 } from '@vicons/ionicons5';
-import type { AppError } from '@/api/errors';
-import { AppError as PanelError, describeError } from '@/api/errors';
-import { probeConnection, type ConnectionProbeResult } from '@/api/client';
+import type { BackendConnection } from '@/api/types';
+import { AppError } from '@/api/errors';
 import {
   activeConnection,
-  activeConnectionId,
   addConnection,
   listConnections,
+  normalizeBaseUrl,
   removeConnection,
   setActiveConnection,
+  touchConnection,
   updateConnection,
 } from '@/lib/connection-store';
-import { ensureSession, login, resetSession, sessionSnapshot } from '@/lib/session';
+import { ensureSession, login } from '@/lib/session';
 import { queryClient } from '@/lib/query-client';
 import { useTheme } from '@/lib/theme';
+import FloatingField from '@/components/common/FloatingField.vue';
+import LoginTerminal from '@/components/LoginTerminal.vue';
+import logoMark from '@/assets/logo-mark.png';
 
 const route = useRoute();
 const router = useRouter();
-const message = useMessage();
-const dialog = useDialog();
 const { isDark, toggle } = useTheme();
 
-const session = sessionSnapshot();
-const connections = computed(() => listConnections());
-const connection = activeConnection;
-
+const server = ref('');
 const username = ref('');
 const password = ref('');
 const submitting = ref(false);
-const loginError = ref<AppError | null>(null);
+const loginError = ref<string | null>(null);
+const historyOpen = ref(false);
 
-const managerOpen = ref(false);
-const formOpen = ref(false);
-const editingId = ref<string | null>(null);
-const formName = ref('');
-const formUrl = ref('');
-const formSaving = ref(false);
-const formError = ref<string | null>(null);
-const testing = ref(false);
-const testResult = ref<ConnectionProbeResult | null>(null);
-
-watch(
-  () => connection.value?.id,
-  () => {
-    username.value = connection.value?.username ?? '';
-    password.value = '';
-    loginError.value = null;
-  },
-  { immediate: true },
-);
+const recentConnections = computed(() => listConnections());
+const year = new Date().getFullYear();
 
 const redirectTarget = computed(() => {
   const redirect = route.query.redirect;
@@ -90,479 +52,659 @@ const redirectTarget = computed(() => {
   return '/';
 });
 
-const errorInfo = computed(() => (loginError.value === null ? null : describeError(loginError.value)));
-
 onMounted(() => {
-  if (activeConnectionId.value !== null) void ensureSession();
+  const current = activeConnection.value ?? listConnections()[0];
+  server.value = current?.baseUrl ?? window.location.origin;
+  username.value = current?.username ?? '';
+  password.value = '';
+  // 没有连接时把会话状态从初始 checking 归位到 no-connection。
+  void ensureSession();
 });
 
-watch(activeConnectionId, (id) => {
-  if (id !== null) void ensureSession(true);
-});
+/** 允许用户只填 host（自动沿用当前页面的协议），也接受完整 URL。 */
+function normalizeServer(raw: string): string {
+  let value = raw.trim().replace(/\/+$/, '');
+  if (value.length === 0) return '';
+  if (!/^https?:\/\//i.test(value)) {
+    const scheme = window.location.protocol === 'https:' ? 'https://' : 'http://';
+    value = scheme + value;
+  }
+  return normalizeBaseUrl(value);
+}
+
+function serverHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function serverName(url: string): string {
+  return serverHost(url);
+}
+
+function syncUsernameFromServer(): void {
+  const saved = listConnections().find((item) => item.baseUrl === normalizeServer(server.value));
+  if (saved?.username !== undefined && saved.username.length > 0) {
+    username.value = saved.username;
+  }
+}
+
+function selectRecent(item: BackendConnection): void {
+  server.value = item.baseUrl;
+  username.value = item.username ?? '';
+  password.value = '';
+  loginError.value = null;
+  historyOpen.value = false;
+}
+
+function forgetRecent(item: BackendConnection): void {
+  removeConnection(item.id);
+  if (normalizeServer(server.value) === item.baseUrl) {
+    const next = listConnections()[0];
+    server.value = next?.baseUrl ?? window.location.origin;
+    username.value = next?.username ?? '';
+    password.value = '';
+  }
+}
+
+function loginErrorFor(error: unknown): string {
+  if (!(error instanceof AppError)) return '登录失败，请稍后重试';
+  switch (error.code) {
+    case 'UNAUTHORIZED':
+      return error.detail?.retryAfterSec !== undefined ? error.message : '用户名或密码错误';
+    case 'NOT_FOUND':
+    case 'INTERNAL':
+      return '服务器地址不正确';
+    case 'NETWORK':
+      return '无法连接服务器';
+    case 'TIMEOUT':
+      return '连接超时';
+    case 'UNAVAILABLE':
+      return '服务暂时不可用';
+    case 'BAD_REQUEST':
+      return error.message.length > 0 ? error.message : '请检查输入';
+    default:
+      return '登录失败，请稍后重试';
+  }
+}
 
 async function submit(): Promise<void> {
-  if (connection.value === undefined) return;
-  if (username.value.trim().length === 0 || password.value.length === 0) {
-    loginError.value = new PanelError('BAD_REQUEST', '请填写用户名与密码', 0, {
-      hint: 'core 登录需要账号密码；没有账号请查看 core 的初始化配置。',
-    });
+  if (submitting.value) return;
+  loginError.value = null;
+
+  const normalized = normalizeServer(server.value);
+  if (normalized.length === 0) {
+    loginError.value = '请填写服务器地址';
     return;
   }
-  submitting.value = true;
-  loginError.value = null;
   try {
-    await login(username.value, password.value);
-    if (connection.value !== undefined) {
-      updateConnection(connection.value.id, { username: username.value.trim() });
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('protocol');
     }
+  } catch {
+    loginError.value = '服务器地址格式不正确';
+    return;
+  }
+  if (username.value.trim().length === 0) {
+    loginError.value = '请填写用户名';
+    return;
+  }
+  if (password.value.length === 0) {
+    loginError.value = '请填写密码';
+    return;
+  }
+
+  submitting.value = true;
+  let createdId: string | null = null;
+  try {
+    const existing = listConnections().find((item) => item.baseUrl === normalized);
+    let connection = existing;
+    if (connection === undefined) {
+      connection = addConnection({ name: serverName(normalized), baseUrl: normalized });
+      createdId = connection.id;
+    }
+    setActiveConnection(connection.id);
+    // 让全局连接切换 watch 先清理旧会话/标签，再提交登录。
+    await nextTick();
+    await login(username.value.trim(), password.value);
+    updateConnection(connection.id, { username: username.value.trim() });
+    touchConnection(connection.id);
     queryClient.clear();
     await router.replace(redirectTarget.value);
   } catch (error) {
-    loginError.value = error as AppError;
+    // 只记录真正登录成功的服务器；失败的新地址不写入最近登录。
+    if (createdId !== null) removeConnection(createdId);
+    loginError.value = loginErrorFor(error);
   } finally {
     submitting.value = false;
   }
 }
 
-function openAdd(): void {
-  editingId.value = null;
-  formName.value = '';
-  formUrl.value = '';
-  formError.value = null;
-  testResult.value = null;
-  formOpen.value = true;
-}
-
-function openEdit(id: string): void {
-  const item = connections.value.find((entry) => entry.id === id);
-  if (item === undefined) return;
-  editingId.value = id;
-  formName.value = item.name;
-  formUrl.value = item.baseUrl;
-  formError.value = null;
-  testResult.value = null;
-  formOpen.value = true;
-}
-
-async function testForm(): Promise<void> {
-  testing.value = true;
-  testResult.value = null;
-  try {
-    testResult.value = await probeConnection({ baseUrl: formUrl.value });
-  } finally {
-    testing.value = false;
-  }
-}
-
-async function saveForm(): Promise<void> {
-  const name = formName.value.trim();
-  const url = formUrl.value.trim();
-  if (name.length === 0) {
-    formError.value = '请填写连接名称。';
-    return;
-  }
-  if (url.length === 0) {
-    formError.value = '请填写 core 地址，例如 https://panel.example.com。';
-    return;
-  }
-  const probe = await probeConnection({ baseUrl: url });
-  if (!probe.ok) {
-    formError.value = `地址不可用：${describeError(probe.error).description} ${describeError(probe.error).hint}`;
-    return;
-  }
-  formSaving.value = true;
-  formError.value = null;
-  try {
-    if (editingId.value === null) {
-      const created = addConnection({ name, baseUrl: url });
-      setActiveConnection(created.id);
-      message.success(`已添加 core 连接 ${created.name}`);
-    } else {
-      updateConnection(editingId.value, { name, baseUrl: url });
-      if (editingId.value === activeConnectionId.value) {
-        resetSession();
-        queryClient.clear();
-      }
-      message.success('连接已更新');
-    }
-    formOpen.value = false;
-  } finally {
-    formSaving.value = false;
-  }
-}
-
-function confirmRemove(id: string): void {
-  const item = connections.value.find((entry) => entry.id === id);
-  if (item === undefined) return;
-  dialog.warning({
-    title: '删除 core 连接',
-    content: `确定删除“${item.name}”（${item.baseUrl}）？这不会影响 core 服务本身，只清理浏览器里的连接配置。`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: () => {
-      removeConnection(id);
-      queryClient.clear();
-      message.success('连接已删除');
-    },
-  });
-}
-
-function selectConnection(id: string): void {
-  setActiveConnection(id);
-  void ensureSession(true);
-}
+const canSubmit = computed(
+  () =>
+    server.value.trim().length > 0 &&
+    username.value.trim().length > 0 &&
+    password.value.length > 0 &&
+    !submitting.value,
+);
 </script>
 
 <template>
   <div class="login-page">
-    <button type="button" class="theme-toggle" @click="toggle">
-      <n-icon :component="isDark ? SunnyOutline : MoonOutline" />
-      {{ isDark ? '浅色' : '深色' }}
-    </button>
-
-    <div class="login-wrap">
-      <div class="brand">
-        <span class="logo">M</span>
-        <div>
-          <h1>MPanel</h1>
-          <p class="small muted">core 控制面 · 多机工作台</p>
-        </div>
+    <aside class="brand-panel">
+      <div class="brand-top">
+        <span class="brand-mark"><img :src="logoMark" alt="MPanel" /></span>
+        <span class="brand-name">MPanel</span>
       </div>
 
-      <n-card :bordered="true" class="login-card">
-        <template v-if="connections.length === 0">
-          <n-empty description="连接 core">
-            <template #extra>
-              <n-button type="primary" @click="openAdd">
-                <template #icon><n-icon :component="AddOutline" /></template>
-                新增 core 连接
-              </n-button>
-            </template>
-          </n-empty>
-        </template>
+      <div class="brand-main">
+        <div class="brand-copy">
+          <p class="eyebrow">MPANEL · SERVER CONSOLE</p>
+          <h1>
+            一处登录，<br />
+            <span class="accent">管理所有服务器。</span>
+          </h1>
+          <p class="lede">把重复的运维收进同一个工作台，把注意力留给真正重要的事。</p>
 
-        <template v-else>
-          <n-form :show-label="true" label-placement="top">
-            <n-form-item label="core 连接">
-              <div class="connection-row">
-                <n-select
-                  :value="activeConnectionId"
-                  :options="connections.map((item) => ({ label: item.name, value: item.id }))"
-                  @update:value="selectConnection"
-                />
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button secondary circle @click="managerOpen = true">
-                      <template #icon><n-icon :component="SettingsOutline" /></template>
-                    </n-button>
-                  </template>
-                  连接管理
-                </n-tooltip>
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button secondary circle @click="openAdd">
-                      <template #icon><n-icon :component="AddOutline" /></template>
-                    </n-button>
-                  </template>
-                  新增连接
-                </n-tooltip>
-              </div>
-            </n-form-item>
+          <ul class="features">
+            <li>
+              <span class="feature-icon"><n-icon :component="ServerOutline" /></span>
+              <span>
+                <strong>统一入口</strong>
+                <small>站点、容器、数据库、文件与终端都在一个面板。</small>
+              </span>
+            </li>
+            <li>
+              <span class="feature-icon"><n-icon :component="PersonOutline" /></span>
+              <span>
+                <strong>多机协作</strong>
+                <small>标签页绑定机器，同时处理多台服务器。</small>
+              </span>
+            </li>
+            <li>
+              <span class="feature-icon"><n-icon :component="LockClosedOutline" /></span>
+              <span>
+                <strong>安全访问</strong>
+                <small>统一登录与权限校验，危险操作确认后才执行。</small>
+              </span>
+            </li>
+          </ul>
+        </div>
 
-            <div v-if="connection" class="conn-meta">
-              <n-tag size="small" type="info" round :bordered="false">core</n-tag>
-              <span class="mono small muted truncate">{{ connection.baseUrl }}</span>
-            </div>
+        <login-terminal />
+      </div>
 
-            <template v-if="session.status === 'checking'">
-              <div class="center"><n-spin size="small" /> <span class="small muted">正在验证 core 会话…</span></div>
-            </template>
+      <p class="brand-foot">© {{ year }} MPanel</p>
+    </aside>
 
-            <template v-else-if="session.status === 'error'">
-              <n-alert type="error" title="无法连接 core" :bordered="true" style="margin-top: 12px">
-                <div>{{ session.error?.message ?? '未知错误' }}</div>
-                <div style="margin-top: 8px">
-                  <n-button size="small" secondary @click="ensureSession(true)">
-                    <template #icon><n-icon :component="RefreshOutline" /></template>
-                    重试
-                  </n-button>
-                </div>
-              </n-alert>
-            </template>
+    <main class="form-panel">
+      <button type="button" class="theme-toggle" :title="isDark ? '浅色主题' : '深色主题'" @click="toggle">
+        <n-icon :component="isDark ? SunnyOutline : MoonOutline" />
+      </button>
 
-            <template v-else>
-              <n-form-item label="用户名">
-                <n-input
-                  v-model:value="username"
-                  placeholder="admin"
-                  autocomplete="username"
-                  :input-props="{ autocomplete: 'username' }"
-                >
-                  <template #prefix><n-icon :component="PersonOutline" /></template>
-                </n-input>
-              </n-form-item>
-              <n-form-item label="密码">
-                <n-input
-                  v-model:value="password"
-                  type="password"
-                  show-password-on="click"
-                  placeholder="core 登录密码"
-                  :input-props="{ autocomplete: 'current-password' }"
-                  @keydown.enter="submit"
-                >
-                  <template #prefix><n-icon :component="LockClosedOutline" /></template>
-                </n-input>
-              </n-form-item>
+      <div class="form-wrap">
+        <div class="mobile-brand">
+          <span class="brand-mark"><img :src="logoMark" alt="MPanel" /></span>
+          <span class="brand-name">MPanel</span>
+        </div>
 
-              <n-button
-                type="primary"
-                block
-                :loading="submitting"
-                :disabled="username.trim().length === 0 || password.length === 0"
-                @click="submit"
-              >
-                登录
-              </n-button>
-            </template>
+        <div class="login-card">
+          <p class="eyebrow">MPANEL CONSOLE</p>
+          <h2>登录面板</h2>
 
-            <n-alert
-              v-if="errorInfo"
-              type="error"
-              :title="errorInfo.title"
-              :bordered="true"
-              style="margin-top: 12px"
+          <div class="fields">
+            <floating-field
+              v-model="server"
+              label="服务器"
+              autocomplete="url"
+              @blur="syncUsernameFromServer"
+              @keydown.enter="submit"
             >
-              <div>{{ errorInfo.description }}</div>
-              <div class="small muted">{{ errorInfo.hint }}</div>
-            </n-alert>
-          </n-form>
-        </template>
-      </n-card>
+              <template #prefix><n-icon :component="ServerOutline" /></template>
+              <template #suffix>
+                <n-popover
+                  v-model:show="historyOpen"
+                  trigger="click"
+                  placement="bottom-end"
+                  raw
+                  :duration="0"
+                  :show-arrow="false"
+                >
+                  <template #trigger>
+                    <button
+                      type="button"
+                      class="history-trigger"
+                      :class="{ open: historyOpen }"
+                      title="最近登录"
+                    >
+                      <n-icon :component="ChevronDownOutline" />
+                    </button>
+                  </template>
+                  <div class="history-panel">
+                    <div class="history-head">最近登录</div>
+                    <div v-if="recentConnections.length === 0" class="history-empty">暂无记录</div>
+                    <div v-else class="history-list">
+                      <div
+                        v-for="item in recentConnections"
+                        :key="item.id"
+                        class="history-row"
+                        role="button"
+                        tabindex="0"
+                        @click="selectRecent(item)"
+                        @keydown.enter="selectRecent(item)"
+                      >
+                        <span class="history-main">
+                          <span class="history-host truncate">{{ serverHost(item.baseUrl) }}</span>
+                          <span class="history-user truncate">{{ item.username ?? '未保存账号' }}</span>
+                        </span>
+                        <button
+                          type="button"
+                          class="history-delete"
+                          title="删除记录"
+                          @click.stop="forgetRecent(item)"
+                        >
+                          <n-icon :component="TrashOutline" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </n-popover>
+              </template>
+            </floating-field>
 
+            <floating-field
+              v-model="username"
+              label="用户名"
+              autocomplete="username"
+              @keydown.enter="submit"
+            >
+              <template #prefix><n-icon :component="PersonOutline" /></template>
+            </floating-field>
 
-    </div>
-
-    <!-- 连接管理 -->
-    <n-modal
-      v-model:show="managerOpen"
-      preset="card"
-      title="core 连接"
-      style="width: 760px; max-width: calc(100vw - 24px)"
-    >
-      <div class="manager-toolbar">
-        <span class="small muted">共 {{ connections.length }} 个连接</span>
-        <n-button size="small" type="primary" @click="openAdd">
-          <template #icon><n-icon :component="AddOutline" /></template>
-          新增 core
-        </n-button>
-      </div>
-      <n-empty v-if="connections.length === 0" description="暂无连接" />
-      <div v-else class="conn-list">
-        <div v-for="item in connections" :key="item.id" class="conn-item">
-          <div class="conn-item-main">
-            <div class="conn-item-title">
-              <strong>{{ item.name }}</strong>
-              <n-tag v-if="item.id === activeConnectionId" size="tiny" type="success" round :bordered="false">
-                当前
-              </n-tag>
-            </div>
-            <div class="mono tiny muted truncate">{{ item.baseUrl }}</div>
+            <floating-field
+              v-model="password"
+              label="密码"
+              type="password"
+              show-password-on="click"
+              autocomplete="current-password"
+              @keydown.enter="submit"
+            >
+              <template #prefix><n-icon :component="LockClosedOutline" /></template>
+            </floating-field>
           </div>
-          <div class="conn-item-actions">
-            <n-button size="tiny" quaternary :disabled="item.id === activeConnectionId" @click="selectConnection(item.id)">
-              <template #icon><n-icon :component="CheckmarkCircleOutline" /></template>
-              设为当前
-            </n-button>
-            <n-button size="tiny" quaternary @click="openEdit(item.id)">
-              <template #icon><n-icon :component="CreateOutline" /></template>
-              编辑
-            </n-button>
-            <n-button size="tiny" quaternary type="error" @click="confirmRemove(item.id)">
-              <template #icon><n-icon :component="TrashOutline" /></template>
-            </n-button>
-          </div>
-        </div>
-      </div>
-    </n-modal>
 
-    <!-- 新增/编辑连接 -->
-    <n-modal
-      v-model:show="formOpen"
-      preset="card"
-      :title="editingId === null ? '新增 core 连接' : '编辑 core 连接'"
-      style="width: 620px; max-width: calc(100vw - 24px)"
-    >
-      <div class="stack">
-        <n-form-item label="名称">
-          <n-input v-model:value="formName" placeholder="例如：生产 core / 本地 core" />
-        </n-form-item>
-        <n-form-item label="core 地址">
-          <n-input
-            v-model:value="formUrl"
-            placeholder="https://panel.example.com 或 http://127.0.0.1:10086"
+          <n-button
+            type="primary"
+            size="large"
+            block
+            :loading="submitting"
+            :disabled="!canSubmit"
+            @click="submit"
           >
-            <template #prefix><n-icon :component="KeyOutline" /></template>
-          </n-input>
-        </n-form-item>
-
-        <div class="toolbar">
-          <n-button size="small" secondary :loading="testing" @click="testForm">
-            <template #icon><n-icon :component="RefreshOutline" /></template>
-            测试连通性
+            登录
           </n-button>
-          <span v-if="testResult" class="small">
-            <n-tag v-if="testResult.ok" size="small" type="success" :bordered="false" round>
-              core {{ testResult.info?.version }} · {{ testResult.latencyMs }} ms
-            </n-tag>
-            <n-tag v-else size="small" type="error" :bordered="false" round>
-              {{ describeError(testResult.error).description }}
-            </n-tag>
-          </span>
+
+          <n-alert
+            v-if="loginError"
+            class="login-error"
+            type="error"
+            :bordered="false"
+            show-icon
+          >
+            {{ loginError }}
+          </n-alert>
         </div>
 
-        <n-alert v-if="formError" type="error" :bordered="true" title="无法保存">
-          {{ formError }}
-        </n-alert>
+        <p class="form-foot">MPanel · 服务器管理面板</p>
       </div>
-
-      <template #footer>
-        <div class="toolbar" style="justify-content: flex-end">
-          <n-button quaternary @click="formOpen = false">取消</n-button>
-          <n-button type="primary" :loading="formSaving" @click="saveForm">保存</n-button>
-        </div>
-      </template>
-    </n-modal>
+    </main>
   </div>
 </template>
 
 <style scoped>
 .login-page {
   min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 46%) minmax(0, 54%);
+  background: var(--mpanel-bg);
+}
+
+/* ------------------------------- left panel ------------------------------- */
+
+.brand-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 44px 52px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #e6edf3;
+  background:
+    radial-gradient(720px 420px at 18% 8%, rgb(47 129 247 / 22%), transparent 62%),
+    linear-gradient(160deg, #0b1220 0%, #0d1117 58%, #090e17 100%);
+}
+.brand-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 85%), transparent 88%);
+  pointer-events: none;
+}
+.brand-panel > * {
+  position: relative;
+  z-index: 1;
+}
+.brand-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 40px;
+  padding: 3px 6px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  flex: 0 0 auto;
+}
+.brand-mark img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.brand-name {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.brand-main {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  max-width: 520px;
+}
+.eyebrow {
+  margin: 0 0 14px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #79c0ff;
+}
+.brand-copy h1 {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+  color: #f0f6fc;
+}
+.brand-copy h1 .accent {
+  background: linear-gradient(90deg, #79c0ff 0%, #a5d6ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lede {
+  margin: 14px 0 0;
+  max-width: 440px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: rgb(230 237 243 / 62%);
+}
+.features {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.feature-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  background: rgb(255 255 255 / 5%);
+  color: #79c0ff;
+  font-size: 16px;
+}
+.features strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+.features small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgb(230 237 243 / 52%);
+}
+.brand-foot {
+  margin: 0;
+  font-size: 11px;
+  color: rgb(230 237 243 / 32%);
+}
+
+/* ------------------------------- right panel ------------------------------ */
+
+.form-panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px 16px;
+  padding: 48px 24px;
   background:
-    radial-gradient(900px 500px at 15% 0%, color-mix(in srgb, var(--mpanel-accent) 18%, transparent), transparent 60%),
+    radial-gradient(680px 420px at 82% 12%, color-mix(in srgb, var(--mpanel-accent) 7%, transparent), transparent 65%),
     var(--mpanel-bg);
 }
 .theme-toggle {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
   border: 1px solid var(--mpanel-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--mpanel-surface);
   color: var(--mpanel-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 16px;
 }
-.login-wrap {
+.theme-toggle:hover {
+  color: var(--mpanel-text);
+}
+.form-wrap {
   width: 100%;
-  max-width: 440px;
+  max-width: 400px;
 }
-.brand {
-  display: flex;
+.mobile-brand {
+  display: none;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.logo {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #4f7cff, #7a5cff);
-  color: #fff;
-  font-weight: 800;
-  font-size: 20px;
-}
-.brand h1 {
-  margin: 0;
-  font-size: 20px;
-  letter-spacing: -0.01em;
-}
-.brand p {
-  margin: 2px 0 0;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 .login-card {
-  border-radius: 14px;
-}
-.connection-row {
-  display: flex;
-  gap: 6px;
-  width: 100%;
-}
-.connection-row :deep(.n-select) {
-  flex: 1;
-}
-.conn-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: -8px 0 12px;
-}
-.center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 18px 0;
-}
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 14px;
-  text-align: center;
-}
-.manager-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.conn-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 50vh;
-  overflow: auto;
-}
-.conn-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
+  padding: 32px 30px 30px;
   border: 1px solid var(--mpanel-border);
+  border-radius: 16px;
+  background: var(--mpanel-surface);
+  box-shadow: 0 18px 50px rgb(1 4 9 / 8%);
+}
+html.dark .login-card {
+  box-shadow: 0 18px 50px rgb(0 0 0 / 36%);
+}
+.login-card .eyebrow {
+  display: inline-block;
+  margin: 0 0 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mpanel-accent) 12%, transparent);
+  color: var(--mpanel-accent);
+  letter-spacing: 0.16em;
+}
+.login-card h2 {
+  margin: 0 0 22px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--mpanel-text);
+}
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.login-card :deep(.n-button) {
+  margin-top: 22px;
+}
+.login-error {
+  margin-top: 14px;
   border-radius: 10px;
+  font-size: 12.5px;
+}
+.history-trigger {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mpanel-muted);
+  cursor: pointer;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+.history-trigger:hover {
+  color: var(--mpanel-text);
+}
+.history-trigger.open {
+  transform: rotate(180deg);
+}
+.history-panel {
+  width: 300px;
+  padding: 6px;
+  border: 1px solid var(--mpanel-border);
+  border-radius: 12px;
+  background: var(--mpanel-surface);
+  box-shadow: 0 16px 36px rgb(1 4 9 / 14%);
+}
+html.dark .history-panel {
+  box-shadow: 0 16px 36px rgb(0 0 0 / 42%);
+}
+.history-head {
+  padding: 6px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--mpanel-muted);
+}
+.history-empty {
+  padding: 18px 10px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--mpanel-muted);
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+}
+.history-row:hover,
+.history-row:focus-visible {
   background: var(--mpanel-surface-soft);
 }
-.conn-item-main {
+.history-main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  flex: 1;
+  line-height: 1.35;
 }
-.conn-item-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.history-host {
+  font-size: 12.5px;
+  color: var(--mpanel-text);
 }
-.conn-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.history-user {
+  font-size: 11px;
+  color: var(--mpanel-muted);
+}
+.history-delete {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mpanel-muted);
+  cursor: pointer;
+}
+.history-delete:hover {
+  background: color-mix(in srgb, var(--mpanel-danger, #cf222e) 12%, transparent);
+  color: var(--mpanel-danger, #cf222e);
+}
+.form-foot {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--mpanel-muted);
+}
+
+@media (max-width: 960px) {
+  .login-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .brand-panel {
+    display: none;
+  }
+  .mobile-brand {
+    display: flex;
+  }
+  .mobile-brand .brand-mark {
+    width: 46px;
+    height: 34px;
+    padding: 2px 5px;
+  }
+  .form-panel {
+    padding: 32px 18px;
+  }
+  .login-card {
+    padding: 26px 22px 24px;
+  }
 }
 </style>

@@ -82,7 +82,7 @@ export async function connectWs(
       }
       reject(
         new AppError('TIMEOUT', 'WebSocket 连接超时', 0, {
-          hint: '请确认 core 与目标机器在线，且反向代理允许 Upgrade/Connection 头。',
+          hint: '请确认服务器与目标机器在线，且反向代理允许 Upgrade/Connection 头。',
         }),
       );
     }, timeoutMs);
@@ -113,7 +113,7 @@ export async function connectWs(
         clearTimeout(timer);
         reject(
           new AppError('NETWORK', 'WebSocket 连接失败', 0, {
-            hint: '请检查 core 地址、机器在线状态与反向代理的 WebSocket 配置。',
+            hint: '请检查服务器地址、机器在线状态与反向代理的 WebSocket 配置。',
           }),
         );
       }
@@ -151,7 +151,7 @@ function closeError(code: number, reason: string): AppError {
     return new AppError('UNAVAILABLE', '连接被限流或超过帧上限', 0, { hint: '请稍后重试。', reason });
   }
   return new AppError('UPSTREAM_ERROR', `WebSocket 已关闭（${code}）`, 0, {
-    hint: '请检查 core 与 agent 日志或重试。',
+    hint: '请检查服务器与节点日志或重试。',
     reason,
   });
 }

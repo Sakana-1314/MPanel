@@ -1,7 +1,11 @@
 import type {
   ContainerActionInput,
+  ContainerDaemonConfig,
   ContainerDetail,
   ContainerLogsQuery,
+  ContainerNetwork,
+  ContainerNetworkCreateInput,
+  ContainerNetworkDetail,
   ContainerStats,
   ContainerSummary,
   ExecRequest,
@@ -46,6 +50,12 @@ export interface ContainersApi {
   logs(id: string, q?: ContainerLogsQuery): Promise<{ logs: string; truncated: boolean }>;
   stats(id: string): Promise<{ stats: ContainerStats }>;
   exec(id: string, req: ExecRequest): Promise<ExecResult>;
+  listNetworks(q?: PageQuery): Promise<ListResult<ContainerNetwork>>;
+  getNetwork(name: string): Promise<ContainerNetworkDetail>;
+  createNetwork(input: ContainerNetworkCreateInput): Promise<ContainerNetworkDetail>;
+  removeNetwork(name: string): Promise<{ deleted: true; name: string }>;
+  getConfig(): Promise<ContainerDaemonConfig>;
+  updateConfig(daemonJson: string): Promise<ContainerDaemonConfig>;
 }
 
 export interface ImagesApi {
@@ -84,6 +94,28 @@ export function createContainersApi(http: ApiTransport): ContainersApi {
       http.request<{ logs: string; truncated: boolean }>(`${base(id)}/logs`, { query: q }),
     stats: (id) => http.request<{ stats: ContainerStats }>(`${base(id)}/stats`),
     exec: (id, req) => http.request<ExecResult>(`${base(id)}/exec`, { method: 'POST', body: req }),
+    listNetworks: (q = {}) =>
+      http.request<ListResult<ContainerNetwork>>('/containers/networks', { query: q }),
+    getNetwork: (name) =>
+      http.request<ContainerNetworkDetail>(
+        `/containers/networks/${encodeURIComponent(name)}/inspect`,
+      ),
+    createNetwork: (input) =>
+      http.request<ContainerNetworkDetail>('/containers/networks', {
+        method: 'POST',
+        body: input,
+      }),
+    removeNetwork: (name) =>
+      http.request<{ deleted: true; name: string }>(
+        `/containers/networks/${encodeURIComponent(name)}`,
+        { method: 'DELETE' },
+      ),
+    getConfig: () => http.request<ContainerDaemonConfig>('/containers/config'),
+    updateConfig: (daemonJson) =>
+      http.request<ContainerDaemonConfig>('/containers/config', {
+        method: 'PUT',
+        body: { daemonJson },
+      }),
   };
 }
 
