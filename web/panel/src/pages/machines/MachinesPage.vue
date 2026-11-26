@@ -447,7 +447,11 @@ const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
   height: 8px;
   border-radius: 999px;
   flex: 0 0 auto;
-  background: var(--mpanel-muted);
+  background: var(--mpanel-status-offline);
+}
+.status-dot.dot-success,
+.status-dot.dot-info {
+  background: var(--mpanel-status-online);
 }
 .name {
   border: 0;

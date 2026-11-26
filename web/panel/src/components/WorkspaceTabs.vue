@@ -145,10 +145,11 @@ const menuOptions = [
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 42px;
-  padding: 0 10px;
+  height: 48px;
+  padding: 0 12px;
   min-width: 0;
-  background: var(--mpanel-bg);
+  /* 顶栏与侧栏同为白底，构成一条连续的面。 */
+  background: var(--mpanel-surface);
 }
 .tabs-scroll {
   display: flex;
@@ -179,13 +180,12 @@ const menuOptions = [
   transition: background-color 0.14s ease, color 0.14s ease;
 }
 .tab:hover {
-  background: color-mix(in srgb, var(--mpanel-surface) 55%, transparent);
+  background: var(--mpanel-surface-soft);
   color: var(--mpanel-text);
 }
 .tab.active {
-  background: var(--mpanel-surface);
-  color: var(--mpanel-text);
-  box-shadow: var(--mpanel-shadow);
+  background: var(--mpanel-accent-soft);
+  color: var(--mpanel-accent);
 }
 .tab-machine {
   max-width: 90px;
@@ -202,19 +202,16 @@ const menuOptions = [
   height: 6px;
   border-radius: 999px;
   flex: 0 0 auto;
-  background: var(--mpanel-muted);
+  background: var(--mpanel-status-offline);
 }
-.dot-success {
-  background: var(--mpanel-success);
-}
-.dot-warning {
-  background: var(--mpanel-attention);
-}
-.dot-error {
-  background: var(--mpanel-danger);
-}
+/* 状态灯只区分「在线=主题蓝」与「离线/异常=灰」。 */
+.dot-success,
 .dot-info {
-  background: var(--mpanel-accent);
+  background: var(--mpanel-status-online);
+}
+.dot-warning,
+.dot-error {
+  background: var(--mpanel-status-offline);
 }
 .tab-close {
   display: grid;

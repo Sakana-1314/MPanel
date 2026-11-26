@@ -1,42 +1,52 @@
 /* Global layout + Naive UI page helpers.
-   层次靠明度差：页面底最浅 -> 卡片更亮 -> 内嵌块再暗一档，尽量不用线条切割。 */
+   配色只有一条主色（蓝）加中性灰阶：层级靠明度差，不靠分割线与边框。 */
 
 :root {
-  --mpanel-bg: #eef1f5;
+  /* 页底比卡片深一档，卡片才能靠底色差浮起来，不必画边框。 */
+  --mpanel-bg: #f3f5fa;
   --mpanel-surface: #ffffff;
-  --mpanel-surface-soft: #f5f7fa;
-  --mpanel-surface-inset: #e9edf2;
-  --mpanel-surface-sunken: #e2e7ee;
-  --mpanel-border: #d1d9e0;
-  --mpanel-border-muted: #d8dee4;
-  --mpanel-text: #1f2328;
-  --mpanel-muted: #59636e;
-  --mpanel-accent: #0969da;
-  --mpanel-accent-soft: #ddf4ff;
-  --mpanel-success: #1a7f37;
-  --mpanel-attention: #9a6700;
-  --mpanel-danger: #cf222e;
-  --mpanel-shadow: 0 1px 0 rgb(31 35 40 / 4%), 0 1px 3px rgb(31 35 40 / 6%);
-  --mpanel-shadow-raised: 0 1px 2px rgb(31 35 40 / 6%), 0 4px 12px rgb(31 35 40 / 6%);
+  --mpanel-surface-soft: #eef1f7;
+  --mpanel-surface-inset: #e8ecf4;
+  --mpanel-surface-sunken: #eef1f7;
+  --mpanel-border: rgba(15, 23, 42, 0.1);
+  --mpanel-border-muted: rgba(15, 23, 42, 0.07);
+  --mpanel-text: #14181f;
+  --mpanel-muted: rgba(51, 54, 57, 0.78);
+  --mpanel-accent: #2563eb;
+  --mpanel-accent-hover: #3b82f6;
+  --mpanel-accent-soft: rgba(37, 99, 235, 0.1);
+  /* 语义色收进蓝色与灰阶：成功=主题蓝，提醒=次要灰，只有错误保留一点红以示区别。 */
+  --mpanel-success: #2563eb;
+  --mpanel-attention: rgba(51, 54, 57, 0.78);
+  --mpanel-danger: #b4232f;
+  /* 在线状态灯一律用主题色，离线用中性灰。 */
+  --mpanel-status-online: #2563eb;
+  --mpanel-status-offline: rgba(15, 23, 42, 0.32);
+  --mpanel-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --mpanel-shadow-raised: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
 html.dark {
-  --mpanel-bg: #010409;
-  --mpanel-surface: #10151c;
-  --mpanel-surface-soft: #171d25;
-  --mpanel-surface-inset: #1c232c;
-  --mpanel-surface-sunken: #05080d;
-  --mpanel-border: #3d444d;
-  --mpanel-border-muted: #29313a;
-  --mpanel-text: #e6edf3;
-  --mpanel-muted: #9198a1;
-  --mpanel-accent: #4493f8;
-  --mpanel-accent-soft: #16263c;
-  --mpanel-success: #3fb950;
-  --mpanel-attention: #d29922;
-  --mpanel-danger: #f85149;
-  --mpanel-shadow: 0 1px 0 rgb(1 4 9 / 40%), 0 1px 3px rgb(1 4 9 / 60%);
-  --mpanel-shadow-raised: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 45%);
+  /* 深色下侧栏/顶栏是「卡片色」，页底再深两档，两者才能拉开层次。 */
+  --mpanel-bg: #0a0a0d;
+  --mpanel-surface: #1a1a20;
+  --mpanel-surface-soft: #121216;
+  --mpanel-surface-inset: #202028;
+  --mpanel-surface-sunken: #0b0b0e;
+  --mpanel-border: rgba(255, 255, 255, 0.1);
+  --mpanel-border-muted: rgba(255, 255, 255, 0.06);
+  --mpanel-text: #f2f4f8;
+  --mpanel-muted: rgba(255, 255, 255, 0.72);
+  --mpanel-accent: #3b82f6;
+  --mpanel-accent-hover: #60a5fa;
+  --mpanel-accent-soft: rgba(59, 130, 246, 0.18);
+  --mpanel-success: #3b82f6;
+  --mpanel-attention: rgba(255, 255, 255, 0.72);
+  --mpanel-danger: #e2666c;
+  --mpanel-status-online: #3b82f6;
+  --mpanel-status-offline: rgba(255, 255, 255, 0.28);
+  --mpanel-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --mpanel-shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -151,8 +161,8 @@ pre,
 .code-block {
   margin: 0;
   padding: 12px;
-  border-radius: 8px;
-  background: var(--mpanel-surface-inset);
+  border-radius: 10px;
+  background: var(--mpanel-surface-soft);
   border: 0;
   overflow: auto;
   font-size: 12px;
@@ -178,33 +188,27 @@ pre,
   overflow-wrap: anywhere;
 }
 
-.workspace-tabs {
-  background: var(--mpanel-bg);
-}
-
-/* 状态点：GitHub 语义色。 */
-.dot-success {
-  background: var(--mpanel-success);
-}
-
-.dot-warning {
-  background: var(--mpanel-attention);
-}
-
-.dot-error {
-  background: var(--mpanel-danger);
-}
-
+/* 状态灯：在线=主题蓝，离线=中性灰，不引入第三种颜色。 */
+.dot-success,
 .dot-info {
-  background: var(--mpanel-accent);
+  background: var(--mpanel-status-online);
 }
 
-/* Naive UI 局部去线：容器本身已靠底色区分，不再叠边框。 */
+.dot-warning,
+.dot-error,
+.dot-default {
+  background: var(--mpanel-status-offline);
+}
+
+/* 内嵌块不再叠边框：卡片里已有底色差，外面再加框就是两层线。 */
 .n-card.n-card--bordered {
   border: 0;
 }
 
-/* 表格只保留行间极淡分隔，列与列之间靠留白区分。 */
+.n-card {
+  box-shadow: none;
+}
+
 .n-table:not(.n-table--bordered) th,
 .n-table:not(.n-table--bordered) td {
   border-right: 0;
@@ -212,16 +216,22 @@ pre,
 
 .n-table th {
   border-color: transparent;
+  background-color: var(--mpanel-surface-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--mpanel-muted);
 }
 
 .n-table td {
-  border-color: color-mix(in srgb, var(--mpanel-muted) 13%, transparent);
+  border-color: var(--mpanel-border-muted);
 }
 
 .n-table tbody tr:hover td {
-  background-color: color-mix(in srgb, var(--mpanel-accent) 5%, transparent);
+  background-color: var(--mpanel-accent-soft);
 }
 
+/* 详情表与内嵌面板去掉网格线，只留底色差。 */
 .n-descriptions.n-descriptions--bordered .n-descriptions-table-wrapper {
   border: 0;
 }
@@ -233,7 +243,8 @@ pre,
 }
 
 .n-descriptions.n-descriptions--bordered .n-descriptions-table-header {
-  background-color: var(--mpanel-surface-soft);
+  background-color: transparent;
+  color: var(--mpanel-muted);
 }
 
 .n-drawer .n-drawer-header,
@@ -241,11 +252,10 @@ pre,
   border: 0;
 }
 
-.n-drawer .n-drawer-header {
-  background-color: var(--mpanel-surface-soft);
+.n-alert .n-alert-border {
+  display: none;
 }
 
-/* tab 一律用分段底色，而不是下划线切割页面。 */
 .n-tabs .n-tabs-nav--line-type .n-tabs-nav-scroll-content,
 .n-tabs .n-tabs-nav--line-type .n-tabs-nav__prefix,
 .n-tabs .n-tabs-nav--line-type .n-tabs-nav__suffix {
@@ -265,7 +275,7 @@ pre,
   padding: 0;
 }
 
-/* 分段型 tab：胶囊宽度跟随文字，整条不拉满页面。 */
+/* 分段型 tab：胶囊宽度跟随文字，选中项是浮起的小块。 */
 .n-tabs.n-tabs--segment-type .n-tabs-nav {
   height: auto;
 }
@@ -284,7 +294,6 @@ pre,
   font-size: 12.5px;
 }
 
-/* 卡片型 tab（终端会话）也用块状选中态。 */
 .n-tabs.n-tabs--card-type .n-tabs-tab {
   border-color: transparent;
   background-color: transparent;
@@ -302,10 +311,6 @@ pre,
   border-bottom: 0;
 }
 
-.n-alert .n-alert-border {
-  display: none;
-}
-
 .n-base-selection,
 .n-input {
   border-radius: 8px;
@@ -317,14 +322,14 @@ pre,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--mpanel-muted) 32%, transparent);
+  background: color-mix(in srgb, var(--mpanel-muted) 28%, transparent);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--mpanel-muted) 52%, transparent);
+  background: color-mix(in srgb, var(--mpanel-muted) 45%, transparent);
   background-clip: padding-box;
 }
 

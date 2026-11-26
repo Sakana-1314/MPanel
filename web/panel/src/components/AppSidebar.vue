@@ -7,6 +7,7 @@ import {
   AddOutline,
   ChevronDownOutline,
   ChevronForwardOutline,
+  ChevronUpOutline,
   CubeOutline,
   FlashOutline,
   FolderOpenOutline,
@@ -33,12 +34,12 @@ import {
   openMachinePage,
   type MachineNavItem,
 } from '@/lib/navigation';
-import { machineStatusType } from '@/lib/status';
+import { machineStatusLabel, machineStatusType } from '@/lib/status';
 import { activeConnection } from '@/lib/connection-store';
 import { logout, sessionSnapshot } from '@/lib/session';
 import { useTheme } from '@/lib/theme';
 import { transportLabel } from '@/lib/format';
-import logoMark from '@/assets/logo-mark.png';
+import logoMark from '@/assets/logo-square.png';
 
 const emit = defineEmits<{ quickOpen: [] }>();
 
@@ -57,11 +58,6 @@ const activeMachine = computed(() =>
 const user = computed(() => sessionSnapshot().user);
 const displayName = computed(() => user.value?.displayName ?? user.value?.username ?? '账户');
 const initial = computed(() => displayName.value.slice(0, 1).toUpperCase());
-
-const machineNav = [
-  { path: '/machines', title: '机器总览', icon: ServerOutline },
-  { path: '/settings', title: '设置', icon: SettingsOutline },
-];
 
 const navIcons: Record<string, Component> = {
   sites: GlobeOutline,
@@ -108,7 +104,10 @@ function toggleGroup(title: string): void {
 }
 
 const accountOptions = [
+  { label: '机器总览', key: 'machines', icon: () => h(NIcon, { component: ServerOutline }) },
   { label: '设置', key: 'settings', icon: () => h(NIcon, { component: SettingsOutline }) },
+  { label: '打开新页面', key: 'quick-open', icon: () => h(NIcon, { component: AddOutline }) },
+  { type: 'divider', key: 'divider' },
   { label: '退出登录', key: 'logout', icon: () => h(NIcon, { component: LogOutOutline }) },
 ];
 
@@ -118,10 +117,6 @@ function navActive(item: MachineNavItem): boolean {
 
 function openMachine(machineId: string): void {
   openMachinePage(machineId, 'sites');
-}
-
-function go(path: string, title: string): void {
-  openCorePage(path, title);
 }
 
 function goNav(item: MachineNavItem): void {
@@ -135,8 +130,16 @@ function goNav(item: MachineNavItem): void {
 }
 
 async function onAccountSelect(key: string): Promise<void> {
+  if (key === 'machines') {
+    openCorePage('/machines', '机器总览');
+    return;
+  }
   if (key === 'settings') {
     openCorePage('/settings', '设置');
+    return;
+  }
+  if (key === 'quick-open') {
+    emit('quickOpen');
     return;
   }
   if (key === 'logout') {
@@ -215,39 +218,28 @@ async function onAccountSelect(key: string): Promise<void> {
             </div>
           </div>
         </nav>
-
-        <nav class="bottom-nav">
-          <button
-            v-for="item in machineNav"
-            :key="item.path"
-            type="button"
-            class="flat-item"
-            :class="{ active: route.path === item.path }"
-            @click="go(item.path, item.title)"
-          >
-            <n-icon :component="item.icon" size="15" />
-            <span>{{ item.title }}</span>
-          </button>
-          <button type="button" class="flat-item" @click="emit('quickOpen')">
-            <n-icon :component="AddOutline" size="15" />
-            <span>打开新页面</span>
-          </button>
-        </nav>
       </div>
     </n-scrollbar>
 
     <div class="account-footer">
-      <n-dropdown trigger="click" :options="accountOptions" @select="onAccountSelect">
-        <button type="button" class="account-btn" title="账号管理">
+      <!-- 当前节点状态只保留在这里：页面里不再重复展示。 -->
+      <div v-if="activeMachine" class="node-line">
+        <span class="status-dot" :class="`dot-${machineStatusType(activeMachine.status)}`" />
+        <span class="truncate">{{ activeMachine.name }}</span>
+        <span class="tiny muted node-state">{{ machineStatusLabel(activeMachine.status) }}</span>
+      </div>
+      <n-dropdown trigger="click" placement="top-start" :options="accountOptions" @select="onAccountSelect">
+        <button type="button" class="account-btn" title="账号与设置">
           <span class="avatar">{{ initial }}</span>
           <span class="account-meta">
             <strong class="truncate">{{ displayName }}</strong>
             <span class="tiny muted truncate">{{ activeConnection?.name ?? '未连接' }}</span>
           </span>
+          <n-icon :component="ChevronUpOutline" size="14" class="account-caret" />
         </button>
       </n-dropdown>
-      <n-button quaternary circle size="small" :title="isDark ? '浅色主题' : '深色主题'" @click="toggle">
-        <template #icon><n-icon :component="isDark ? SunnyOutline : MoonOutline" /></template>
+      <n-button quaternary circle size="medium" :title="isDark ? '浅色主题' : '深色主题'" @click="toggle">
+        <template #icon><n-icon :component="isDark ? SunnyOutline : MoonOutline" size="16" /></template>
       </n-button>
     </div>
   </div>
@@ -259,46 +251,46 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--mpanel-bg);
+  /* 侧栏是白底面，与浅灰内容区只靠明度区分，不画右边线。 */
+  background: var(--mpanel-surface);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 14px 14px 10px;
+  gap: 10px;
+  height: 64px;
+  padding: 0 18px;
+  flex: 0 0 auto;
 }
 .logo {
-  width: 34px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  padding: 2px 4px;
-  border-radius: 6px;
-  background: #fff;
-  border: 1px solid var(--mpanel-border-muted);
   flex: 0 0 auto;
 }
 .logo img {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 .brand-text {
   display: flex;
-  flex-direction: column;
+  gap: 6px;
+  align-items: baseline;
   line-height: 1.25;
   min-width: 0;
 }
 .brand-text strong {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 .roll {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 0 8px 12px;
+  gap: 14px;
+  padding: 4px 10px 14px;
 }
 
 /* --------------------------- machine switcher --------------------------- */
@@ -306,31 +298,29 @@ async function onAccountSelect(key: string): Promise<void> {
 .machine-switch {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 6px;
-  border-radius: 10px;
-  background: var(--mpanel-surface-inset);
+  gap: 2px;
 }
 .machine-row {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--mpanel-text);
   font-size: 12.5px;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.14s ease;
 }
 .machine-row:hover {
-  background: color-mix(in srgb, var(--mpanel-surface) 55%, transparent);
+  background: var(--mpanel-surface-soft);
 }
 .machine-row.active {
-  background: var(--mpanel-surface);
-  box-shadow: var(--mpanel-shadow);
+  background: var(--mpanel-accent-soft);
+  color: var(--mpanel-accent);
   font-weight: 600;
 }
 .machine-name {
@@ -339,14 +329,20 @@ async function onAccountSelect(key: string): Promise<void> {
 }
 .transport {
   flex: 0 0 auto;
-  opacity: 0.75;
+  opacity: 0.7;
 }
+/* 状态灯只有两种颜色：主题蓝=在线，中性灰=离线/异常。
+   这里显式覆盖全局 dot-* 配色，因为 scoped 选择器特异性更高。 */
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
-  background: var(--mpanel-muted);
+  background: var(--mpanel-status-offline);
   flex: 0 0 auto;
+}
+.status-dot.dot-success,
+.status-dot.dot-info {
+  background: var(--mpanel-status-online);
 }
 
 /* ------------------------------- accordion ------------------------------ */
@@ -399,25 +395,23 @@ async function onAccountSelect(key: string): Promise<void> {
 .acc-body {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 3px;
-  margin: 2px 0 4px;
-  border-radius: 9px;
-  background: var(--mpanel-surface-inset);
+  gap: 2px;
+  padding: 2px 0 4px 14px;
 }
 .acc-item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--mpanel-text);
   font-size: 12.5px;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
 }
 .acc-item:hover {
   background: var(--mpanel-surface-soft);
@@ -428,39 +422,6 @@ async function onAccountSelect(key: string): Promise<void> {
   font-weight: 600;
 }
 
-/* ------------------------------ bottom nav ------------------------------ */
-
-.bottom-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 6px;
-  margin-top: 2px;
-  border-radius: 10px;
-  background: var(--mpanel-surface-inset);
-}
-.flat-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--mpanel-text);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-}
-.flat-item:hover {
-  background: var(--mpanel-surface-soft);
-}
-.flat-item.active {
-  background: var(--mpanel-accent-soft);
-  color: var(--mpanel-accent);
-  font-weight: 600;
-}
 .empty {
   padding: 6px 8px;
 }
@@ -469,46 +430,68 @@ async function onAccountSelect(key: string): Promise<void> {
 
 .account-footer {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  flex: 0 0 auto;
+}
+/* 当前节点状态只在左下角出现，页面内容区不再重复。 */
+.node-line {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--mpanel-text);
+}
+.node-state {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 .account-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
+  gap: 10px;
+  width: 100%;
   min-width: 0;
   border: 0;
-  background: transparent;
+  background: var(--mpanel-surface-soft);
   color: var(--mpanel-text);
-  padding: 4px 6px;
-  border-radius: 6px;
+  padding: 9px 10px;
+  border-radius: 10px;
   cursor: pointer;
   text-align: left;
+  transition: background-color 0.15s ease;
 }
 .account-btn:hover {
-  background: var(--mpanel-surface-soft);
+  background: var(--mpanel-surface-inset);
+}
+.account-caret {
+  flex: 0 0 auto;
+  color: var(--mpanel-muted);
 }
 .avatar {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: var(--mpanel-accent);
   color: #fff;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   flex: 0 0 auto;
 }
 .account-meta {
   display: flex;
   flex-direction: column;
+  gap: 1px;
   min-width: 0;
-  line-height: 1.25;
+  flex: 1;
+  line-height: 1.3;
 }
 .account-meta strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 </style>

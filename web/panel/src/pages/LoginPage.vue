@@ -27,7 +27,7 @@ import { queryClient } from '@/lib/query-client';
 import { useTheme } from '@/lib/theme';
 import FloatingField from '@/components/common/FloatingField.vue';
 import LoginTerminal from '@/components/LoginTerminal.vue';
-import logoMark from '@/assets/logo-mark.png';
+import logoMark from '@/assets/logo-square.png';
 
 const route = useRoute();
 const router = useRouter();
