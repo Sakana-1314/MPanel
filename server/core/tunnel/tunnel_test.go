@@ -147,7 +147,7 @@ func TestStdioSessionClosesOnPipeBreak(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("session did not close after pipe break")
 	}
-	if server.Online("m_close") {
-		t.Fatal("session still registered")
-	}
+	// Closed may be signalled just before the registry entry is removed;
+	// poll instead of reading the map on the same tick.
+	waitFor(t, 2*time.Second, func() bool { return !server.Online("m_close") })
 }
