@@ -129,8 +129,9 @@ async function load(): Promise<void> {
     Object.assign(values, defaultStoreValues(data.manifest, { home }));
 
     try {
-      await api.value.stacks.get(data.manifest.stack);
-      existingStack.value = true;
+      const detail = await api.value.stacks.get(data.manifest.stack);
+      // 只有本地存在受管 compose 才视为可复用；外部同名容器项目不猜密码。
+      existingStack.value = detail.composeYaml.trim().length > 0;
     } catch {
       existingStack.value = false;
     }
