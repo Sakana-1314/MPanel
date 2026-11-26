@@ -461,12 +461,12 @@ const resultText = computed(() => {
           <n-table :single-line="false" size="small">
             <thead>
               <tr>
-                <th style="min-width: 180px">节点</th>
-                <th style="width: 120px">状态</th>
-                <th style="min-width: 130px">分组 / 来源</th>
-                <th style="min-width: 150px">最近心跳</th>
-                <th style="min-width: 180px">快照</th>
-                <th style="width: 220px">操作</th>
+                <th style="min-width: 150px">节点</th>
+                <th style="width: 80px">状态</th>
+                <th style="min-width: 110px">分组 / 来源</th>
+                <th style="min-width: 110px">最近心跳</th>
+                <th style="min-width: 150px">快照</th>
+                <th style="width: 140px">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -612,9 +612,9 @@ const resultText = computed(() => {
               <tr>
                 <th style="width: 150px">类型</th>
                 <th style="min-width: 160px">机器</th>
-                <th style="width: 120px">状态</th>
+                <th style="width: 80px">状态</th>
                 <th style="min-width: 150px">创建 / 耗时</th>
-                <th style="width: 220px">操作</th>
+                <th style="width: 140px">操作</th>
               </tr>
             </thead>
             <tbody>
