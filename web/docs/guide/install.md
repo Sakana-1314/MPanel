@@ -67,7 +67,7 @@ main 每次更新后，`构建成品` 工作流会删除旧的 `dev` Release 并
 
 | 资产 | 内容 |
 |---|---|
-| `mpanel-linux-amd64.tar.gz` | `mpanel-core`、`mpanel-agent`、`mpanelctl`、`web/` 面板产物、`LICENSE` |
+| `mpanel-linux-amd64.tar.gz` | `mpanel-core`、`mpanel-agent`、`mpanelctl`、`web/` 面板产物与同源 `store/`、`LICENSE` |
 | `mpanel-linux-arm64.tar.gz` | 同上，ARM64 |
 | `SHA256SUMS` | 两个压缩包的 SHA-256 |
 
