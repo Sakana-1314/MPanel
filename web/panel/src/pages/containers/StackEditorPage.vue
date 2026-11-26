@@ -73,7 +73,7 @@ async function save(): Promise<void> {
       </n-button>
     </div>
 
-    <PageHeader :title="`编辑栈 · ${stackName}`">
+    <PageHeader :title="`编辑编排 · ${stackName}`">
       <template #meta>
         <n-tag v-if="dirty" size="small" type="warning" round :bordered="false">未保存</n-tag>
       </template>

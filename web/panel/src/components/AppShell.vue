@@ -1,30 +1,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useEventListener, useMediaQuery } from '@vueuse/core';
 import {
   NDrawer,
   NDrawerContent,
   NLayout,
   NLayoutContent,
-  NLayoutHeader,
   NLayoutSider,
 } from 'naive-ui';
 import AppSidebar from './AppSidebar.vue';
-import AppTopBar from './AppTopBar.vue';
 import WorkspaceTabs from './WorkspaceTabs.vue';
 import MachineContextBar from './MachineContextBar.vue';
 import QuickOpen from './QuickOpen.vue';
 import { activeConnectionId } from '@/lib/connection-store';
+import { useMachinesQuery } from '@/lib/machines';
+import { pageTitleForRoute } from '@/lib/navigation';
 import {
   activeTab,
   createTab,
   findTabByPath,
+  pruneMissingMachines,
   setActiveTab,
   updateActiveTab,
 } from '@/lib/workspace';
 
 const route = useRoute();
+const router = useRouter();
+const machinesQuery = useMachinesQuery();
 const isMobile = useMediaQuery('(max-width: 900px)');
 const mobileOpen = ref(false);
 const quickOpen = ref(false);
@@ -46,7 +49,7 @@ watch(
     const connectionId = activeConnectionId.value;
     if (connectionId === null) return;
     const targetMachineId = machineId.value;
-    const pageTitle = typeof route.meta.title === 'string' ? route.meta.title : 'MPanel';
+    const pageTitle = pageTitleForRoute(route);
     const tab = activeTab.value;
     if (
       tab !== undefined &&
@@ -79,11 +82,21 @@ const pageKey = computed(() => {
     route.params.siteId,
     route.params.taskId,
     route.params.stackName,
+    route.query.kind,
   ]
     .filter((value) => typeof value === 'string' && value.length > 0)
     .join(':');
   return `${tabId}:${name}:${identity}`;
 });
+
+watch(
+  () => machinesQuery.data.value,
+  (data) => {
+    if (data === undefined || data.available === false) return;
+    const result = pruneMissingMachines(new Set(data.items.map((machine) => machine.id)));
+    if (result.removedActive) void router.push(result.nextPath ?? '/');
+  },
+);
 
 useEventListener(window, 'keydown', (event: KeyboardEvent) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -117,18 +130,15 @@ watch(
     </n-layout-sider>
 
     <n-layout style="height: 100vh">
-      <n-layout-header :bordered="false">
-        <AppTopBar
-          @menu="mobileOpen = true"
-          @quick-open="quickOpen = true"
-        />
-      </n-layout-header>
-
-      <WorkspaceTabs @quick-open="quickOpen = true" />
+      <WorkspaceTabs
+        :mobile="isMobile"
+        @menu="mobileOpen = true"
+        @quick-open="quickOpen = true"
+      />
 
       <n-layout-content
         :native-scrollbar="false"
-        content-style="height: calc(100vh - 96px); overflow: auto"
+        content-style="height: calc(100vh - 42px); overflow: auto"
       >
         <MachineContextBar v-if="machineId !== null" :machine-id="machineId" />
         <div class="content-inner">
@@ -144,7 +154,7 @@ watch(
 
   <n-drawer v-model:show="mobileOpen" placement="left" :width="272">
     <n-drawer-content :native-scrollbar="false" body-content-style="padding: 0">
-      <div style="height: calc(100vh - 48px)">
+      <div style="height: 100vh">
         <AppSidebar @quick-open="quickOpen = true" />
       </div>
     </n-drawer-content>

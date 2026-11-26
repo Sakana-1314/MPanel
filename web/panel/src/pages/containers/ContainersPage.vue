@@ -170,7 +170,7 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
           刷新
         </n-button>
         <n-button size="small" quaternary @click="router.push(`/m/${machineId}/images`)">镜像</n-button>
-        <n-button size="small" quaternary @click="router.push(`/m/${machineId}/stacks`)">Compose 栈</n-button>
+        <n-button size="small" quaternary @click="router.push(`/m/${machineId}/stacks`)">编排</n-button>
       </template>
     </PageHeader>
 

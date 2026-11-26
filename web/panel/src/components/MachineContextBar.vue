@@ -12,7 +12,12 @@ import { useAction } from '@/composables/use-action';
 import { useCoreApi } from '@/lib/api';
 import { useMachineQuery } from '@/lib/machines';
 import { coreKey } from '@/lib/query-keys';
-import { MACHINE_AREAS, openMachineDetail, openMachinePage } from '@/lib/navigation';
+import {
+  MACHINE_NAV_GROUPS,
+  MACHINE_NAV_ITEMS,
+  openMachineDetail,
+  openMachineNavItem,
+} from '@/lib/navigation';
 import { machineStatusType } from '@/lib/status';
 import MachineStatusTag from './common/MachineStatusTag.vue';
 import RelativeTime from './common/RelativeTime.vue';
@@ -49,10 +54,13 @@ const connectAction = useAction(
   },
 );
 
-const pageOptions = MACHINE_AREAS.map((item) => ({ label: item.title, key: item.area }));
+const pageOptions = MACHINE_NAV_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({ label: `${group.title} · ${item.title}`, key: item.key })),
+);
 
-function onPageSelect(area: string): void {
-  openMachinePage(props.machineId, area, { forceNew: true });
+function onPageSelect(key: string): void {
+  const item = MACHINE_NAV_ITEMS.find((entry) => entry.key === key);
+  if (item !== undefined) openMachineNavItem(props.machineId, item, { forceNew: true });
 }
 </script>
 

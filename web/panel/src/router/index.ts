@@ -132,19 +132,19 @@ const routes: RouteRecordRaw[] = [
         path: 'm/:machineId/stacks',
         name: 'stacks',
         component: StacksPage,
-        meta: { title: 'Compose 栈', machine: true },
+        meta: { title: '编排', machine: true },
       },
       {
         path: 'm/:machineId/stacks/:stackName',
         name: 'stack-detail',
         component: StackDetailPage,
-        meta: { title: '栈详情', machine: true },
+        meta: { title: '编排详情', machine: true },
       },
       {
         path: 'm/:machineId/stacks/:stackName/edit',
         name: 'stack-edit',
         component: StackEditorPage,
-        meta: { title: '编辑栈', machine: true },
+        meta: { title: '编辑编排', machine: true },
       },
       {
         path: 'm/:machineId/files',
@@ -218,6 +218,10 @@ router.beforeEach(async (to) => {
 });
 
 router.afterEach((to) => {
-  const pageTitle = typeof to.meta.title === 'string' ? to.meta.title : 'MPanel';
+  let pageTitle = typeof to.meta.title === 'string' ? to.meta.title : 'MPanel';
+  if (to.name === 'databases') {
+    if (to.query.kind === 'postgres') pageTitle = 'PostgreSQL';
+    if (to.query.kind === 'redis') pageTitle = 'Redis';
+  }
   document.title = `${pageTitle} · MPanel`;
 });

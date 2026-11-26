@@ -23,6 +23,7 @@ import {
 } from 'naive-ui';
 import {
   AddOutline,
+  LayersOutline,
   CreateOutline,
   OpenOutline,
   PlayOutline,
@@ -58,8 +59,11 @@ const message = useMessage();
 const machineId = String(route.params.machineId ?? '');
 const api = useMachineApi(machineId);
 
+const fixedKind =
+  route.query.kind === 'postgres' || route.query.kind === 'redis' ? route.query.kind : null;
+const pageTitle = fixedKind === 'postgres' ? 'PostgreSQL' : fixedKind === 'redis' ? 'Redis' : '数据库';
 const search = ref('');
-const kindFilter = ref('all');
+const kindFilter = ref<'all' | 'postgres' | 'redis'>(fixedKind ?? 'all');
 const selectedId = ref<string | null>(null);
 const tab = ref('overview');
 
@@ -91,8 +95,8 @@ watch(
       selectedId.value = null;
       return;
     }
-    if (selectedId.value === null || !profiles.value.some((item) => item.id === selectedId.value)) {
-      selectedId.value = filtered.value[0]?.id ?? profiles.value[0]?.id ?? null;
+    if (selectedId.value === null || !filtered.value.some((item) => item.id === selectedId.value)) {
+      selectedId.value = filtered.value[0]?.id ?? null;
     }
   },
   { immediate: true },
@@ -109,6 +113,15 @@ const pgCount = computed(() => profiles.value.filter((p) => p.kind === 'postgres
 const redisCount = computed(() => profiles.value.filter((p) => p.kind === 'redis').length);
 const failedCount = computed(
   () => profiles.value.filter((p) => p.lastCheck !== null && !p.lastCheck.ok).length,
+);
+const pageEmpty = computed(
+  () =>
+    !profilesQuery.isLoading.value &&
+    (profiles.value.length === 0 ||
+      (fixedKind !== null && search.value.trim().length === 0 && filtered.value.length === 0)),
+);
+const emptyDescription = computed(() =>
+  fixedKind !== null ? `还没有 ${pageTitle} 档案` : '还没有数据库档案',
 );
 
 /* ------------------------------- profile form ------------------------------- */
@@ -140,9 +153,9 @@ watch(
 function openCreate(): void {
   editing.value = null;
   form.name = '';
-  form.kind = 'postgres';
+  form.kind = fixedKind ?? 'postgres';
   form.host = '';
-  form.port = '5432';
+  form.port = form.kind === 'redis' ? '6379' : '5432';
   form.username = '';
   form.password = '';
   form.database = '';
@@ -394,10 +407,10 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
 
 <template>
   <div class="page">
-    <PageHeader title="数据库">
+    <PageHeader :title="pageTitle">
       <template #meta>
-        <n-tag size="small" round :bordered="false">PostgreSQL {{ pgCount }}</n-tag>
-        <n-tag size="small" round :bordered="false">Redis {{ redisCount }}</n-tag>
+        <n-tag v-if="fixedKind === null" size="small" round :bordered="false">PostgreSQL {{ pgCount }}</n-tag>
+        <n-tag v-if="fixedKind === null" size="small" round :bordered="false">Redis {{ redisCount }}</n-tag>
         <n-tag v-if="failedCount > 0" size="small" type="error" round :bordered="false">
           {{ failedCount }} 个测试失败
         </n-tag>
@@ -420,11 +433,19 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
 
     <error-state v-if="profilesQuery.isError.value" :error="profilesQuery.error.value" @retry="profilesQuery.refetch()" />
 
-    <div class="db-layout">
+    <n-empty v-if="pageEmpty" :description="emptyDescription">
+      <template #icon><n-icon :component="LayersOutline" size="36" /></template>
+      <template #extra>
+        <n-button type="primary" :disabled="!profilesAvailable" @click="openCreate">新建档案</n-button>
+      </template>
+    </n-empty>
+
+    <div v-else class="db-layout">
       <n-card size="small" class="list-card">
         <div class="toolbar" style="margin-bottom: 8px">
           <n-input v-model:value="search" size="small" placeholder="搜索档案…" clearable />
           <n-select
+            v-if="fixedKind === null"
             v-model:value="kindFilter"
             size="small"
             style="width: 120px"

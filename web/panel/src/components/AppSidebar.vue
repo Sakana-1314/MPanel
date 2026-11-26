@@ -1,37 +1,56 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NIcon, NScrollbar, NSpin, NTooltip } from 'naive-ui';
 import {
+  NButton,
+  NDropdown,
+  NIcon,
+  NScrollbar,
+  NSpin,
+  useMessage,
+} from 'naive-ui';
+import type { Component } from 'vue';
+import {
+  AddOutline,
+  ChevronUpOutline,
   CubeOutline,
+  FlashOutline,
   FolderOpenOutline,
   GitNetworkOutline,
   GlobeOutline,
   GridOutline,
-  ImagesOutline,
   LayersOutline,
+  LogOutOutline,
+  MoonOutline,
   ServerOutline,
   SettingsOutline,
   ShieldCheckmarkOutline,
+  SunnyOutline,
   TerminalOutline,
   TimeOutline,
-  AddOutline,
 } from '@vicons/ionicons5';
 import { useMachinesQuery } from '@/lib/machines';
 import { activeTab } from '@/lib/workspace';
 import {
-  MACHINE_AREAS,
-  machinePath,
+  MACHINE_NAV_GROUPS,
+  isNavItemActive,
+  machineNavPath,
   openCorePage,
   openMachinePage,
+  type MachineNavItem,
 } from '@/lib/navigation';
 import { machineStatusType } from '@/lib/status';
+import { activeConnection } from '@/lib/connection-store';
+import { logout, sessionSnapshot } from '@/lib/session';
+import { useTheme } from '@/lib/theme';
 
 const emit = defineEmits<{ quickOpen: [] }>();
 
 const route = useRoute();
 const router = useRouter();
+const message = useMessage();
 const machinesQuery = useMachinesQuery();
+const { isDark, toggle } = useTheme();
 
 const machines = computed(() => machinesQuery.data.value?.items ?? []);
 const activeMachineId = computed(() => activeTab.value?.machineId ?? null);
@@ -39,24 +58,40 @@ const activeMachine = computed(() =>
   machines.value.find((machine) => machine.id === activeMachineId.value),
 );
 
+const user = computed(() => sessionSnapshot().user);
+const displayName = computed(() => user.value?.displayName ?? user.value?.username ?? '账户');
+const initial = computed(() => displayName.value.slice(0, 1).toUpperCase());
+
 const coreNav = [
   { path: '/', title: '概览', icon: GridOutline },
   { path: '/machines', title: '机器', icon: ServerOutline },
   { path: '/edge', title: '边缘节点', icon: GitNetworkOutline },
-  { path: '/settings', title: '设置', icon: SettingsOutline },
 ];
 
-const areaIcons: Record<string, typeof GlobeOutline> = {
+const navIcons: Record<string, Component> = {
   sites: GlobeOutline,
   certs: ShieldCheckmarkOutline,
-  databases: LayersOutline,
+  postgres: LayersOutline,
+  redis: FlashOutline,
   containers: CubeOutline,
-  images: ImagesOutline,
   stacks: LayersOutline,
   files: FolderOpenOutline,
   terminal: TerminalOutline,
   tasks: TimeOutline,
 };
+
+const accountOptions = [
+  {
+    label: '设置',
+    key: 'settings',
+    icon: () => h(NIcon, { component: SettingsOutline }),
+  },
+  {
+    label: '退出登录',
+    key: 'logout',
+    icon: () => h(NIcon, { component: LogOutOutline }),
+  },
+];
 
 function isCoreActive(path: string): boolean {
   if (path === '/') return route.path === '/';
@@ -64,8 +99,8 @@ function isCoreActive(path: string): boolean {
   return route.path === path;
 }
 
-function areaActive(area: string): boolean {
-  return route.path === machinePath(activeMachineId.value ?? '', area);
+function navActive(item: MachineNavItem): boolean {
+  return isNavItemActive(activeMachineId.value, item, route.path, route.query);
 }
 
 function openMachine(machineId: string): void {
@@ -76,13 +111,30 @@ function go(path: string): void {
   openCorePage(path, coreNav.find((item) => item.path === path)?.title ?? 'MPanel');
 }
 
-function goArea(area: string): void {
+function goNav(item: MachineNavItem): void {
   const machineId = activeMachineId.value;
   if (machineId === null) {
     emit('quickOpen');
     return;
   }
-  void router.push(machinePath(machineId, area));
+  const path = machineNavPath(machineId, item);
+  if (route.fullPath !== path) void router.push(path);
+}
+
+async function onAccountSelect(key: string): Promise<void> {
+  if (key === 'settings') {
+    openCorePage('/settings', '设置');
+    return;
+  }
+  if (key === 'logout') {
+    try {
+      await logout();
+    } catch {
+      // 即使请求失败也清理本地登录态。
+    }
+    message.success('已退出登录');
+    void router.replace('/login');
+  }
 }
 </script>
 
@@ -138,25 +190,48 @@ function goArea(area: string): void {
         </div>
       </div>
 
-      <div v-if="activeMachineId !== null" class="section">
+      <div v-if="activeMachineId !== null" class="section machine-nav">
         <div class="section-title">
           <span class="truncate">{{ activeMachine?.name ?? activeMachineId }}</span>
         </div>
-        <nav class="nav">
+        <div v-for="group in MACHINE_NAV_GROUPS" :key="group.title" class="nav-group">
+          <div class="nav-group-title">{{ group.title }}</div>
           <button
-            v-for="item in MACHINE_AREAS"
-            :key="item.area"
+            v-for="item in group.items"
+            :key="item.key"
             type="button"
             class="nav-item"
-            :class="{ active: areaActive(item.area) }"
-            @click="goArea(item.area)"
+            :class="{ active: navActive(item) }"
+            @click="goNav(item)"
           >
-            <n-icon :component="areaIcons[item.area] ?? GlobeOutline" />
+            <n-icon :component="navIcons[item.key] ?? GlobeOutline" />
             <span>{{ item.title }}</span>
           </button>
-        </nav>
+        </div>
       </div>
     </n-scrollbar>
+
+    <div class="account-footer">
+      <n-dropdown trigger="click" :options="accountOptions" @select="onAccountSelect">
+        <button type="button" class="account-btn" title="账号管理">
+          <span class="avatar">{{ initial }}</span>
+          <span class="account-meta">
+            <strong class="truncate">{{ displayName }}</strong>
+            <span class="tiny muted truncate">{{ activeConnection?.name ?? '未连接' }}</span>
+          </span>
+          <n-icon :component="ChevronUpOutline" size="12" class="muted" />
+        </button>
+      </n-dropdown>
+      <n-button
+        quaternary
+        circle
+        size="small"
+        :title="isDark ? '浅色主题' : '深色主题'"
+        @click="toggle"
+      >
+        <template #icon><n-icon :component="isDark ? SunnyOutline : MoonOutline" /></template>
+      </n-button>
+    </div>
   </div>
 </template>
 
@@ -173,7 +248,7 @@ function goArea(area: string): void {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 16px 10px;
+  padding: 10px 14px 4px;
 }
 .logo {
   width: 34px;
@@ -194,20 +269,20 @@ function goArea(area: string): void {
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 10px;
+  gap: 1px;
+  padding: 0 8px;
 }
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 5px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--mpanel-text);
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: left;
   cursor: pointer;
 }
@@ -220,26 +295,44 @@ function goArea(area: string): void {
   font-weight: 600;
 }
 .section {
-  padding: 10px;
+  padding: 6px;
   border-top: 1px solid var(--mpanel-border);
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 6px 8px;
-  font-size: 11px;
+  padding: 2px 6px 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--mpanel-text);
+}
+.machine-nav {
+  padding-top: 6px;
+}
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 2px;
+}
+.nav-group-title {
+  padding: 1px 10px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--mpanel-muted);
+}
+.nav-group .nav-item {
+  padding-left: 10px;
 }
 .machine-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 220px;
+  max-height: 160px;
   overflow-y: auto;
 }
 .machine-item {
@@ -247,7 +340,7 @@ function goArea(area: string): void {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 7px 9px;
+  padding: 6px 9px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -290,12 +383,49 @@ function goArea(area: string): void {
   padding: 8px;
   line-height: 1.6;
 }
-.hint {
-  line-height: 1.7;
-}
-.sidebar-footer {
-  padding: 10px 16px;
+.account-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
   border-top: 1px solid var(--mpanel-border);
-  line-height: 1.5;
+}
+.account-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mpanel-text);
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.account-btn:hover {
+  background: color-mix(in srgb, var(--mpanel-accent) 8%, transparent);
+}
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--mpanel-accent) 25%, transparent);
+  color: var(--mpanel-accent);
+  font-size: 12px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.account-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.account-meta strong {
+  font-size: 12px;
 }
 </style>

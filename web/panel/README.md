@@ -41,15 +41,14 @@ web/panel/src/
 │  └─ theme.ts / format.ts / status.ts
 ├─ components/
 │  ├─ AppShell.vue               NLayout 外壳 + KeepAlive 页面缓存
-│  ├─ AppSidebar.vue             机器工作台导航（点击机器新开标签）
-│  ├─ AppTopBar.vue              连接切换、主题、账户
-│  ├─ WorkspaceTabs.vue          多机混合标签栏
+│  ├─ AppSidebar.vue             分组导航 + 机器列表 + 左下角账户/主题
+│  ├─ WorkspaceTabs.vue          顶栏标签页（无 navbar；移动端菜单入口）
 │  ├─ QuickOpen.vue              Ctrl+K 打开任意机器的页面
 │  ├─ MachineContextBar.vue      当前标签机器的状态/能力/新开页面
 │  └─ common/                    PageHeader、CodeEditor、Xterm、StatusTag…
 └─ pages/
    ├─ LoginPage.vue              core 登录与连接管理
-   ├─ dashboard/                 多机总览与已打开标签
+   ├─ dashboard/                 多机总览
    ├─ machines/                  机器 CRUD、健康、入网信息
    ├─ edge/                      入网密钥、节点、离线作业
    ├─ sites/                     站点列表/表单/预览/导入导出/应用
