@@ -223,12 +223,12 @@ const menuOptions = [
   position: relative;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   /* 所有标签统一宽度，未激活时也保持同样占位，切换不跳动。 */
-  flex: 0 0 248px;
-  width: 248px;
+  flex: 0 0 165px;
+  width: 165px;
   height: 33px;
-  padding: 0 9px 0 11px;
+  padding: 0 8px 0 9px;
   border: 1px solid var(--mpanel-border);
   border-bottom: 0;
   border-radius: 9px 9px 0 0;
@@ -263,7 +263,7 @@ const menuOptions = [
   background: var(--mpanel-accent);
 }
 .tab-machine {
-  max-width: 78px;
+  max-width: 56px;
   flex: 0 1 auto;
   font-weight: 600;
 }

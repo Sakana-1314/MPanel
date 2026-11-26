@@ -110,24 +110,30 @@ const activeKey = computed<string | null>(() => {
 });
 
 /**
- * 展开的分组：受控维护，除了用户手动展开的，还要把当前路由所在分组一并展开，
- * 否则直接打开某个页面时菜单里看不到自己在哪。
+ * 展开的分组：手风琴模式，同一时间只保留一个。
+ * 用户点开新分组时收起其它分组；路由进入某页面时自动展开所在分组。
  */
 const expandedKeys = ref<Array<string | number>>([]);
+
+function onExpandedKeys(keys: Array<string | number>): void {
+  expandedKeys.value = keys.length === 0 ? [] : [keys[keys.length - 1]];
+}
 
 watch(
   () => [route.fullPath, activeMachineId.value] as const,
   () => {
     const machineId = activeMachineId.value;
-    const keys = new Set<string | number>(expandedKeys.value);
-    if (machineId !== null) {
-      for (const group of MACHINE_NAV_GROUPS) {
-        if (group.items.some((item) => isNavItemActive(machineId, item, route.path, route.query))) {
-          keys.add(groupKey(group.title));
-        }
+    if (machineId === null) {
+      expandedKeys.value = [];
+      return;
+    }
+    for (const group of MACHINE_NAV_GROUPS) {
+      if (group.items.some((item) => isNavItemActive(machineId, item, route.path, route.query))) {
+        expandedKeys.value = [groupKey(group.title)];
+        return;
       }
     }
-    expandedKeys.value = [...keys];
+    expandedKeys.value = [];
   },
   { immediate: true },
 );
@@ -213,7 +219,7 @@ async function onLogout(): Promise<void> {
           :expanded-keys="expandedKeys"
           :indent="16"
           @update:value="onMenuSelect"
-          @update:expanded-keys="expandedKeys = $event"
+          @update:expanded-keys="onExpandedKeys"
         />
       </div>
     </n-scrollbar>
