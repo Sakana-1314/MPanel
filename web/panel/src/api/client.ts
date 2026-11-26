@@ -168,7 +168,8 @@ async function execute(
       method: opts.method ?? 'GET',
       headers,
       body,
-      credentials: 'include',
+      // 面板只用 Authorization: Bearer 鉴权，不需要也不应该带 Cookie。
+      credentials: 'omit',
       signal: controller.signal,
     });
     if (!response.ok) throw await parseErrorResponse(response);
@@ -432,7 +433,7 @@ export async function probeConnection(input: {
   try {
     const response = await fetch(joinUrl(base, '/healthz'), {
       signal: controller.signal,
-      credentials: 'include',
+      credentials: 'omit',
       cache: 'no-store',
     });
     if (!response.ok) {

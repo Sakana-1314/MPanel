@@ -24,6 +24,7 @@ type smokeClient struct {
 	t      *testing.T
 	base   string
 	client *http.Client
+	token  string
 }
 
 func (c *smokeClient) do(method, path string, body any, out any) int {
@@ -42,6 +43,9 @@ func (c *smokeClient) do(method, path string, body any, out any) int {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -72,6 +76,21 @@ func (c *smokeClient) ok(method, path string, body any, out any) {
 	if status < 200 || status >= 300 {
 		c.t.Fatalf("%s %s: status %d", method, path, status)
 	}
+}
+
+// noAuth 发一个不带 Authorization 头的请求，用于断言未鉴权行为。
+func (c *smokeClient) noAuth(method, path string) int {
+	c.t.Helper()
+	req, err := http.NewRequest(method, c.base+path, nil)
+	if err != nil {
+		c.t.Fatalf("new request: %v", err)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		c.t.Fatalf("%s %s: %v", method, path, err)
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode
 }
 
 func (c *smokeClient) waitFor(what string, timeout time.Duration, condition func() bool) {
@@ -198,10 +217,20 @@ func TestSmoke(t *testing.T) {
 	if !setup.OK {
 		t.Fatal("setup failed")
 	}
+	token, _ := setup.Data["token"].(string)
+	if token == "" {
+		t.Fatalf("setup response missing token: %#v", setup.Data)
+	}
+	// 面板改用 Authorization 头鉴权，后续请求都带上 JWT。
+	client.token = token
 	var me envelope[map[string]any]
 	client.ok(http.MethodGet, "/api/v1/auth/me", nil, &me)
 	if me.Data["role"] != "core" {
 		t.Fatalf("me.role = %v", me.Data["role"])
+	}
+	// 没有凭据的请求必须被拒绝。
+	if status := client.noAuth(http.MethodGet, "/api/v1/machines"); status != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated /machines = %d, want 401", status)
 	}
 
 	// ---- http machine ----

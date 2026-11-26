@@ -210,32 +210,43 @@ func isPublicPath(path string) bool {
 	return false
 }
 
+// authenticate 按顺序尝试：静态 core token → 面板 API token → 会话 JWT。
+// Bearer 是唯一凭据来源，服务端不再读取 Cookie。
 func (c *Core) authenticate(r *http.Request) (auth.Principal, error) {
-	if token := bearer(r); token != "" {
-		if configured := os.Getenv("MPANEL_CORE_TOKEN"); configured != "" && constantTimeEqual(token, configured) {
-			return auth.Principal{User: c.auth.User(), AuthType: "token", Scope: "write", Static: true}, nil
-		}
-		if principal, ok := c.auth.AuthenticateToken(token); ok {
-			return principal, nil
-		}
-		return auth.Principal{}, &protocol.PanelError{Code: protocol.CodeUnauthorized, Message: "API token 无效或已吊销"}
+	token := bearer(r)
+	if token == "" {
+		return auth.Principal{}, &protocol.PanelError{Code: protocol.CodeUnauthorized, Message: "缺少 Authorization 凭据"}
 	}
-	if cookie, err := r.Cookie(auth.CookieName); err == nil {
-		if session, ok := c.auth.TouchSession(cookie.Value); ok {
-			return auth.Principal{
-				User:      auth.User{ID: "usr_" + session.Username, Username: session.Username, DisplayName: nil, Role: session.Role},
-				AuthType:  "session",
-				Scope:     "write",
-				SessionID: session.ID,
-			}, nil
-		}
+	if configured := os.Getenv("MPANEL_CORE_TOKEN"); configured != "" && constantTimeEqual(token, configured) {
+		return auth.Principal{User: c.auth.User(), AuthType: "token", Scope: "write", Static: true}, nil
 	}
-	return auth.Principal{}, &protocol.PanelError{Code: protocol.CodeUnauthorized, Message: "未登录或会话已过期"}
+	if principal, ok := c.auth.AuthenticateToken(token); ok {
+		return principal, nil
+	}
+	claims, err := c.auth.VerifyJWT(token)
+	if err != nil {
+		return auth.Principal{}, err
+	}
+	// JWT 只证明签发过；会话仍需存在且未过期，这样修改密码/登出能立即失效。
+	session, ok := c.auth.Session(claims.SessionID)
+	if !ok {
+		return auth.Principal{}, &protocol.PanelError{Code: protocol.CodeUnauthorized, Message: "会话已失效，请重新登录"}
+	}
+	return auth.Principal{
+		User: auth.User{
+			ID:          claims.UserID,
+			Username:    session.Username,
+			DisplayName: nil,
+			Role:        session.Role,
+		},
+		AuthType:  "session",
+		Scope:     "write",
+		SessionID: session.ID,
+	}, nil
 }
 
-// corsMiddleware 允许三类来源：显式白名单、与本次请求同源的 Origin/Referer、
-// 以及本机与内网地址。同源判定让前端既能被 core 自己托管，也能在本地
-// 任意端口（如 vite dev server 或反代）复用同一份 core 而不必先改配置。
+// corsMiddleware 默认允许任意来源：面板只用 Authorization 头鉴权，浏览器
+// 不会自动带凭据，因此放开跨源不会泄露数据。配置了 cors_origins 时改为白名单。
 func (c *Core) corsMiddleware(next http.Handler) http.Handler {
 	return c.corsConfig().Middleware(next)
 }
@@ -243,9 +254,8 @@ func (c *Core) corsMiddleware(next http.Handler) http.Handler {
 // corsConfig 是 REST 与 WS 共用的来源策略。
 func (c *Core) corsConfig() httpapi.CORSConfig {
 	return httpapi.CORSConfig{
-		Allowed:        httpapi.ParseCORSOrigins(c.cfg.System.CorsOrigins),
-		AllowLocal:     c.cfg.System.CorsAllowLocal,
-		TrustForwarded: c.cfg.System.CorsTrustForwarded,
+		Allowed:    httpapi.ParseCORSOrigins(c.cfg.System.CorsOrigins),
+		VaryOrigin: c.cfg.System.CorsTrustForwarded,
 	}
 }
 

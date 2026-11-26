@@ -2,7 +2,7 @@ import { reactive } from 'vue';
 import type { AuthMe, AuthUser } from '../api/types';
 import { getCoreClient } from '../api/client';
 import { AppError } from '../api/errors';
-import { getActiveConnection, activeConnectionId } from './connection-store';
+import { getActiveConnection, activeConnectionId, setConnectionToken } from './connection-store';
 import { clearAuth, setAuthState } from './auth-store';
 
 export type SessionStatus =
@@ -104,6 +104,13 @@ export async function login(username: string, password: string): Promise<void> {
     });
   }
   const result = await getCoreClient().auth.login({ username: username.trim(), password });
+  if (result.token === undefined || result.token.length === 0) {
+    throw new AppError('INTERNAL', '服务器没有返回登录凭据', 0, {
+      hint: 'core 版本过旧或反向代理改写了响应体，请核对面板版本。',
+    });
+  }
+  // token 写入连接：后续请求由 client 统一放进 Authorization 头。
+  setConnectionToken(connection.id, result.token, true);
   session.me = {
     authenticated: true,
     role: 'core',
@@ -126,7 +133,10 @@ export async function logout(): Promise<void> {
     await getCoreClient().auth.logout();
   } finally {
     const id = activeConnectionId.value;
-    if (id !== null) clearAuth(id);
+    if (id !== null) {
+      setConnectionToken(id, undefined);
+      clearAuth(id);
+    }
     reset('unauthenticated');
   }
 }

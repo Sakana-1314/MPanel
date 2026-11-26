@@ -17,6 +17,28 @@ interface ConnectionState {
 /** 编译期/config.json 种子提供的 core token，只存在内存中。 */
 const memoryTokens = new Map<string, string>();
 
+/**
+ * 登录得到的 JWT 存 sessionStorage：刷新页面与同一标签页内的导航保持登录，
+ * 关闭标签页即失效。不用 localStorage，避免长期留存在磁盘上被其它脚本读取。
+ */
+const TOKEN_PREFIX = 'mpanel.jwt.';
+
+function loadStoredToken(id: string): string | undefined {
+  if (typeof sessionStorage === 'undefined') return undefined;
+  const value = sessionStorage.getItem(TOKEN_PREFIX + id);
+  return value !== null && value.length > 0 ? value : undefined;
+}
+
+function saveStoredToken(id: string, token: string | undefined): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    if (token === undefined || token.length === 0) sessionStorage.removeItem(TOKEN_PREFIX + id);
+    else sessionStorage.setItem(TOKEN_PREFIX + id, token);
+  } catch {
+    // 隐私模式或配额不足时忽略：内存里的 token 仍然可用。
+  }
+}
+
 function loadPersisted(): PersistedState {
   const empty: PersistedState = { connections: [], activeId: null };
   if (typeof localStorage === 'undefined') return empty;
@@ -106,16 +128,25 @@ export function getConnectionById(id: string | null | undefined): BackendConnect
 export function getActiveConnection(): BackendConnection | undefined {
   const connection = state.connections.find((item) => item.id === state.activeId);
   if (connection === undefined) return undefined;
-  const token = memoryTokens.get(connection.id);
+  const token = memoryTokens.get(connection.id) ?? loadStoredToken(connection.id);
   return token === undefined ? connection : { ...connection, token };
 }
 
 export const activeConnection = computed<BackendConnection | undefined>(() => getActiveConnection());
 export const activeConnectionId = computed<string | null>(() => state.activeId);
 
-export function setConnectionToken(id: string, token: string | undefined): void {
-  if (token === undefined || token.length === 0) memoryTokens.delete(id);
-  else memoryTokens.set(id, token);
+/**
+ * 保存连接凭据。`persist=true` 表示这是登录换来的会话 token，写入
+ * sessionStorage；编译期种子 token 只在内存里，随标签页关闭消失。
+ */
+export function setConnectionToken(id: string, token: string | undefined, persist = false): void {
+  if (token === undefined || token.length === 0) {
+    memoryTokens.delete(id);
+    saveStoredToken(id, undefined);
+    return;
+  }
+  memoryTokens.set(id, token);
+  saveStoredToken(id, persist ? token : undefined);
 }
 
 export function addConnection(input: {
@@ -167,6 +198,7 @@ export function removeConnection(id: string): void {
   if (index < 0) return;
   state.connections.splice(index, 1);
   memoryTokens.delete(id);
+  saveStoredToken(id, undefined);
   if (state.activeId === id) state.activeId = state.connections[0]?.id ?? null;
   persist();
 }

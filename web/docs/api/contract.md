@@ -96,16 +96,16 @@ interface ListResult<T> {
 |---|---|---|
 | `GET /healthz` | 无认证 | 无认证 |
 | `POST /auth/login` | 不存在（404） | 无认证 |
-| `POST /auth/ws-ticket` | Bearer token | session cookie 或 Bearer core token |
-| 其余 `/api/v1/*` | Bearer token | session cookie 或 Bearer core token |
-| `WS /ws/*` | `?ticket=` / `?token=` / `Authorization: Bearer <MPANEL_TOKEN>`（服务端到服务端） | `?ticket=` / `?token=` / `Authorization: Bearer <MPANEL_CORE_TOKEN>`（脚本）；**不接受仅 cookie** |
+| `POST /auth/ws-ticket` | Bearer token | Bearer（会话 JWT 或 core token） |
+| 其余 `/api/v1/*` | Bearer token | Bearer（会话 JWT / 面板 API token / core token） |
+| `WS /ws/*` | `?ticket=` / `?token=` / `Authorization: Bearer <MPANEL_TOKEN>`（服务端到服务端） | `?ticket=` / `?token=` / `Authorization: Bearer <MPANEL_CORE_TOKEN>`（脚本） |
 | `WS /ws/worker`（core 内部） | — | reverse-ws machine secret |
 | `POST /databases/handoff/redeem`（worker） | **无**（JSON body 的 ticket 是凭据） | —（core 经 proxy 例外行） |
 | `POST /api/v1/machines/:id/proxy/databases/handoff/redeem` | — | **无 session**（JSON body 的 ticket 是凭据；§8.4） |
 | `/`、静态资源（core） | — | 无认证（SPA 自己登录） |
 
 - worker REST 只接受 `Authorization: Bearer <MPANEL_TOKEN>`；cookie 无效。
-- core 登录后用 HttpOnly cookie；脚本用 `Authorization: Bearer <MPANEL_CORE_TOKEN>`，两者都有时 Bearer 优先。
+- core REST 只接受 `Authorization: Bearer`：登录接口返回的会话 JWT、面板 API token，或 `MPANEL_CORE_TOKEN` 静态 token；两者都有时 Bearer 优先。**core 不接受 Cookie 鉴权**，因此跨源请求不携带任何隐式凭据，CORS 默认允许任意来源。
 - 任何 WS 裸连（无 ticket/token/Bearer）在 upgrade 阶段直接 `401 UNAUTHORIZED`，不建立 socket。
 - worker WS gateway 必须同时接受 Bearer、`?token=`、`?ticket=`；Bearer 用于 core http 传输/服务端直连，`?token=` 用于隧道 loopback，`?ticket=` 用于浏览器。
 - `/ws/worker` 是机器注册通道，不属于用户 WS：用 machine secret 的 Bearer，禁止裸连。
@@ -286,18 +286,19 @@ worker 没有 login/logout/password。
 
 - Auth：无。
 - Body：`{ username: string; password: string }`。
-- data：`{ user: AuthUser; expiresAt: string }`。
-- 副作用：`Set-Cookie: <MPANEL_COOKIE_NAME>=<random>; HttpOnly; SameSite=<lax|none|strict>; Path=/; Max-Age=604800[; Secure]`（默认名 `mpanel_session`、`SameSite=Lax`；跨站前端必须 `SameSite=None; Secure` 并配置 CORS）。
+- data：`{ user: AuthUser; expiresAt: string; token: string }`。
+- **鉴权方式**：`token` 是 HS256 JWT（`iss=mpanel-core`，claims 含 `sub`/`uid`/`role`/`sid`/`iat`/`exp`）。后续请求把它放在 `Authorization: Bearer <token>`。服务端不使用 Cookie，响应不设置 `Set-Cookie`。
+- 前端将 token 存在 `sessionStorage`（关闭标签页即失效），请求使用 `credentials: 'omit'`。
 - 错误：`BAD_REQUEST`、`UNAUTHORIZED`（`details.retryAfterSec`）。
 
 #### `POST /auth/logout`
 
-- Auth：session/Bearer。
-- data：`{ ok: true }`；清除 cookie 与服务器 session（Bearer 为 no-op）。
+- Auth：Bearer。
+- data：`{ ok: true }`；删除服务端 session，客户端自行丢弃 token。
 
 #### `GET /auth/me`
 
-- Auth：session/Bearer。
+- Auth：Bearer。
 - data：`{ authenticated: true, role: 'core', authType: 'session' | 'token', user: AuthUser }`。
 
 #### `POST /auth/ws-ticket`

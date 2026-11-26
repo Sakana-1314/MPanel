@@ -52,11 +52,9 @@ type System struct {
 	TmpDir      string `yaml:"tmp_dir"`
 	WebDir      string `yaml:"web_dir"`
 	CorsOrigins string `yaml:"cors_origins"`
-	// CorsAllowLocal 允许本机/内网 Origin 直连（vite dev、局域网访问）。
-	CorsAllowLocal bool `yaml:"cors_allow_local"`
-	// CorsTrustForwarded 采信 X-Forwarded-Proto/Host 判定同源；仅当 core 前置
-	// 反向代理会重写这两个头时开启，否则客户端可伪造同源。
-	CorsTrustForwarded bool `yaml:"cors_trust_forwarded"`
+	// CorsTrustForwarded 为真时按 Origin 回显并加 Vary: Origin，便于中间缓存
+	// 正确分片。默认空值表示回 Access-Control-Allow-Origin: *。
+	CorsTrustForwarded bool `yaml:"cors_vary_origin"`
 	Username    string `yaml:"username"`
 	Password    string `yaml:"password"`
 	Secret      string `yaml:"secret"`
@@ -144,12 +142,9 @@ func NewApp(baseDir string) *App {
 			BackupDir:   filepath.Join(baseDir, "backup"),
 			TmpDir:      filepath.Join(baseDir, "tmp"),
 			WebDir:      filepath.Join(baseDir, "web"),
-			// 默认允许本机/内网 Origin：vite dev server 与局域网调试无需改配置。
-			// 转发头默认不采信，避免客户端伪造 X-Forwarded-Host 冒充同源。
-			CorsAllowLocal: true,
-			Secret:         RandomToken(32),
-			Version:        Version,
-			Language:       "zh",
+			Secret:      RandomToken(32),
+			Version:     Version,
+			Language:    "zh",
 		},
 		Log: Log{Level: "info"},
 	}
@@ -351,8 +346,7 @@ func applyAppEnv(cfg *App) {
 	str("MPANEL_TMP_DIR", &s.TmpDir)
 	str("MPANEL_WEB_DIR", &s.WebDir)
 	str("MPANEL_CORS_ORIGINS", &s.CorsOrigins)
-	applyBoolEnv("MPANEL_CORS_ALLOW_LOCAL", &s.CorsAllowLocal)
-	applyBoolEnv("MPANEL_CORS_TRUST_FORWARDED", &s.CorsTrustForwarded)
+	applyBoolEnv("MPANEL_CORS_VARY_ORIGIN", &s.CorsTrustForwarded)
 	str("MPANEL_SECRET", &s.Secret)
 	str("MPANEL_USERNAME", &s.Username)
 	str("MPANEL_PASSWORD", &s.Password)

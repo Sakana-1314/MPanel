@@ -6,126 +6,80 @@ import (
 	"testing"
 )
 
-func newRequest(t *testing.T, method, target, origin, host string) *http.Request {
-	t.Helper()
-	req := httptest.NewRequest(method, target, nil)
+func serveCORS(policy CORSConfig, origin, host string) *httptest.ResponseRecorder {
+	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "http://panel.example.com/api/v1/machines", nil)
+	req.Host = host
 	if origin != "" {
 		req.Header.Set("Origin", origin)
 	}
-	if host != "" {
-		req.Host = host
-	}
-	return req
-}
-
-func TestCORSMiddlewareAllowsExplicitOrigin(t *testing.T) {
-	policy := CORSConfig{Allowed: []string{"https://ui.example.com"}}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, newRequest(t, http.MethodGet, "http://panel.example.com/api/v1/machines", "https://ui.example.com", "panel.example.com"))
-
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://ui.example.com" {
-		t.Fatalf("Allow-Origin = %q, want explicit origin", got)
-	}
-	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
-		t.Fatalf("Allow-Credentials = %q, want true", got)
-	}
+	handler.ServeHTTP(rec, req)
+	return rec
 }
 
-func TestCORSMiddlewareRejectsUnknownPublicOrigin(t *testing.T) {
-	policy := CORSConfig{Allowed: []string{"https://ui.example.com"}, AllowLocal: true}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, newRequest(t, http.MethodGet, "http://panel.example.com/api/v1/machines", "https://evil.example.net", "panel.example.com"))
-
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("Allow-Origin = %q, want empty for unknown public origin", got)
-	}
-}
-
-func TestCORSMiddlewareAllowsSameOrigin(t *testing.T) {
-	policy := CORSConfig{AllowLocal: true}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, newRequest(t, http.MethodPost, "http://panel.example.com/api/v1/auth/login", "http://panel.example.com", "panel.example.com"))
-
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://panel.example.com" {
-		t.Fatalf("Allow-Origin = %q, want same origin", got)
-	}
-}
-
-func TestCORSMiddlewareAllowsLocalDevServer(t *testing.T) {
-	policy := CORSConfig{AllowLocal: true}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
-
-	for _, origin := range []string{"http://127.0.0.1:5173", "http://localhost:5173", "http://192.168.1.20:5288"} {
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, newRequest(t, http.MethodGet, "http://127.0.0.1:10086/api/v1/machines", origin, "127.0.0.1:10086"))
-		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != origin {
-			t.Fatalf("Allow-Origin = %q, want %q for local dev", got, origin)
+// 默认策略允许任意来源：面板只用 Authorization 头，不带 Cookie。
+func TestCORSAllowsAnyOriginByDefault(t *testing.T) {
+	policy := CORSConfig{}
+	for _, origin := range []string{
+		"https://any.example.com",
+		"https://evil.example.net",
+		"http://127.0.0.1:5173",
+	} {
+		rec := serveCORS(policy, origin, "panel.example.com")
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+			t.Fatalf("origin %q: Allow-Origin = %q, want *", origin, got)
 		}
 	}
 }
 
-func TestCORSMiddlewareRejectsLocalWhenDisabled(t *testing.T) {
-	policy := CORSConfig{AllowLocal: false}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+// 不使用 Cookie 就必须不声明 Allow-Credentials，否则浏览器会拒绝跨源响应。
+func TestCORSDoesNotAllowCredentials(t *testing.T) {
+	rec := serveCORS(CORSConfig{}, "https://any.example.com", "panel.example.com")
+	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "" {
+		t.Fatalf("Allow-Credentials = %q, want empty (no cookie auth)", got)
+	}
+}
 
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, newRequest(t, http.MethodGet, "http://127.0.0.1:10086/api/v1/machines", "http://127.0.0.1:5173", "127.0.0.1:10086"))
+func TestCORSAllowsAuthorizationHeader(t *testing.T) {
+	rec := serveCORS(CORSConfig{}, "https://any.example.com", "panel.example.com")
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); !containsFold(got, "authorization") {
+		t.Fatalf("Allow-Headers = %q, want it to include Authorization", got)
+	}
+}
 
+// 配置了白名单就退回精确匹配，用于部署方主动收紧的场景。
+func TestCORSWhitelistRestrictsOrigins(t *testing.T) {
+	policy := CORSConfig{Allowed: []string{"https://ui.example.com"}}
+
+	rec := serveCORS(policy, "https://ui.example.com", "panel.example.com")
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://ui.example.com" {
+		t.Fatalf("Allow-Origin = %q, want whitelisted origin echoed", got)
+	}
+
+	rec = serveCORS(policy, "https://evil.example.net", "panel.example.com")
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("Allow-Origin = %q, want empty when AllowLocal is off", got)
+		t.Fatalf("Allow-Origin = %q, want empty for non-whitelisted origin", got)
 	}
 }
 
-func TestCORSMiddlewareIgnoresSpoofedForwardedHost(t *testing.T) {
-	policy := CORSConfig{AllowLocal: false, TrustForwarded: false}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
-
-	req := newRequest(t, http.MethodGet, "http://127.0.0.1:10086/api/v1/machines", "https://evil.example.net", "127.0.0.1:10086")
-	req.Header.Set("X-Forwarded-Host", "evil.example.net")
-	req.Header.Set("X-Forwarded-Proto", "https")
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("Allow-Origin = %q, want empty: forwarded headers must not grant access", got)
+func TestCORSWhitelistAcceptsWildcard(t *testing.T) {
+	policy := CORSConfig{Allowed: []string{"*"}}
+	rec := serveCORS(policy, "https://anything.example", "panel.example.com")
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("Allow-Origin = %q, want *", got)
 	}
 }
 
-func TestCORSMiddlewareHonoursForwardedHostWhenTrusted(t *testing.T) {
-	policy := CORSConfig{AllowLocal: false, TrustForwarded: true}
-	handler := policy.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
-
-	req := newRequest(t, http.MethodGet, "http://127.0.0.1:10086/api/v1/machines", "https://panel.example.com", "127.0.0.1:10086")
-	req.Header.Set("X-Forwarded-Host", "panel.example.com")
-	req.Header.Set("X-Forwarded-Proto", "https")
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://panel.example.com" {
-		t.Fatalf("Allow-Origin = %q, want proxied origin", got)
-	}
-}
-
-func TestCORSMiddlewarePreflightReturns204(t *testing.T) {
-	policy := CORSConfig{AllowLocal: true}
+func TestCORSPreflightReturns204(t *testing.T) {
 	called := false
-	handler := policy.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+	handler := CORSConfig{}.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
 
-	req := newRequest(t, http.MethodOptions, "http://127.0.0.1:10086/api/v1/auth/login", "http://127.0.0.1:5173", "127.0.0.1:10086")
+	req := httptest.NewRequest(http.MethodOptions, "http://panel.example.com/api/v1/auth/login", nil)
+	req.Header.Set("Origin", "https://any.example.com")
 	req.Header.Set("Access-Control-Request-Method", "POST")
-
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
@@ -135,28 +89,31 @@ func TestCORSMiddlewarePreflightReturns204(t *testing.T) {
 	if called {
 		t.Fatal("preflight must not reach the wrapped handler")
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Methods"); got == "" {
+	if rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Fatal("preflight response is missing Allow-Methods")
 	}
 }
 
-func TestCORSAllowsRefererFallback(t *testing.T) {
-	policy := CORSConfig{Allowed: []string{"https://ui.example.com"}}
-	req := httptest.NewRequest(http.MethodGet, "http://panel.example.com/api/v1/machines", nil)
-	req.Host = "panel.example.com"
-	req.Header.Set("Referer", "https://ui.example.com/settings?tab=about")
-
-	if !policy.OriginAllowed(req) {
-		t.Fatal("Referer origin should be accepted")
+// WebSocket 不走 CORS 头，但同样要按策略判断来源。
+func TestOriginAllowed(t *testing.T) {
+	if !(CORSConfig{}).OriginAllowed(httptest.NewRequest(http.MethodGet, "/ws/terminal/x", nil)) {
+		t.Fatal("default policy must allow any origin")
 	}
-}
 
-func TestCORSAllowsRequestsWithoutOrigin(t *testing.T) {
-	policy := CORSConfig{AllowLocal: false}
-	req := httptest.NewRequest(http.MethodGet, "http://panel.example.com/api/v1/machines", nil)
-
-	if !policy.OriginAllowed(req) {
-		t.Fatal("requests without Origin (agents, scripts) must pass")
+	restricted := CORSConfig{Allowed: []string{"https://ui.example.com"}}
+	req := httptest.NewRequest(http.MethodGet, "/ws/terminal/x", nil)
+	req.Header.Set("Origin", "https://ui.example.com")
+	if !restricted.OriginAllowed(req) {
+		t.Fatal("whitelisted origin must be allowed")
+	}
+	req.Header.Set("Origin", "https://evil.example.net")
+	if restricted.OriginAllowed(req) {
+		t.Fatal("non-whitelisted origin must be rejected")
+	}
+	// 没有 Origin 的客户端（agent、脚本）不受影响。
+	noOrigin := httptest.NewRequest(http.MethodGet, "/ws/terminal/x", nil)
+	if !restricted.OriginAllowed(noOrigin) {
+		t.Fatal("requests without Origin must pass")
 	}
 }
 
@@ -168,4 +125,41 @@ func TestParseCORSOrigins(t *testing.T) {
 	if len(ParseCORSOrigins("")) != 0 {
 		t.Fatal("empty config must yield no origins")
 	}
+}
+
+func containsFold(haystack, needle string) bool {
+	lower := make([]rune, 0, len(haystack))
+	for _, r := range haystack {
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		lower = append(lower, r)
+	}
+	target := make([]rune, 0, len(needle))
+	for _, r := range needle {
+		if r >= 'A' && r <= 'Z' {
+			r += 'a' - 'A'
+		}
+		target = append(target, r)
+	}
+	return containsRunes(lower, target)
+}
+
+func containsRunes(haystack, needle []rune) bool {
+	if len(needle) == 0 {
+		return true
+	}
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		match := true
+		for j := range needle {
+			if haystack[i+j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
 }
