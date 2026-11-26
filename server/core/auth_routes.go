@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/server/core/auth"
 	"github.com/sakana-1314/mpanel/server/core/httpapi"
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
@@ -36,9 +35,13 @@ func (c *Core) handleSetup(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, err)
 		return
 	}
-	c.setSessionCookie(w, r, session)
+	token, err := c.auth.IssueJWT(session)
+	if err != nil {
+		httpapi.Fail(w, err)
+		return
+	}
 	c.audit.Write("auth.setup", user.Username, "ok", map[string]any{"ip": c.clientIP(r)})
-	httpapi.OK(w, map[string]any{"user": user, "expiresAt": session.ExpiresAt})
+	httpapi.OK(w, map[string]any{"user": user, "expiresAt": session.ExpiresAt, "token": token})
 }
 
 func (c *Core) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -52,19 +55,20 @@ func (c *Core) handleLogin(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, err)
 		return
 	}
-	c.setSessionCookie(w, r, session)
+	token, err := c.auth.IssueJWT(session)
+	if err != nil {
+		httpapi.Fail(w, err)
+		return
+	}
 	c.audit.Write("auth.login", user.Username, "ok", map[string]any{"ip": c.clientIP(r)})
-	httpapi.OK(w, map[string]any{"user": user, "expiresAt": session.ExpiresAt})
+	httpapi.OK(w, map[string]any{"user": user, "expiresAt": session.ExpiresAt, "token": token})
 }
 
+// handleLogout 吊销当前会话。客户端自己丢弃 Bearer token，服务端只需删除会话记录。
 func (c *Core) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if principal, ok := principalFrom(r); ok && principal.SessionID != "" {
 		_ = c.auth.DeleteSession(principal.SessionID)
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name: auth.CookieName, Value: "", Path: "/", MaxAge: -1,
-		HttpOnly: true, SameSite: http.SameSiteLaxMode,
-	})
 	httpapi.OK(w, map[string]any{"ok": true})
 }
 
@@ -80,7 +84,6 @@ func (c *Core) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	httpapi.OK(w, body)
 }
-
 type changePasswordRequest struct {
 	CurrentPassword string `json:"currentPassword"`
 	NewPassword     string `json:"newPassword"`
@@ -174,19 +177,6 @@ func (c *Core) handleWSTicket(w http.ResponseWriter, r *http.Request) {
 	}
 	ticket, expiresAt := c.auth.IssueTicket(machineID, ticketPath)
 	httpapi.OK(w, map[string]any{"ticket": ticket, "expiresAt": expiresAt})
-}
-
-func (c *Core) setSessionCookie(w http.ResponseWriter, r *http.Request, session auth.SessionRecord) {
-	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.CookieName,
-		Value:    session.ID,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int(auth.SessionTTL.Seconds()),
-	})
 }
 
 // normalizeWSTicketPath accepts both the worker-style /ws/... path and the

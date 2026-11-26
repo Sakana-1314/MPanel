@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sakana-1314/mpanel/server/core/auth"
 	"github.com/sakana-1314/mpanel/server/core/config"
 )
 
@@ -132,5 +131,3 @@ func systemdAvailable() bool {
 	}
 	return true
 }
-
-var _ = auth.CookieName

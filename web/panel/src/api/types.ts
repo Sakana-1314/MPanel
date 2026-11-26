@@ -986,6 +986,8 @@ export interface LoginInput {
 export interface LoginResult {
   user: AuthUser;
   expiresAt: string;
+  /** HS256 JWT；后续请求放在 `Authorization: Bearer <token>`。 */
+  token: string;
 }
 
 export interface ChangePasswordInput {

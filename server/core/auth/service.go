@@ -19,9 +19,7 @@ import (
 )
 
 const (
-	// CookieName is the session cookie used by the panel.
-	CookieName = "mpanel_session"
-	// SessionTTL is the sliding session lifetime.
+	// SessionTTL is the session lifetime; the JWT exp matches it.
 	SessionTTL = 12 * time.Hour
 	// TicketTTL is the WS ticket lifetime.
 	TicketTTL = 60 * time.Second

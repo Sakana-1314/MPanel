@@ -1,36 +1,24 @@
 package httpapi
 
 import (
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
-// CORSConfig decides which browser origins may call the panel with credentials.
+// CORSConfig 控制浏览器跨源访问面板。
 //
-// The panel is usually served by core itself, so browser requests are same-origin
-// and carry no Origin header at all. A cross-origin request only appears when the
-// UI is opened from somewhere else: a dev server on another port, a reverse proxy,
-// or a static mirror. Three rules are applied in order:
+// 面板只用 Authorization: Bearer 鉴权，不使用 Cookie，因此浏览器不会自动
+// 携带凭据。无差别允许任意来源是安全的：第三方页面即使能发起请求，没有
+// token 也只会拿到 401，无法以访问者身份读取数据。这也意味着任何前端
+// （静态站、桌面壳、第三方集成）都能直接调用接口。
 //
-//  1. explicit allowlist entries (MPANEL_CORS_ORIGINS) always win;
-//  2. the origin must match the request's own scheme://host — resolved through
-//     X-Forwarded-* only when the direct peer is a trusted proxy;
-//  3. loopback and private-network origins are accepted when AllowLocal is on,
-//     which covers `vite dev` on 127.0.0.1:5173 talking to a panel on 10086.
-//
-// Arbitrary public origins are never reflected. These responses carry cookies, so
-// reflecting any Origin would let any website read the panel with the visitor's
-// session.
+// 响应里不设置 Access-Control-Allow-Credentials —— 携带凭据的跨源请求会被
+// 浏览器拒绝，正好与「不要 Cookie」保持一致。
 type CORSConfig struct {
-	// Allowed lists explicit origins (scheme://host[:port]).
+	// Allowed 为空表示允许任意来源（默认）。显式列出时只允许这些来源。
 	Allowed []string
-	// AllowLocal accepts loopback/private origins and the request's own host.
-	AllowLocal bool
-	// TrustForwarded allows X-Forwarded-Proto/Host to decide the request origin.
-	// It must only be enabled when a reverse proxy in front of core rewrites them.
-	TrustForwarded bool
+	// VaryOrigin 为真时按来源回显并加 Vary: Origin，便于中间缓存正确分片。
+	VaryOrigin bool
 }
 
 // ParseCORSOrigins splits a comma separated origin list, dropping empties.
@@ -44,17 +32,11 @@ func ParseCORSOrigins(value string) []string {
 	return out
 }
 
-// Middleware applies the decision described on CORSConfig.
+// Middleware applies CORS headers. Preflights are answered without reaching
+// the wrapped handler.
 func (c CORSConfig) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin := requestOrigin(r); origin != "" && c.Allows(origin, r) {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token,X-Requested-With")
-			w.Header().Set("Access-Control-Max-Age", "600")
-			w.Header().Add("Vary", "Origin")
-		}
+		c.writeHeaders(w, r)
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -63,93 +45,57 @@ func (c CORSConfig) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// OriginAllowed reports whether the caller may read responses. WebSocket upgrades
-// do not pass through CORS headers, so handlers that check Origin use this instead.
-func (c CORSConfig) OriginAllowed(r *http.Request) bool {
-	origin := requestOrigin(r)
-	return origin == "" || c.Allows(origin, r)
+func (c CORSConfig) writeHeaders(w http.ResponseWriter, r *http.Request) {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	allowOrigin := "*"
+	if len(c.Allowed) > 0 {
+		allowed := false
+		for _, item := range c.Allowed {
+			if item == "*" {
+				// 显式 * 与默认策略等价，直接回 *。
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token,X-Requested-With,X-Request-Id")
+				w.Header().Set("Access-Control-Max-Age", "600")
+				w.Header().Add("Vary", "Origin")
+				return
+			}
+			if strings.EqualFold(item, origin) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return
+		}
+		// 白名单模式按来源回显，兼容需要精确匹配的中间件。
+		if origin != "" {
+			allowOrigin = origin
+		}
+	} else if c.VaryOrigin && origin != "" {
+		allowOrigin = origin
+	}
+	w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token,X-Requested-With,X-Request-Id")
+	w.Header().Set("Access-Control-Max-Age", "600")
+	w.Header().Add("Vary", "Origin")
 }
 
-// Allows reports whether a concrete origin is permitted for this request.
-func (c CORSConfig) Allows(origin string, r *http.Request) bool {
+// OriginAllowed 供 WebSocket 升级使用：WS 不经过 CORS 头，但同样要判断来源。
+// 默认放行；显式白名单时按名单校验。带 ticket/token 才可能建成连接。
+func (c CORSConfig) OriginAllowed(r *http.Request) bool {
+	if len(c.Allowed) == 0 {
+		return true
+	}
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true
+	}
 	for _, item := range c.Allowed {
 		if item == "*" || strings.EqualFold(item, origin) {
 			return true
 		}
 	}
-	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return false
-	}
-	if sameOrigin(parsed, c.requestOrigin(r)) {
-		return true
-	}
-	if !c.AllowLocal {
-		return false
-	}
-	if host := parsed.Hostname(); host != "" {
-		if ip := net.ParseIP(host); ip != nil {
-			return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
-		}
-		return host == "localhost" ||
-			strings.HasSuffix(host, ".localhost") ||
-			host == "host.docker.internal"
-	}
 	return false
-}
-
-// requestOrigin is the origin of the request itself: scheme://host[:port].
-func (c CORSConfig) requestOrigin(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	host := r.Host
-	if c.TrustForwarded {
-		if forwarded := firstHeaderValue(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
-			scheme = forwarded
-		}
-		if forwarded := firstHeaderValue(r.Header.Get("X-Forwarded-Host")); forwarded != "" {
-			host = forwarded
-		}
-	}
-	if host == "" {
-		return ""
-	}
-	return scheme + "://" + host
-}
-
-// requestOrigin prefers the Origin header and falls back to Referer, so plain
-// navigations (which omit Origin) are still attributable.
-func requestOrigin(r *http.Request) string {
-	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
-		return origin
-	}
-	return originOfReferer(r.Header.Get("Referer"))
-}
-
-func originOfReferer(referer string) string {
-	parsed, err := url.Parse(strings.TrimSpace(referer))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return ""
-	}
-	return parsed.Scheme + "://" + parsed.Host
-}
-
-func sameOrigin(a *url.URL, allowed string) bool {
-	if allowed == "" {
-		return false
-	}
-	b, err := url.Parse(allowed)
-	if err != nil {
-		return false
-	}
-	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
-}
-
-func firstHeaderValue(value string) string {
-	if value == "" {
-		return ""
-	}
-	return strings.TrimSpace(strings.Split(value, ",")[0])
 }
