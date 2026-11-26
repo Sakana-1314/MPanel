@@ -17,8 +17,8 @@
 
 ## 一键初始化失败
 
-- 商店模板来自 GitHub：默认 `https://raw.githubusercontent.com/Sakana-1314/MPanel/main/web/store`。
-  无法访问时在面板 `config.json` 设置 `storeUrl` 指向 jsDelivr 或同源 `/store`。
+- 商店模板来自 GitHub：默认先试 raw，再回退 jsDelivr 与同源 `/store`，每个地址最多 10 秒。
+  全部不可达时在面板 `config.json` 设置 `storeUrl` 指向可达镜像。
 - 安装需要 Docker Engine 与 Compose v2；错误输出会显示 `docker compose` 的原始信息。
 - 数据库端口默认只绑定 `127.0.0.1`，端口冲突时修改安装向导中的宿主端口。
 

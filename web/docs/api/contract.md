@@ -1615,7 +1615,7 @@ interface TaskCreateInput {
 interface RuntimeConfig {
   appName?: string;
   dbxUrl?: string;
-  /** web/store 模板来源；绝对 URL 或同源相对路径。 */
+  /** web/store 模板来源；绝对 URL 或同源相对路径。未设置时 raw → jsDelivr → 同源 /store。 */
   storeUrl?: string;
   /** kind 仅为兼容旧 config.json；面板忽略非 core 条目。 */
   defaultBackend?: { url: string; kind?: 'core'; label?: string };
