@@ -144,6 +144,11 @@ watch(
   },
 );
 
+function toggleContainer(container: ContainerSummary): void {
+  const kind = container.state === 'running' ? 'stop' : 'start';
+  void action.run({ id: container.id, kind });
+}
+
 function containerStateType(state: string): 'success' | 'warning' | 'error' | 'default' | 'info' {
   if (state === 'running') return 'success';
   if (state === 'paused' || state === 'restarting') return 'warning';
@@ -245,9 +250,8 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
               <div class="actions">
                 <n-tooltip>
                   <template #trigger>
-                    <n-button size="tiny" type="primary" secondary @click="openDetail(container)">
+                    <n-button size="tiny" quaternary @click="openDetail(container)">
                       <template #icon><n-icon :component="EyeOutline" /></template>
-                      详情
                     </n-button>
                   </template>
                   详情 / 日志 / 统计 / 执行
@@ -257,26 +261,15 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
                     <n-button
                       size="tiny"
                       quaternary
-                      :disabled="container.state === 'running'"
-                      @click="action.run({ id: container.id, kind: 'start' })"
+                      :disabled="container.state === 'paused'"
+                      @click="toggleContainer(container)"
                     >
-                      <template #icon><n-icon :component="PlayOutline" /></template>
+                      <template #icon>
+                        <n-icon :component="container.state === 'running' ? StopOutline : PlayOutline" />
+                      </template>
                     </n-button>
                   </template>
-                  启动
-                </n-tooltip>
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button
-                      size="tiny"
-                      quaternary
-                      :disabled="container.state !== 'running'"
-                      @click="action.run({ id: container.id, kind: 'stop' })"
-                    >
-                      <template #icon><n-icon :component="StopOutline" /></template>
-                    </n-button>
-                  </template>
-                  停止
+                  {{ container.state === 'running' ? '停止' : '启动' }}
                 </n-tooltip>
                 <n-tooltip>
                   <template #trigger>
@@ -356,7 +349,7 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
 }
 .actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 2px;
 }
 .empty-row {

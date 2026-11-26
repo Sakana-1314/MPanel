@@ -303,10 +303,10 @@ const applyOutput = computed(() => {
   font-size: 12px;
 }
 .ok {
-  color: #2fbf71;
+  color: var(--mpanel-success);
 }
 .bad {
-  color: #e05561;
+  color: var(--mpanel-danger);
 }
 .notes p {
   margin: 0 0 8px;

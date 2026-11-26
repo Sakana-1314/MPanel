@@ -32,15 +32,15 @@ withDefaults(
   font-variant-numeric: tabular-nums;
 }
 .stat-success {
-  color: #2fbf71;
+  color: var(--mpanel-success);
 }
 .stat-warning {
-  color: #e6a23c;
+  color: var(--mpanel-attention);
 }
 .stat-error {
-  color: #e05561;
+  color: var(--mpanel-danger);
 }
 .stat-info {
-  color: #4f7cff;
+  color: var(--mpanel-accent);
 }
 </style>

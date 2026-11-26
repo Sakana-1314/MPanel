@@ -8,6 +8,7 @@ export type MachineArea =
   | 'certs'
   | 'databases'
   | 'containers'
+  | 'containers-config'
   | 'images'
   | 'stacks'
   | 'files'
@@ -26,10 +27,11 @@ export const MACHINE_AREAS: MachineAreaItem[] = [
   { area: 'certs', title: '证书', description: '证书与到期时间' },
   { area: 'databases', title: '数据库', description: 'PostgreSQL / Redis' },
   { area: 'containers', title: '容器', description: 'Docker 容器' },
+  { area: 'containers-config', title: '配置', description: '网络、仓库与 daemon 配置' },
   { area: 'images', title: '镜像', description: 'Docker 镜像' },
   { area: 'stacks', title: '编排', description: 'Compose 编排' },
   { area: 'files', title: '文件', description: '文件浏览与编辑' },
-  { area: 'terminal', title: '终端', description: 'PTY / 管道会话' },
+  { area: 'terminal', title: '终端', description: '交互式终端会话' },
   { area: 'tasks', title: '计划任务', description: 'Cron 任务' },
 ];
 
@@ -66,6 +68,8 @@ export const MACHINE_NAV_GROUPS: MachineNavGroup[] = [
     items: [
       { key: 'containers', area: 'containers', title: '容器' },
       { key: 'stacks', area: 'stacks', title: '编排' },
+      { key: 'images', area: 'images', title: '镜像' },
+      { key: 'container-config', area: 'containers-config', title: '配置' },
     ],
   },
   {

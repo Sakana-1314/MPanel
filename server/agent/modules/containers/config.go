@@ -129,7 +129,7 @@ func parseNetworkList(output string) []ContainerNetwork {
 			Labels:     parseLabelList(entry.Labels),
 		}
 		if entry.CreatedAt != "" {
-			created := entry.CreatedAt
+			created := normalizeDockerTime(entry.CreatedAt)
 			network.CreatedAt = &created
 		}
 		items = append(items, network)
@@ -211,7 +211,7 @@ func networkDetailFromInspect(inspected networkInspect) ContainerNetworkDetail {
 		detail.Labels = map[string]string{}
 	}
 	if inspected.Created != "" {
-		created := inspected.Created
+		created := normalizeDockerTime(inspected.Created)
 		detail.CreatedAt = &created
 	}
 	if len(inspected.IPAM.Config) > 0 {

@@ -295,10 +295,10 @@ function submit(): void {
   flex-wrap: wrap;
 }
 .ok-text {
-  color: #2fbf71;
+  color: var(--mpanel-success);
 }
 .error-text {
-  color: #e05561;
+  color: var(--mpanel-danger);
 }
 .next-runs {
   display: flex;

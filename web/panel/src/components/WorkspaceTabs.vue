@@ -168,7 +168,7 @@ const menuOptions = [
   max-width: 260px;
   padding: 5px 7px 5px 9px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 12px;
   color: var(--mpanel-muted);
   cursor: pointer;
@@ -177,14 +177,14 @@ const menuOptions = [
   flex: 0 0 auto;
 }
 .tab:hover {
-  background: color-mix(in srgb, var(--mpanel-accent) 8%, transparent);
+  background: var(--mpanel-surface-soft);
   color: var(--mpanel-text);
 }
 .tab.active {
   background: var(--mpanel-surface);
   border-color: var(--mpanel-border);
   color: var(--mpanel-text);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  box-shadow: var(--mpanel-shadow);
 }
 .tab-machine {
   max-width: 90px;
@@ -204,16 +204,16 @@ const menuOptions = [
   background: var(--mpanel-muted);
 }
 .dot-success {
-  background: #2fbf71;
+  background: var(--mpanel-success);
 }
 .dot-warning {
-  background: #e6a23c;
+  background: var(--mpanel-attention);
 }
 .dot-error {
-  background: #e05561;
+  background: var(--mpanel-danger);
 }
 .dot-info {
-  background: #4f7cff;
+  background: var(--mpanel-accent);
 }
 .tab-close {
   display: grid;
@@ -228,7 +228,7 @@ const menuOptions = [
   opacity: 0.55;
 }
 .tab-close:hover {
-  background: color-mix(in srgb, var(--mpanel-danger, #e05561) 18%, transparent);
+  background: color-mix(in srgb, var(--mpanel-danger) 18%, transparent);
   opacity: 1;
 }
 .add-tab {

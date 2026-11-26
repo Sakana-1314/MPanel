@@ -1,23 +1,37 @@
-/* Global layout + Naive UI page helpers. */
+/* Global layout + Naive UI page helpers. 配色对齐 GitHub Primer。 */
 
 :root {
-  --mpanel-bg: #f2f5fa;
+  --mpanel-bg: #f6f8fa;
   --mpanel-surface: #ffffff;
-  --mpanel-surface-soft: #eef3fb;
-  --mpanel-border: #dde5f2;
-  --mpanel-text: #162033;
-  --mpanel-muted: #67748c;
-  --mpanel-accent: #4f7cff;
+  --mpanel-surface-soft: #f6f8fa;
+  --mpanel-surface-inset: #eff2f5;
+  --mpanel-border: #d1d9e0;
+  --mpanel-border-muted: #d8dee4;
+  --mpanel-text: #1f2328;
+  --mpanel-muted: #59636e;
+  --mpanel-accent: #0969da;
+  --mpanel-accent-soft: #ddf4ff;
+  --mpanel-success: #1a7f37;
+  --mpanel-attention: #9a6700;
+  --mpanel-danger: #cf222e;
+  --mpanel-shadow: 0 1px 0 rgb(31 35 40 / 4%), 0 1px 3px rgb(31 35 40 / 6%);
 }
 
 html.dark {
-  --mpanel-bg: #090d16;
-  --mpanel-surface: #111827;
-  --mpanel-surface-soft: #151f33;
-  --mpanel-border: #243149;
-  --mpanel-text: #e7edf8;
-  --mpanel-muted: #8b99b3;
-  --mpanel-accent: #6f94ff;
+  --mpanel-bg: #010409;
+  --mpanel-surface: #0d1117;
+  --mpanel-surface-soft: #151b23;
+  --mpanel-surface-inset: #161b22;
+  --mpanel-border: #3d444d;
+  --mpanel-border-muted: #30363d;
+  --mpanel-text: #e6edf3;
+  --mpanel-muted: #9198a1;
+  --mpanel-accent: #4493f8;
+  --mpanel-accent-soft: #121d2f;
+  --mpanel-success: #3fb950;
+  --mpanel-attention: #d29922;
+  --mpanel-danger: #f85149;
+  --mpanel-shadow: 0 1px 0 rgb(1 4 9 / 40%), 0 1px 3px rgb(1 4 9 / 60%);
 }
 
 * {
@@ -34,20 +48,20 @@ body,
 body {
   background: var(--mpanel-bg);
   color: var(--mpanel-text);
-  font-family: Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, -apple-system,
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'PingFang SC',
+    'Microsoft YaHei', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 a {
-  color: inherit;
+  color: var(--mpanel-accent);
   text-decoration: none;
 }
 
 code,
 pre,
 .mono {
-  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, 'SFMono-Regular', ui-monospace,
+  font-family: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono',
     monospace;
 }
 
@@ -73,7 +87,7 @@ pre,
 .page-header h1 {
   margin: 0;
   font-size: 20px;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
@@ -91,7 +105,8 @@ pre,
 .card-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-items: start;
 }
 
 .split {
@@ -131,9 +146,9 @@ pre,
 .code-block {
   margin: 0;
   padding: 12px;
-  border-radius: 8px;
-  background: var(--mpanel-surface-soft);
-  border: 1px solid var(--mpanel-border);
+  border-radius: 6px;
+  background: var(--mpanel-surface-inset);
+  border: 1px solid var(--mpanel-border-muted);
   overflow: auto;
   font-size: 12px;
   line-height: 1.55;
@@ -159,19 +174,42 @@ pre,
 }
 
 .workspace-tabs {
-  border-bottom: 1px solid var(--mpanel-border);
-  background: color-mix(in srgb, var(--mpanel-bg) 82%, transparent);
-  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--mpanel-border-muted);
+  background: var(--mpanel-surface);
+}
+
+/* 状态点：GitHub 语义色。 */
+.dot-success {
+  background: var(--mpanel-success);
+}
+
+.dot-warning {
+  background: var(--mpanel-attention);
+}
+
+.dot-error {
+  background: var(--mpanel-danger);
+}
+
+.dot-info {
+  background: var(--mpanel-accent);
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--mpanel-muted) 35%, transparent);
+  background: color-mix(in srgb, var(--mpanel-muted) 32%, transparent);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--mpanel-muted) 52%, transparent);
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-track {
