@@ -185,7 +185,7 @@ func (c *Core) authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if isPublicPath(path) || r.Method == http.MethodOptions {
+		if isPublicPath(path) || isProxyWSPath(path) || r.Method == http.MethodOptions {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -208,6 +208,13 @@ func isPublicPath(path string) bool {
 		return true
 	}
 	return false
+}
+
+// isProxyWSPath lets browser WebSocket upgrades reach handleProxyWS without an
+// Authorization header. Browsers cannot set headers on WebSocket, so the route
+// authenticates with the one-shot ticket (or a bearer query token) itself.
+func isProxyWSPath(path string) bool {
+	return strings.HasPrefix(path, "/api/v1/machines/") && strings.Contains(path, "/proxy/ws/")
 }
 
 // authenticate 按顺序尝试：静态 core token → 面板 API token → 会话 JWT。
