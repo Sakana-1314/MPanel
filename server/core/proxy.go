@@ -180,7 +180,14 @@ func readLimited(body io.Reader, limit int64) ([]byte, error) {
 
 func copyResponse(w http.ResponseWriter, resp *http.Response) {
 	for key, values := range resp.Header {
-		if hopByHop[strings.ToLower(key)] {
+		lower := strings.ToLower(key)
+		if hopByHop[lower] {
+			continue
+		}
+		// The agent reflects CORS too; forwarding it would duplicate the
+		// Access-Control-* headers that core's own middleware already wrote.
+		// Browsers reject duplicate Allow-Origin values.
+		if strings.HasPrefix(lower, "access-control-") {
 			continue
 		}
 		for _, value := range values {
