@@ -1,0 +1,152 @@
+name: 构建成品
+
+# main 每次更新或手动触发时，交叉编译 Linux amd64/arm64 的成品包，
+# 删除旧的 dev Release 与 tag 后重新发布：
+#   dev  -> 预发布，标题带 commit 短哈希
+#   assets: mpanel-linux-{amd64,arm64}.tar.gz + SHA256SUMS
+# 版本号写入二进制：dev-<short sha>。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 构建成品-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建 Linux 成品
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/panel/pnpm-lock.yaml
+
+      - name: 构建面板
+        working-directory: web/panel
+        env:
+          VITE_BASE_PATH: /
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: 交叉编译并打包
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            staging="dist/mpanel-linux-${arch}"
+            rm -rf "$staging"
+            mkdir -p "$staging"
+            for cmd in mpanel-core mpanel-agent mpanelctl; do
+              CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+                -ldflags "-s -w -X github.com/sakana-1314/mpanel/server/core/config.Version=dev-${short_sha}" \
+                -o "$staging/$cmd" "./server/cmd/$cmd"
+            done
+            cp -R web/panel/dist "$staging/web"
+            cp LICENSE "$staging/LICENSE"
+            tar -C dist -czf "dist/mpanel-linux-${arch}.tar.gz" "mpanel-linux-${arch}"
+            rm -rf "$staging"
+          done
+          (cd dist && sha256sum mpanel-linux-*.tar.gz > SHA256SUMS)
+          ls -lh dist
+
+      - name: 校验成品
+        run: |
+          set -euo pipefail
+          file dist/mpanel-linux-amd64.tar.gz dist/mpanel-linux-arm64.tar.gz
+          # amd64 二进制可在 GitHub 的 x64 runner 上直接执行。
+          tar -xzf dist/mpanel-linux-amd64.tar.gz -C dist
+          ./dist/mpanel-linux-amd64/mpanel-core version
+          ./dist/mpanel-linux-amd64/mpanel-agent version
+          ./dist/mpanel-linux-amd64/mpanelctl version || true
+          test -f dist/mpanel-linux-amd64/web/index.html
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpanel-dev-linux
+          path: |
+            dist/mpanel-linux-*.tar.gz
+            dist/SHA256SUMS
+          retention-days: 7
+
+  release:
+    name: 替换 dev 发布
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: mpanel-dev-linux
+          path: dist
+
+      - name: 删除旧 dev 发布
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release delete dev --yes --cleanup-tag || true
+          # 双重保险：清理 release 删除后残留的 tag。
+          gh api -X DELETE "repos/${GH_REPO}/git/refs/tags/dev" >/dev/null 2>&1 || true
+          sleep 2
+
+      - name: 发布 dev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          cat > notes.md <<EOF
+          ## MPanel dev 成品
+
+          - commit：\`${GITHUB_SHA}\`
+          - 版本：\`dev-${short_sha}\`
+          - 构建时间：\`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`
+          - 架构：Linux amd64 / arm64（CGO 关闭，静态运行）
+          - 内容：\`mpanel-core\`、\`mpanel-agent\`、\`mpanelctl\`、已构建的 \`web/\` 面板、\`LICENSE\`
+
+          校验：
+
+          \`\`\`bash
+          sha256sum -c SHA256SUMS
+          \`\`\`
+
+          这是每次 main 更新后替换的预发布 dev 版本，不保证可重复下载同一构建。
+          EOF
+          gh release create dev \
+            dist/mpanel-linux-*.tar.gz dist/SHA256SUMS \
+            --title "dev · ${short_sha}" \
+            --notes-file notes.md \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --latest=false
