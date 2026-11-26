@@ -15,6 +15,7 @@ import {
   NTable,
   NTooltip,
   useDialog,
+  useMessage,
   NTag,
 } from 'naive-ui';
 import {
@@ -53,6 +54,7 @@ const queryClient = useQueryClient();
 const machineId = String(route.params.machineId ?? '');
 const api = useMachineApi(machineId);
 const dialog = useDialog();
+const message = useMessage();
 
 const search = ref('');
 const enabledFilter = ref('all');
@@ -102,6 +104,8 @@ async function checkStatus(): Promise<void> {
   try {
     const info = await api.value.system.info(true);
     queryClient.setQueryData(machineKey(machineId, 'system', 'info'), info);
+  } catch (error) {
+    message.error(describeError(error).description);
   } finally {
     checking.value = false;
   }

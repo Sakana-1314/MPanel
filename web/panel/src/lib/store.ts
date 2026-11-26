@@ -278,8 +278,8 @@ export function validateStoreValues(
         return `${label} 需为 1–65535 的整数`;
       }
     }
-    if (variable.key === 'MPANEL_DATA_DIR' && !value.startsWith('/')) {
-      return `${label} 必须是绝对路径（以 / 开头）`;
+    if (variable.key === 'MPANEL_DATA_DIR' && !/^(\/|[A-Za-z]:\/)/.test(value)) {
+      return `${label} 必须是绝对路径（/ 开头或 X:/ 形式）`;
     }
   }
   return null;
@@ -293,7 +293,8 @@ export function defaultStoreValues(
   for (const variable of manifest.variables ?? []) {
     let value = variable.default ?? '';
     if (variable.key === 'MPANEL_DATA_DIR' && paths?.home !== undefined && paths.home.length > 0) {
-      value = `${paths.home.replace(/[\\/]+$/, '')}/data`;
+      // Compose/YAML 里统一用正斜杠；Windows 开发机写 C:/... 也能被 Docker 接受。
+      value = `${paths.home.replace(/\\/g, '/').replace(/\/+$/, '')}/data`;
     }
     if (value.length === 0 && variable.generate !== undefined) {
       value = generateSecret(variable.generate.length ?? 28);
