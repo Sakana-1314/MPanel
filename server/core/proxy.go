@@ -37,7 +37,7 @@ func (c *Core) handleProxyHTTP(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, protocol.BadRequest("请求体超过 64MiB 上限"))
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), proxyTimeout(target))
 	defer cancel()
 	resp, err := transport.Do(ctx, r.Method, target, filterHeaders(r.Header), body)
 	if err != nil {
@@ -196,3 +196,29 @@ func copyResponse(w http.ResponseWriter, resp *http.Response) {
 }
 
 var _ = json.Marshal
+
+// proxyTimeout follows contract §2.7: ordinary API calls are 120s, while
+// image pulls, large file transfers and compose up/pull may legitimately take
+// much longer. Matching is on the agent-side /api/v1 path, query excluded.
+func proxyTimeout(target string) time.Duration {
+	path := target
+	if idx := strings.IndexByte(path, '?'); idx >= 0 {
+		path = path[:idx]
+	}
+	switch {
+	case path == "/api/v1/images/pull":
+		return 620 * time.Second
+	case strings.HasPrefix(path, "/api/v1/files/upload"),
+		strings.HasPrefix(path, "/api/v1/files/download"),
+		strings.HasPrefix(path, "/api/v1/files/archive"),
+		strings.HasPrefix(path, "/api/v1/files/extract"):
+		return 620 * time.Second
+	case strings.HasPrefix(path, "/api/v1/databases/backups/") && strings.HasSuffix(path, "/download"):
+		return 620 * time.Second
+	case strings.HasPrefix(path, "/api/v1/stacks/") &&
+		(strings.HasSuffix(path, "/up") || strings.HasSuffix(path, "/pull")):
+		return 620 * time.Second
+	default:
+		return 120 * time.Second
+	}
+}

@@ -247,7 +247,7 @@ const basePath = `${connection.url}/api/v1/machines/${machineId}/proxy`;
 | 终端输入帧 | 1 MiB |
 | 代理/隧道请求体 | 流式；单帧 16 MiB |
 | 任务命令 | 64 KiB |
-| 超时 | 普通 API 120 s；`images/pull` 620 s；`files/upload`、`files/download`、`files/archive`、`files/extract`、`databases/backups/:id/download` 620 s；备份/恢复异步 |
+| 超时 | 普通 API 120 s；`images/pull`、`files/upload`、`files/download`、`files/archive`、`files/extract`、`databases/backups/:id/download`、`stacks/:name/up|pull` 620 s；备份/恢复异步；core 代理与 worker 保持同一组超时 |
 
 ### 2.7.1 core 代理与 worker 请求体解析
 

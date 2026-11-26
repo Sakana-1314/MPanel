@@ -345,7 +345,15 @@ async function deploy(): Promise<void> {
         addStep('profile', '创建数据库档案');
         const input = buildProfileInput(app);
         if (input === null) throw new Error('应用清单缺少数据库档案映射');
-        const profile = await runStep('profile', () => api.value.databases.create(input));
+        const existingProfiles = await api.value.databases.list({ limit: 200 });
+        const sameName = existingProfiles.items.find((profile) => profile.name === input.name);
+        let profile: DatabaseProfile;
+        if (sameName !== undefined) {
+          profile = sameName;
+          setStep('profile', 'warning', `同名档案 ${sameName.name} 已存在，直接复用`);
+        } else {
+          profile = await runStep('profile', () => api.value.databases.create(input));
+        }
         createdProfile.value = profile;
         addStep('verify', '测试数据库连接');
         await waitForProfile(profile.id);
