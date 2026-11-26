@@ -63,6 +63,9 @@ system:
   version: 0.3.0
   entrance: ""
   language: zh
+  cors_origins: ""
+  cors_allow_local: true
+  cors_trust_forwarded: false
 log:
   level: info
 ```
@@ -87,6 +90,19 @@ log:
 | `version` | string | 构建版本 | — | 版本号，可用 `-ldflags` 注入 |
 | `entrance` | string | 空 | `system.entrance` | 预留的安全入口字段，当前只加载/持久化 |
 | `language` | string | `zh` | — | 默认语言 |
+| `cors_origins` | string | 空 | — | 额外允许跨域读取面板的来源，逗号分隔（`https://panel.example.com,https://ui.example.com`）；`*` 表示允许任意来源 |
+| `cors_allow_local` | bool | `true` | — | 允许本机与内网来源（`localhost`、`*.localhost`、回环与私有网段）直接跨域访问，便于 vite dev server 与局域网调试 |
+| `cors_trust_forwarded` | bool | `false` | — | 采信 `X-Forwarded-Proto` / `X-Forwarded-Host` 判定同源。仅当 core 前置的反向代理会重写这两个头时开启，否则客户端可伪造它们冒充同源 |
+
+#### 跨域来源判定
+
+面板默认由 core 自己托管，浏览器的请求本就同源，不会带 `Origin`。只有前端跑在别处时才会出现跨域：vite dev server 用另一个端口、外层反向代理、或静态镜像。core 按以下顺序判定，命中即允许并回 `Access-Control-Allow-Origin: <该来源>` + `Access-Control-Allow-Credentials: true`：
+
+1. `cors_origins` 显式列出的来源（或 `*`）；
+2. 与本次请求自身 `scheme://host` 相同的来源（反代场景需开启 `cors_trust_forwarded`）；
+3. `cors_allow_local` 开启时，本机与内网来源。
+
+未命中不返回任何 CORS 头，浏览器按跨域失败处理。**不会**反射任意公网来源：这些响应带 Cookie，反射任意来源等于允许任意网页以访问者身份读取面板。`/ws` 的 Origin 校验复用同一套策略（agent 与脚本客户端不带 `Origin`，不受影响）。
 
 ### 2.2 `log` 字段
 
