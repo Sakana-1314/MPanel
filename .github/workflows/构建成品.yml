@@ -114,10 +114,19 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh release delete dev --yes --cleanup-tag || true
-          # 双重保险：清理 release 删除后残留的 tag。
+          release_id="$(gh api "repos/${GH_REPO}/releases/tags/dev" --jq .id 2>/dev/null || true)"
+          if [ -n "$release_id" ]; then
+            gh api -X DELETE "repos/${GH_REPO}/releases/${release_id}"
+          fi
           gh api -X DELETE "repos/${GH_REPO}/git/refs/tags/dev" >/dev/null 2>&1 || true
-          sleep 2
+          if gh api "repos/${GH_REPO}/releases/tags/dev" >/dev/null 2>&1; then
+            echo "旧 dev 发布仍然存在，停止发布" >&2
+            exit 1
+          fi
+          if gh api "repos/${GH_REPO}/git/refs/tags/dev" >/dev/null 2>&1; then
+            echo "旧 dev 标签仍然存在，停止发布" >&2
+            exit 1
+          fi
 
       - name: 发布 dev
         env:
