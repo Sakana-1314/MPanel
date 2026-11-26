@@ -4,6 +4,7 @@ import {
   NAlert,
   NButton,
   NCard,
+  NDropdown,
   NEmpty,
   NIcon,
   NInput,
@@ -16,16 +17,18 @@ import {
 import {
   AddOutline,
   CreateOutline,
+  EllipsisHorizontalOutline,
   EyeOutline,
   KeyOutline,
   PlayOutline,
   RefreshOutline,
+  ServerOutline,
   StopOutline,
   TrashOutline,
   WifiOutline,
   OpenOutline,
 } from '@vicons/ionicons5';
-import type { Machine, MachineEnrollment, MachineTestResult } from '@/api/types';
+import type { Machine, MachineEnrollment } from '@/api/types';
 import { useCoreApi } from '@/lib/api';
 import { useMachinesQuery } from '@/lib/machines';
 import { coreKey } from '@/lib/query-keys';
@@ -34,7 +37,6 @@ import { openMachineDetail, openMachinePage } from '@/lib/navigation';
 import { machineStatusType } from '@/lib/status';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import StatCard from '@/components/common/StatCard.vue';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import MachineFormModal from './MachineFormModal.vue';
@@ -51,7 +53,6 @@ const formOpen = ref(false);
 const editing = ref<Machine | undefined>(undefined);
 const enrollment = ref<MachineEnrollment | null>(null);
 const enrollmentOpen = ref(false);
-const testResults = ref<Record<string, MachineTestResult>>({});
 
 const machines = computed(() => machinesQuery.data.value?.items ?? []);
 
@@ -129,13 +130,6 @@ const rotateAction = useAction(
   },
 );
 
-async function testMachine(machine: Machine): Promise<void> {
-  const result = await testAction.run(machine);
-  if (result !== undefined) {
-    testResults.value = { ...testResults.value, [machine.id]: result };
-  }
-}
-
 const testAction = useAction((machine: Machine) => api.value.machines.test(machine.id), {
   success: (result, machine) =>
     result.reachable
@@ -178,6 +172,22 @@ async function rotate(machine: Machine): Promise<void> {
   enrollmentOpen.value = true;
 }
 
+function rowMenuOptions(machine: Machine): Array<{ label: string; key: string }> {
+  return [
+    { label: '详情与健康', key: 'detail' },
+    { label: '编辑机器', key: 'edit' },
+    ...(machine.transport === 'reverse-ws' ? [{ label: '轮换 machine secret', key: 'rotate' }] : []),
+    { label: '删除机器', key: 'delete' },
+  ];
+}
+
+function onRowMenu(key: string, machine: Machine): void {
+  if (key === 'detail') openMachineDetail(machine.id);
+  else if (key === 'edit') openEdit(machine);
+  else if (key === 'rotate') void rotate(machine);
+  else if (key === 'delete') confirmDelete(machine);
+}
+
 function onSaved(result: { machine: Machine; enrollment?: MachineEnrollment }): void {
   if (result.enrollment !== undefined) {
     enrollment.value = result.enrollment;
@@ -199,7 +209,6 @@ const isBusy = computed(
   <div class="page">
     <PageHeader
       title="机器"
-      subtitle="core 通过 http / stdio / reverse-ws 管理 agent。这里的每台机器都可以独立打开一个工作台标签页，多台机器可以同时操作。"
     >
       <template #actions>
         <n-button size="small" secondary :loading="machinesQuery.isFetching.value" @click="machinesQuery.refetch()">
@@ -212,12 +221,6 @@ const isBusy = computed(
         </n-button>
       </template>
     </PageHeader>
-
-    <div class="stat-grid">
-      <stat-card label="机器总数" :value="counts.total" :hint="`reverse-ws ${counts.remote} 台`" :loading="machinesQuery.isLoading.value" />
-      <stat-card label="在线" :value="counts.online" :type="counts.online > 0 ? 'success' : 'default'" hint="心跳 ≤ 15s" :loading="machinesQuery.isLoading.value" />
-      <stat-card label="异常" :value="counts.issues" :type="counts.issues > 0 ? 'error' : 'default'" hint="离线 / 降级 / error" :loading="machinesQuery.isLoading.value" />
-    </div>
 
     <n-alert
       v-if="machinesQuery.data.value?.available === false"
@@ -246,21 +249,16 @@ const isBusy = computed(
         <n-select v-model:value="transportFilter" :options="transportOptions" style="width: 150px" />
         <div class="spacer" />
         <span class="small muted">
-          共 {{ filtered.length }} 台
+          {{ filtered.length }} 台 · 在线 {{ counts.online }} · 异常 {{ counts.issues }}
           <template v-if="machinesQuery.isFetching.value"> · 刷新中…</template>
         </span>
       </div>
     </n-card>
 
     <n-empty v-if="machines.length === 0 && !machinesQuery.isLoading.value" description="还没有机器">
+      <template #icon><n-icon :component="ServerOutline" size="36" /></template>
       <template #extra>
-        <div class="empty-actions">
-          <p class="small muted" style="max-width: 560px; line-height: 1.7">
-            接入第一台机器后，core 才能代理站点、证书、数据库、容器、文件与终端请求。
-            支持 http（直连 agent URL）、stdio（core 拉起本地进程）与 reverse-ws（agent 主动连回，适合 NAT）。
-          </p>
-          <n-button type="primary" @click="openCreate">新增机器</n-button>
-        </div>
+        <n-button type="primary" @click="openCreate">新增机器</n-button>
       </template>
     </n-empty>
 
@@ -272,8 +270,7 @@ const isBusy = computed(
             <th style="width: 130px">状态</th>
             <th style="min-width: 170px">传输 / 端点</th>
             <th style="min-width: 150px">最近心跳</th>
-            <th style="width: 130px">连通性测试</th>
-            <th style="width: 260px">操作</th>
+            <th style="width: 170px">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -293,10 +290,7 @@ const isBusy = computed(
             <td>
               <div class="stack-tight">
                 <MachineStatusTag :status="machine.status" />
-                <span class="tiny muted">
-                  {{ machine.desiredState === 'running' ? '期望运行' : '期望停止' }}
-                  · {{ machine.enabled ? '已启用' : '已禁用' }}
-                </span>
+                <n-tag v-if="!machine.enabled" size="tiny" round :bordered="false">已禁用</n-tag>
                 <span v-if="machine.lastError" class="tiny error-text truncate" :title="machine.lastError">
                   {{ machine.lastError }}
                 </span>
@@ -321,35 +315,19 @@ const isBusy = computed(
               </div>
             </td>
             <td>
-              <div v-if="testResults[machine.id]" class="stack-tight">
-                <n-tag
-                  size="tiny"
-                  :type="testResults[machine.id]!.reachable ? 'success' : 'error'"
-                  round
-                  :bordered="false"
-                >
-                  {{ testResults[machine.id]!.reachable ? '可达' : '不可达' }}
-                </n-tag>
-                <span class="tiny muted">
-                  {{ testResults[machine.id]!.latencyMs ?? '?' }} ms
-                </span>
-              </div>
-              <span v-else class="tiny muted">—</span>
-            </td>
-            <td>
               <div class="actions">
+                <n-button size="tiny" type="primary" secondary @click="openMachinePage(machine.id, 'sites')">
+                  <template #icon><n-icon :component="OpenOutline" /></template>
+                  打开
+                </n-button>
                 <n-tooltip>
                   <template #trigger>
-                    <n-button size="tiny" type="primary" secondary @click="openMachinePage(machine.id, 'sites')">
-                      <template #icon><n-icon :component="OpenOutline" /></template>
-                      打开
-                    </n-button>
-                  </template>
-                  在新标签页打开该机器的站点工作台
-                </n-tooltip>
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button size="tiny" quaternary :disabled="isBusy" @click="machine.desiredState === 'running' ? disconnectAction.run(machine) : connectAction.run(machine)">
+                    <n-button
+                      size="tiny"
+                      quaternary
+                      :disabled="isBusy"
+                      @click="machine.desiredState === 'running' ? disconnectAction.run(machine) : connectAction.run(machine)"
+                    >
                       <template #icon>
                         <n-icon :component="machine.desiredState === 'running' ? StopOutline : PlayOutline" />
                       </template>
@@ -359,44 +337,21 @@ const isBusy = computed(
                 </n-tooltip>
                 <n-tooltip>
                   <template #trigger>
-                    <n-button size="tiny" quaternary :loading="testAction.pending.value" @click="testMachine(machine)">
+                    <n-button size="tiny" quaternary :loading="testAction.pending.value" @click="testAction.run(machine)">
                       <template #icon><n-icon :component="WifiOutline" /></template>
                     </n-button>
                   </template>
                   测试连通性
                 </n-tooltip>
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button size="tiny" quaternary @click="openMachineDetail(machine.id)">
-                      <template #icon><n-icon :component="EyeOutline" /></template>
-                    </n-button>
-                  </template>
-                  详情与健康
-                </n-tooltip>
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button size="tiny" quaternary @click="openEdit(machine)">
-                      <template #icon><n-icon :component="CreateOutline" /></template>
-                    </n-button>
-                  </template>
-                  编辑
-                </n-tooltip>
-                <n-tooltip v-if="machine.transport === 'reverse-ws'">
-                  <template #trigger>
-                    <n-button size="tiny" quaternary @click="rotate(machine)">
-                      <template #icon><n-icon :component="KeyOutline" /></template>
-                    </n-button>
-                  </template>
-                  轮换 machine secret
-                </n-tooltip>
-                <n-tooltip>
-                  <template #trigger>
-                    <n-button size="tiny" quaternary type="error" @click="confirmDelete(machine)">
-                      <template #icon><n-icon :component="TrashOutline" /></template>
-                    </n-button>
-                  </template>
-                  删除机器
-                </n-tooltip>
+                <n-dropdown
+                  trigger="click"
+                  :options="rowMenuOptions(machine)"
+                  @select="(key: string) => onRowMenu(key, machine)"
+                >
+                  <n-button size="tiny" quaternary aria-label="更多操作">
+                    <template #icon><n-icon :component="EllipsisHorizontalOutline" /></template>
+                  </n-button>
+                </n-dropdown>
               </div>
             </td>
           </tr>

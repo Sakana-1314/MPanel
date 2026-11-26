@@ -73,7 +73,7 @@ async function save(): Promise<void> {
       </n-button>
     </div>
 
-    <PageHeader :title="`编辑栈 · ${stackName}`" subtitle="保存只更新 compose 文件；应用需要执行 up/restart。">
+    <PageHeader :title="`编辑栈 · ${stackName}`">
       <template #meta>
         <n-tag v-if="dirty" size="small" type="warning" round :bordered="false">未保存</n-tag>
       </template>

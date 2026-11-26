@@ -256,21 +256,15 @@ async function submit(): Promise<void> {
         </n-form-item>
       </div>
 
-      <n-form-item label="传输类型" required>
+      <n-form-item label="传输类型（创建后不可修改）" required>
         <n-select
           v-model:value="transport"
           :disabled="isEdit"
           :options="transportOptions"
         />
       </n-form-item>
-      <p class="tiny muted" style="margin: -8px 0 4px">
-        契约不允许修改传输类型；换传输请新建机器。
-      </p>
 
       <template v-if="transport === 'http'">
-        <n-alert type="info" :bordered="true" title="http 传输">
-          core 直连 agent 的 HTTP API；创建后立即探测 /system/info，失败不阻止创建。
-        </n-alert>
         <n-form-item label="agent URL" required>
           <n-input v-model:value="url" placeholder="http://127.0.0.1:10087" />
         </n-form-item>
@@ -302,11 +296,6 @@ async function submit(): Promise<void> {
           />
         </n-form-item>
       </template>
-
-      <n-alert v-if="transport === 'reverse-ws'" type="info" :bordered="true" title="reverse-ws 传输">
-        创建后 core 生成 machine secret 与注册地址；agent 主动连回 core，core 不主动拨号。
-        secret 只显示一次。
-      </n-alert>
 
       <n-form-item
         v-if="transport === 'http' || transport === 'stdio'"

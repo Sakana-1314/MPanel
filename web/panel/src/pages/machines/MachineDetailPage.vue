@@ -62,10 +62,10 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
 
 <template>
   <div class="page">
-    <PageHeader
-      title="机器详情"
-      :subtitle="machineId"
-    >
+    <PageHeader title="机器详情">
+      <template #meta>
+        <n-tag size="small" round :bordered="false" class="mono">{{ machineId }}</n-tag>
+      </template>
       <template #actions>
         <n-button size="small" secondary :loading="machineQuery.isFetching.value" @click="machineQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
@@ -197,10 +197,6 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
         </n-card>
 
         <n-card size="small" title="打开该机器的页面">
-          <p class="small muted" style="margin-top: 0">
-            每个入口会新建（或聚焦）一个工作台标签页；同一台机器的多个页面可以同时打开，
-            其它机器的标签也不会被替换。
-          </p>
           <div class="area-grid">
             <n-button
               v-for="area in MACHINE_AREAS"

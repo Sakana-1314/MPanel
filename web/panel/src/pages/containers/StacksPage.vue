@@ -18,6 +18,7 @@ import {
 import {
   AddOutline,
   EyeOutline,
+  LayersOutline,
   PlayOutline,
   RefreshOutline,
   ReloadOutline,
@@ -116,13 +117,21 @@ function openDetail(stack: StackSummary): void {
 
 <template>
   <div class="page">
-    <PageHeader title="Compose 栈" subtitle="Docker Compose 项目：查看、编辑、启停与删除。请求经 core 代理到当前标签绑定的机器。">
+    <PageHeader title="Compose 栈">
+      <template #meta>
+        <n-tooltip v-if="!available">
+          <template #trigger>
+            <n-tag size="small" type="warning" round :bordered="false">Compose 不可用</n-tag>
+          </template>
+          {{ stacksQuery.data.value?.reason ?? 'agent 返回 available=false' }}
+        </n-tooltip>
+      </template>
       <template #actions>
         <n-button size="small" secondary :loading="stacksQuery.isFetching.value" @click="stacksQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" type="primary" @click="createOpen = true">
+        <n-button size="small" type="primary" :disabled="!available" @click="createOpen = true">
           <template #icon><n-icon :component="AddOutline" /></template>
           新建栈
         </n-button>
@@ -130,10 +139,6 @@ function openDetail(stack: StackSummary): void {
         <n-button size="small" quaternary @click="router.push(`/m/${machineId}/images`)">镜像</n-button>
       </template>
     </PageHeader>
-
-    <n-alert v-if="!available" type="warning" :bordered="true" title="Docker Compose 不可用">
-      {{ stacksQuery.data.value?.reason ?? 'agent 返回 available=false。' }}
-    </n-alert>
 
     <error-state v-if="stacksQuery.isError.value" :error="stacksQuery.error.value" @retry="stacksQuery.refetch()" />
 
@@ -146,11 +151,9 @@ function openDetail(stack: StackSummary): void {
     </n-card>
 
     <n-empty v-if="stacks.length === 0 && !stacksQuery.isLoading.value" description="还没有 Compose 栈">
+      <template #icon><n-icon :component="LayersOutline" size="36" /></template>
       <template #extra>
-        <div class="stack-center">
-          <p class="small muted">创建第一个栈，编辑 compose.yaml 后即可 up/down/restart。</p>
-          <n-button type="primary" @click="createOpen = true">新建栈</n-button>
-        </div>
+        <n-button type="primary" :disabled="!available" @click="createOpen = true">新建栈</n-button>
       </template>
     </n-empty>
 

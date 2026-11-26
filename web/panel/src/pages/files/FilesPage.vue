@@ -68,6 +68,7 @@ const rootsQuery = useQuery({
 
 const roots = computed(() => rootsQuery.data.value?.items ?? []);
 const currentRoot = computed(() => roots.value.find((item) => item.name === root.value));
+const writable = computed(() => currentRoot.value?.writable === true && rootsQuery.data.value?.available !== false);
 
 watch(
   roots,
@@ -465,22 +466,21 @@ function typeIcon(item: FileItem): typeof DocumentOutline {
   <div class="page">
     <PageHeader
       title="文件"
-      subtitle="沙箱文件浏览、编辑、上传与回收站。所有路径都经过 realpath 前缀校验；请求经 core 代理到当前标签绑定的机器。"
     >
       <template #actions>
         <n-button size="small" secondary :loading="listQuery.isFetching.value" @click="listQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" secondary :loading="uploading" @click="chooseUpload">
+        <n-button size="small" secondary :loading="uploading" :disabled="!writable" @click="chooseUpload">
           <template #icon><n-icon :component="CloudUploadOutline" /></template>
           上传
         </n-button>
-        <n-button size="small" type="primary" @click="mkdirOpen = true">
+        <n-button size="small" type="primary" :disabled="!writable" @click="mkdirOpen = true">
           <template #icon><n-icon :component="FolderOpenOutline" /></template>
           新建目录
         </n-button>
-        <n-button size="small" secondary @click="newFileOpen = true">
+        <n-button size="small" secondary :disabled="!writable" @click="newFileOpen = true">
           <template #icon><n-icon :component="DocumentOutline" /></template>
           新建文件
         </n-button>
@@ -536,6 +536,7 @@ function typeIcon(item: FileItem): typeof DocumentOutline {
     </n-card>
 
     <n-empty v-if="roots.length === 0 && !rootsQuery.isLoading.value" description="没有可用的文件根">
+      <template #icon><n-icon :component="FolderOutline" size="36" /></template>
       <template #extra>
         <p class="small muted">请检查 agent 的 MPANEL_FILES_ROOTS 配置与目录权限。</p>
       </template>

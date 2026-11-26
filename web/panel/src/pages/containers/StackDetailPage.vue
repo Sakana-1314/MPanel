@@ -111,7 +111,7 @@ function stateType(state: string): 'success' | 'warning' | 'error' | 'default' |
       </n-button>
     </div>
 
-    <PageHeader :title="stackName" subtitle="Compose 栈详情：容器、compose 配置与启停操作。">
+    <PageHeader :title="stackName">
       <template #actions>
         <n-button size="small" secondary :loading="stackQuery.isFetching.value" @click="stackQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>

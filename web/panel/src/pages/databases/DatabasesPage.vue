@@ -48,7 +48,6 @@ import { downloadFrom } from '@/lib/download';
 import { describeError } from '@/api/errors';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import StatCard from '@/components/common/StatCard.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
 import SecretReveal from '@/components/common/SecretReveal.vue';
@@ -71,6 +70,7 @@ const profilesQuery = useQuery({
 });
 
 const profiles = computed(() => profilesQuery.data.value?.items ?? []);
+const profilesAvailable = computed(() => profilesQuery.data.value?.available !== false);
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return profiles.value.filter((profile) => {
@@ -394,28 +394,25 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
 
 <template>
   <div class="page">
-    <PageHeader
-      title="数据库"
-      subtitle="PostgreSQL / Redis 档案、连接测试、统计、备份与 dbx 查询。密码只写不读；请求经 core 代理到当前标签绑定的机器。"
-    >
+    <PageHeader title="数据库">
+      <template #meta>
+        <n-tag size="small" round :bordered="false">PostgreSQL {{ pgCount }}</n-tag>
+        <n-tag size="small" round :bordered="false">Redis {{ redisCount }}</n-tag>
+        <n-tag v-if="failedCount > 0" size="small" type="error" round :bordered="false">
+          {{ failedCount }} 个测试失败
+        </n-tag>
+      </template>
       <template #actions>
         <n-button size="small" secondary :loading="profilesQuery.isFetching.value" @click="profilesQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" type="primary" @click="openCreate">
+        <n-button size="small" type="primary" :disabled="!profilesAvailable" @click="openCreate">
           <template #icon><n-icon :component="AddOutline" /></template>
           新建档案
         </n-button>
       </template>
     </PageHeader>
-
-    <div class="stat-grid">
-      <stat-card label="档案总数" :value="profiles.length" hint="PostgreSQL / Redis" :loading="profilesQuery.isLoading.value" />
-      <stat-card label="PostgreSQL" :value="pgCount" :loading="profilesQuery.isLoading.value" />
-      <stat-card label="Redis" :value="redisCount" :loading="profilesQuery.isLoading.value" />
-      <stat-card label="最近测试失败" :value="failedCount" :type="failedCount > 0 ? 'error' : 'default'" hint="lastCheck.ok=false" :loading="profilesQuery.isLoading.value" />
-    </div>
 
     <n-alert v-if="profilesQuery.data.value?.available === false" type="warning" :bordered="true" title="数据库档案存储不可用">
       {{ profilesQuery.data.value.reason ?? '后端返回 available=false。' }}
@@ -689,7 +686,6 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
         <n-form-item label="备注（可选）">
           <n-input v-model:value="backupLabel" placeholder="例如：升级前" />
         </n-form-item>
-        <p class="tiny muted">备份异步执行；缺少 pg_dump / redis-cli 时任务会失败并在列表中显示错误。</p>
       </div>
       <template #footer>
         <div class="toolbar" style="justify-content: flex-end">

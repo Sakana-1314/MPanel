@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import {
-  NAlert,
-  NButton,
-  NIcon,
-} from 'naive-ui';
-import { RefreshOutline } from '@vicons/ionicons5';
+import { NAlert, NButton, NIcon, NTooltip } from 'naive-ui';
+import { HelpCircleOutline, RefreshOutline } from '@vicons/ionicons5';
 import { describeError } from '@/api/errors';
 
 const props = defineProps<{
@@ -19,14 +15,34 @@ const described = computed(() => describeError(props.error, props.title ?? '加�
 
 <template>
   <n-alert type="error" :title="described.title" :bordered="true">
-    <div>{{ described.description }}</div>
-    <div class="muted small" style="margin-top: 4px">{{ described.hint }}</div>
-    <div v-if="$slots.default" style="margin-top: 6px"><slot /></div>
-    <div style="margin-top: 8px">
-      <n-button size="small" secondary @click="emit('retry')">
+    <div class="error-body">
+      <span class="truncate" :title="described.description">{{ described.description }}</span>
+      <n-tooltip v-if="described.hint">
+        <template #trigger>
+          <n-button size="tiny" quaternary circle aria-label="错误详情">
+            <template #icon><n-icon :component="HelpCircleOutline" /></template>
+          </n-button>
+        </template>
+        {{ described.hint }}
+      </n-tooltip>
+      <n-button size="tiny" secondary @click="emit('retry')">
         <template #icon><n-icon :component="RefreshOutline" /></template>
         重试
       </n-button>
     </div>
+    <slot />
   </n-alert>
 </template>
+
+<style scoped>
+.error-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.error-body > span {
+  flex: 1;
+  min-width: 0;
+}
+</style>

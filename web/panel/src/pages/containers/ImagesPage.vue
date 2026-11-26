@@ -19,6 +19,7 @@ import {
 } from 'naive-ui';
 import {
   CloudDownloadOutline,
+  ImagesOutline,
   RefreshOutline,
   TrashOutline,
 } from '@vicons/ionicons5';
@@ -120,14 +121,22 @@ function confirmPrune(): void {
 
 <template>
   <div class="page">
-    <PageHeader title="镜像" subtitle="Docker 镜像拉取、删除与清理。请求经 core 代理到当前标签绑定的机器。">
+    <PageHeader title="镜像">
+      <template #meta>
+        <n-tooltip v-if="!available">
+          <template #trigger>
+            <n-tag size="small" type="warning" round :bordered="false">Docker 不可用</n-tag>
+          </template>
+          {{ imagesQuery.data.value?.reason ?? 'agent 返回 available=false' }}
+        </n-tooltip>
+      </template>
       <template #actions>
         <n-button size="small" secondary :loading="imagesQuery.isFetching.value" @click="imagesQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" secondary @click="confirmPrune">清理</n-button>
-        <n-button size="small" type="primary" @click="pullOpen = true">
+        <n-button size="small" secondary :disabled="!available" @click="confirmPrune">清理</n-button>
+        <n-button size="small" type="primary" :disabled="!available" @click="pullOpen = true">
           <template #icon><n-icon :component="CloudDownloadOutline" /></template>
           拉取镜像
         </n-button>
@@ -135,10 +144,6 @@ function confirmPrune(): void {
         <n-button size="small" quaternary @click="router.push(`/m/${machineId}/stacks`)">Compose 栈</n-button>
       </template>
     </PageHeader>
-
-    <n-alert v-if="!available" type="warning" :bordered="true" title="Docker 不可用">
-      {{ imagesQuery.data.value?.reason ?? 'agent 返回 available=false。' }}
-    </n-alert>
 
     <error-state v-if="imagesQuery.isError.value" :error="imagesQuery.error.value" @retry="imagesQuery.refetch()" />
 
@@ -160,8 +165,9 @@ function confirmPrune(): void {
     </n-card>
 
     <n-empty v-if="images.length === 0 && !imagesQuery.isLoading.value" description="没有镜像">
+      <template #icon><n-icon :component="ImagesOutline" size="36" /></template>
       <template #extra>
-        <n-button type="primary" @click="pullOpen = true">拉取第一个镜像</n-button>
+        <n-button type="primary" :disabled="!available" @click="pullOpen = true">拉取第一个镜像</n-button>
       </template>
     </n-empty>
 
@@ -214,7 +220,6 @@ function confirmPrune(): void {
     <n-modal v-model:show="pullOpen" preset="card" title="拉取镜像" style="width: 560px; max-width: calc(100vw - 24px)">
       <div class="pull-form">
         <n-input v-model:value="pullReference" placeholder="例如 nginx:latest / ghcr.io/owner/app:v1" @keydown.enter="pull" />
-        <p class="tiny muted">拉取可能需要几分钟；请求超时单独放宽到 620 秒。</p>
       </div>
       <template #footer>
         <div class="toolbar" style="justify-content: flex-end">

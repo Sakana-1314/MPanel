@@ -102,7 +102,6 @@ async function save(): Promise<void> {
 
     <PageHeader
       :title="isNew ? '新建任务' : (draft.name.length > 0 ? draft.name : '未命名任务')"
-      :subtitle="isNew ? '创建 cron 任务；保存后按计划执行，也可手动运行。' : '修改后保存即可更新调度；运行历史保留。'"
     >
       <template #meta>
         <n-tag v-if="dirty" size="small" type="warning" round :bordered="false">未保存</n-tag>

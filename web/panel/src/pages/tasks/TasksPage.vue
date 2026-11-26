@@ -65,6 +65,7 @@ const tasksQuery = useQuery({
 });
 
 const tasks = computed(() => tasksQuery.data.value?.items ?? []);
+const tasksAvailable = computed(() => tasksQuery.data.value?.available !== false);
 
 const toggleAction = useAction(
   (input: { task: Task; enabled: boolean }) => api.value.tasks.update(input.task.id, { enabled: input.enabled }),
@@ -138,14 +139,13 @@ const runningCount = computed(() => tasks.value.filter((task) => task.lastRun?.s
   <div class="page">
     <PageHeader
       title="计划任务"
-      subtitle="Cron 任务、手动运行与运行历史。任务在目标 agent 上执行；当前标签绑定一台机器，其它机器的任务可在其它标签同时打开。"
     >
       <template #actions>
         <n-button size="small" secondary :loading="refreshing" @click="refresh">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" type="primary" @click="createTask">
+        <n-button size="small" type="primary" :disabled="!tasksAvailable" @click="createTask">
           <template #icon><n-icon :component="AddOutline" /></template>
           新建任务
         </n-button>
@@ -176,10 +176,10 @@ const runningCount = computed(() => tasks.value.filter((task) => task.lastRun?.s
     </n-card>
 
     <n-empty v-if="tasks.length === 0 && !tasksQuery.isLoading.value" description="还没有计划任务">
+      <template #icon><n-icon :component="CalendarOutline" size="36" /></template>
       <template #extra>
         <div class="stack-center">
-          <p class="small muted">创建一个 cron 任务，保存后可按计划自动执行，也可随时手动运行。</p>
-          <n-button type="primary" @click="createTask">新建任务</n-button>
+          <n-button type="primary" :disabled="!tasksAvailable" @click="createTask">新建任务</n-button>
         </div>
       </template>
     </n-empty>

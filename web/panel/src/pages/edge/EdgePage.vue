@@ -30,6 +30,7 @@ import {
   KeyOutline,
   OpenOutline,
   RefreshOutline,
+  TerminalOutline,
   TrashOutline,
 } from '@vicons/ionicons5';
 import type {
@@ -61,7 +62,6 @@ import { formatDate, formatDuration, formatUptime } from '@/lib/format';
 import { edgeJobStatusLabel, edgeJobStatusType, machineStatusType } from '@/lib/status';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import StatCard from '@/components/common/StatCard.vue';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import CodeBlock from '@/components/common/CodeBlock.vue';
@@ -430,7 +430,6 @@ const resultText = computed(() => {
   <div class="page">
     <PageHeader
       title="边缘节点"
-      subtitle="NAT 后的 agent 使用入网密钥主动连回 core；节点与普通机器同构，支持分组、快照和离线异步作业。这里的所有能力都属于 core。"
     >
       <template #actions>
         <n-button size="small" secondary :loading="refreshing" @click="refreshAll">
@@ -454,34 +453,30 @@ const resultText = computed(() => {
       @retry="machinesQuery.refetch()"
     />
 
-    <div class="stat-grid">
-      <stat-card label="边缘节点" :value="edgeNodes.length" :hint="`core 全部机器 ${machines.length} 台`" :loading="machinesQuery.isLoading.value" />
-      <stat-card label="在线" :value="edgeNodes.filter((m) => m.status === 'online').length" type="success" hint="心跳 ≤ 15s" :loading="machinesQuery.isLoading.value" />
-      <stat-card label="离线" :value="edgeNodes.filter((m) => m.status === 'offline').length" type="error" hint="等待 agent 重连" :loading="machinesQuery.isLoading.value" />
-      <stat-card label="待执行作业" :value="pendingCount" type="warning" hint="节点上线后串行执行" :loading="jobsQuery.isLoading.value" />
-    </div>
-
     <n-tabs v-model:value="tab" type="line" animated>
-      <n-tab-pane name="nodes" tab="节点">
-        <n-empty v-if="edgeNodes.length === 0 && !machinesQuery.isLoading.value" description="还没有边缘节点">
-          <template #extra>
-            <div class="guide">
-              <div class="step">
-                <span class="step-no">1</span>
-                <div><strong>创建入网密钥</strong><p class="small muted">设置分组、有效期与使用次数；secret 只显示一次。</p></div>
-              </div>
-              <div class="step">
-                <span class="step-no">2</span>
-                <div><strong>在目标机启动 agent</strong><p class="small muted">设置 MPANEL_TRANSPORT=reverse-ws、MPANEL_CORE_URL 与 MPANEL_EDGE_KEY。</p></div>
-              </div>
-              <div class="step">
-                <span class="step-no">3</span>
-                <div><strong>节点自动出现</strong><p class="small muted">agent 连回 /ws/worker 后，节点会出现在这里。</p></div>
-              </div>
-              <n-button type="primary" @click="keyModal = true">创建第一个密钥</n-button>
+      <n-tab-pane name="nodes" :tab="`节点 ${edgeNodes.length}`">
+        <div v-if="edgeNodes.length === 0 && !machinesQuery.isLoading.value" class="edge-empty">
+          <div class="flow">
+            <div class="flow-step">
+              <span class="flow-icon"><n-icon :component="KeyOutline" /></span>
+              <span>创建密钥</span>
             </div>
-          </template>
-        </n-empty>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">
+              <span class="flow-icon"><n-icon :component="TerminalOutline" /></span>
+              <span>启动 agent</span>
+            </div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">
+              <span class="flow-icon"><n-icon :component="GitNetworkOutline" /></span>
+              <span>节点上线</span>
+            </div>
+          </div>
+          <n-button type="primary" size="large" @click="keyModal = true">
+            <template #icon><n-icon :component="KeyOutline" /></template>
+            创建入网密钥
+          </n-button>
+        </div>
 
         <n-card v-else size="small" :content-style="{ padding: '0' }">
           <n-table :single-line="false" size="small">
@@ -541,7 +536,7 @@ const resultText = computed(() => {
         </n-card>
       </n-tab-pane>
 
-      <n-tab-pane name="keys" tab="入网密钥">
+      <n-tab-pane name="keys" :tab="`入网密钥 ${keys.length}`">
         <n-card size="small">
           <div class="toolbar">
             <span class="small muted">共 {{ keys.length }} 个密钥 · 共享密钥让 agent 自助注册，secret 只在创建时显示。</span>
@@ -612,7 +607,7 @@ const resultText = computed(() => {
         </n-card>
       </n-tab-pane>
 
-      <n-tab-pane name="jobs" tab="作业">
+      <n-tab-pane name="jobs" :tab="`作业 ${pendingCount > 0 ? `${pendingCount} 待执行` : jobs.length}`">
         <n-card size="small">
           <div class="toolbar">
             <n-select v-model:value="jobMachineFilter" :options="machineOptions" style="width: 200px" />
@@ -719,7 +714,6 @@ const resultText = computed(() => {
             <n-input-number v-model:value="keyMaxUses" :min="0" :step="1" style="width: 100%" />
           </n-form-item>
         </div>
-        <p class="tiny muted" style="margin: 0">最大使用次数填 0 表示不限；secret 只在创建响应中出现一次。</p>
         <n-alert v-if="keyFormError" type="error" :bordered="true">{{ keyFormError }}</n-alert>
       </div>
       <template #footer>
@@ -798,9 +792,6 @@ const resultText = computed(() => {
           />
         </n-form-item>
         <n-alert v-if="jobFormError" type="error" :bordered="true">{{ jobFormError }}</n-alert>
-        <p class="tiny muted" style="margin: 0">
-          作业由 core 串行执行；目标节点离线时保持 pending，上线后继续。
-        </p>
       </div>
       <template #footer>
         <div class="toolbar" style="justify-content: flex-end">
@@ -871,31 +862,43 @@ const resultText = computed(() => {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-.guide {
+.edge-empty {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-width: 620px;
-  text-align: left;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  min-height: calc(100vh - 320px);
+  padding: 24px 16px;
 }
-.step {
+.flow {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
-.step-no {
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--mpanel-muted);
+}
+.flow-icon {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--mpanel-accent) 18%, transparent);
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--mpanel-surface-soft);
+  border: 1px solid var(--mpanel-border);
   color: var(--mpanel-accent);
-  font-size: 12px;
-  font-weight: 700;
-  flex: 0 0 auto;
+  font-size: 24px;
 }
-.step p {
-  margin: 2px 0 0;
+.flow-arrow {
+  color: var(--mpanel-border);
+  font-size: 20px;
 }
 </style>
