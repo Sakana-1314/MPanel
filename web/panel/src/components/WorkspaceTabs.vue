@@ -151,8 +151,8 @@ const menuOptions = [
   display: flex;
   align-items: flex-end;
   gap: 4px;
-  height: 50px;
-  padding: 0 10px;
+  height: 46px;
+  padding: 0 8px;
   min-width: 0;
   background: var(--mpanel-surface-soft);
   border-bottom: 1px solid var(--mpanel-border-muted);
@@ -164,7 +164,7 @@ const menuOptions = [
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding-top: 9px;
+  padding-top: 7px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -176,13 +176,13 @@ const menuOptions = [
   display: flex;
   align-items: center;
   gap: 5px;
-  height: 36px;
-  max-width: 260px;
-  padding: 0 7px 0 11px;
+  height: 33px;
+  max-width: 230px;
+  padding: 0 7px 0 10px;
   border: 1px solid transparent;
   border-bottom: 0;
   border-radius: 9px 9px 0 0;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--mpanel-muted);
   cursor: pointer;
   user-select: none;
@@ -213,11 +213,11 @@ const menuOptions = [
   background: var(--mpanel-accent);
 }
 .tab-machine {
-  max-width: 90px;
+  max-width: 78px;
   font-weight: 600;
 }
 .tab-title {
-  max-width: 110px;
+  max-width: 92px;
 }
 .tab.active .tab-title {
   font-weight: 600;
@@ -244,8 +244,8 @@ const menuOptions = [
 .tab-close {
   display: grid;
   place-items: center;
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   margin-left: 1px;
   border: 0;
   border-radius: 5px;
@@ -266,14 +266,14 @@ const menuOptions = [
 }
 .add-tab {
   flex: 0 0 auto;
-  margin: 0 2px 7px 3px;
+  margin: 0 2px 6px 3px;
 }
 .tab-menu {
   flex: 0 0 auto;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
 }
 .tab-mobile-menu {
   flex: 0 0 auto;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
 }
 </style>
