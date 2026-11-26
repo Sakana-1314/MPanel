@@ -215,6 +215,8 @@ interface ListResult<T> {
 | `/databases/handoff/redeem` | `POST /api/v1/databases/handoff/redeem` |
 
 - core 删除 `cookie`、`authorization`、hop-by-hop 头，注入机器凭据、`x-mpanel-request-id`、`x-mpanel-user`；不透传 `set-cookie`。
+- core 丢弃 agent 返回的 `Access-Control-*` 头，只由 core 的 CORS 中间件写一份；重复 `Access-Control-Allow-Origin` 会被浏览器判为 CORS 失败。
+- `/proxy/ws/*` 不走 Bearer 中间件（浏览器 WebSocket 不能设置请求头），由 `handleProxyWS` 校验收票；HTTP 代理仍要求 Bearer。
 - 兼容写法：`suffix` 也可以带 `/api/v1` 前缀（如 `GET /api/v1/machines/:id/proxy/api/v1/system/info`）；core 检测到后不再重复拼接，等价于 `/proxy/system/info`。这是加法兼容，不改变上表语义。
 - 必须转发**原始 query 字符串**（保留重复参数/编码），不能用 Fastify 解析对象重建。
 - worker 返回的 `UNAUTHORIZED`/`FORBIDDEN`（core 机器凭据错误）转为 `UPSTREAM_ERROR`；其他 envelope 原样透传状态码/body。
