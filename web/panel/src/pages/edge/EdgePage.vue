@@ -77,7 +77,10 @@ const tab = ref('nodes');
 const refreshing = ref(false);
 
 const machines = computed(() => machinesQuery.data.value?.items ?? []);
-const edgeNodes = computed(() => machines.value.filter((machine) => machine.edge));
+// 手动创建的 reverse-ws 机器与自助入网节点同属边缘形态，一并展示。
+const edgeNodes = computed(() =>
+  machines.value.filter((machine) => machine.edge || machine.transport === 'reverse-ws'),
+);
 
 /* ------------------------------- keys ------------------------------- */
 
