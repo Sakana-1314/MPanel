@@ -137,7 +137,7 @@ watch(
 
       <n-layout-content
         :native-scrollbar="false"
-        content-style="height: calc(100vh - 48px); overflow: auto"
+        content-style="height: calc(100vh - 50px); overflow: auto"
       >
         <div class="content-inner">
           <router-view v-slot="{ Component }">

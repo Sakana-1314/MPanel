@@ -98,7 +98,8 @@ const menuOptions = [
         :key="tab.id"
         class="tab"
         :class="{ active: tab.id === activeTabId }"
-        role="button"
+        role="tab"
+        :aria-selected="tab.id === activeTabId"
         tabindex="0"
         @click="activate(tab.id, tab.path)"
         @keydown.enter="activate(tab.id, tab.path)"
@@ -133,7 +134,7 @@ const menuOptions = [
       </n-tooltip>
     </div>
     <n-dropdown trigger="click" :options="menuOptions" @select="onMenuSelect">
-      <n-button size="tiny" quaternary circle title="标签页操作">
+      <n-button size="tiny" quaternary circle class="tab-menu" title="标签页操作">
         <template #icon><n-icon :component="EllipsisHorizontalOutline" /></template>
       </n-button>
     </n-dropdown>
@@ -141,22 +142,28 @@ const menuOptions = [
 </template>
 
 <style scoped>
+/*
+ * 浏览器式标签条：灰色轨道 + 顶部圆角标签 + 选中标签与内容区同色，
+ * 用形状和层级明确「这是可切换的标签页」，而不是一排按钮。
+ */
 .workspace-tabs {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
-  height: 48px;
-  padding: 0 12px;
+  height: 50px;
+  padding: 0 10px;
   min-width: 0;
-  /* 顶栏与侧栏同为白底，构成一条连续的面。 */
-  background: var(--mpanel-surface);
+  background: var(--mpanel-surface-soft);
+  border-bottom: 1px solid var(--mpanel-border-muted);
 }
 .tabs-scroll {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: flex-end;
+  gap: 3px;
   flex: 1;
   min-width: 0;
+  height: 100%;
+  padding-top: 9px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -164,14 +171,17 @@ const menuOptions = [
   display: none;
 }
 .tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 5px;
+  height: 36px;
   max-width: 260px;
-  padding: 5px 7px 5px 9px;
-  border: 0;
-  border-radius: 7px;
-  font-size: 12px;
+  padding: 0 7px 0 11px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 9px 9px 0 0;
+  font-size: 12.5px;
   color: var(--mpanel-muted);
   cursor: pointer;
   user-select: none;
@@ -180,12 +190,26 @@ const menuOptions = [
   transition: background-color 0.14s ease, color 0.14s ease;
 }
 .tab:hover {
-  background: var(--mpanel-surface-soft);
+  background: color-mix(in srgb, var(--mpanel-surface) 62%, transparent);
   color: var(--mpanel-text);
 }
 .tab.active {
-  background: var(--mpanel-accent-soft);
-  color: var(--mpanel-accent);
+  background: var(--mpanel-surface);
+  color: var(--mpanel-text);
+  border-color: var(--mpanel-border-muted);
+  /* 底部一条同色盖住轨道底线，让选中标签与下方内容连成一体。 */
+  box-shadow: 0 1px 0 0 var(--mpanel-surface);
+}
+/* 选中标签顶部的高亮条，进一步强化「当前标签」。 */
+.tab.active::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--mpanel-accent);
 }
 .tab-machine {
   max-width: 90px;
@@ -193,6 +217,9 @@ const menuOptions = [
 }
 .tab-title {
   max-width: 110px;
+}
+.tab.active .tab-title {
+  font-weight: 600;
 }
 .tab-sep {
   opacity: 0.5;
@@ -216,20 +243,32 @@ const menuOptions = [
 .tab-close {
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
+  margin-left: 1px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+.tab:hover .tab-close,
+.tab.active .tab-close,
+.tab:focus-within .tab-close {
   opacity: 0.55;
 }
 .tab-close:hover {
-  background: color-mix(in srgb, var(--mpanel-danger) 18%, transparent);
+  background: var(--mpanel-surface-inset);
   opacity: 1;
 }
 .add-tab {
   flex: 0 0 auto;
+  margin: 0 2px 7px 3px;
+}
+.tab-menu {
+  flex: 0 0 auto;
+  margin-bottom: 7px;
 }
 </style>
