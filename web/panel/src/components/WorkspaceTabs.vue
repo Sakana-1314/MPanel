@@ -148,6 +148,7 @@ const menuOptions = [
   height: 42px;
   padding: 0 10px;
   min-width: 0;
+  background: var(--mpanel-bg);
 }
 .tabs-scroll {
   display: flex;
@@ -167,22 +168,22 @@ const menuOptions = [
   gap: 5px;
   max-width: 260px;
   padding: 5px 7px 5px 9px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: 0;
+  border-radius: 7px;
   font-size: 12px;
   color: var(--mpanel-muted);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
   flex: 0 0 auto;
+  transition: background-color 0.14s ease, color 0.14s ease;
 }
 .tab:hover {
-  background: var(--mpanel-surface-soft);
+  background: color-mix(in srgb, var(--mpanel-surface) 55%, transparent);
   color: var(--mpanel-text);
 }
 .tab.active {
   background: var(--mpanel-surface);
-  border-color: var(--mpanel-border);
   color: var(--mpanel-text);
   box-shadow: var(--mpanel-shadow);
 }

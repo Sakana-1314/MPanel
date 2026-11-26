@@ -168,7 +168,7 @@ const stats = computed(() => statsQuery.data.value?.stats);
           <n-button size="tiny" quaternary type="error" @click="confirmRemove">删除</n-button>
         </div>
 
-        <n-tabs v-model:value="tab" type="line" animated>
+        <n-tabs v-model:value="tab" type="segment" animated>
           <n-tab-pane name="overview" tab="概览">
             <div class="kv">
               <dt>镜像</dt><dd class="mono">{{ detail.image }}</dd>

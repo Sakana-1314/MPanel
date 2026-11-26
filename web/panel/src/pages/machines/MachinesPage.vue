@@ -423,8 +423,7 @@ const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .machine-card:hover {
-  border-color: var(--mpanel-border);
-  box-shadow: var(--mpanel-shadow);
+  box-shadow: var(--mpanel-shadow-raised);
 }
 .machine-card.offline {
   opacity: 0.86;
@@ -503,7 +502,8 @@ const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
   flex-wrap: wrap;
   gap: 2px;
   margin-top: auto;
-  padding-top: 4px;
-  border-top: 1px solid var(--mpanel-border-muted);
+  padding: 6px 4px 2px;
+  border-radius: 8px;
+  background: var(--mpanel-surface-soft);
 }
 </style>

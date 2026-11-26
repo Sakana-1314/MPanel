@@ -1,10 +1,12 @@
-/* Global layout + Naive UI page helpers. 配色对齐 GitHub Primer。 */
+/* Global layout + Naive UI page helpers.
+   层次靠明度差：页面底最浅 -> 卡片更亮 -> 内嵌块再暗一档，尽量不用线条切割。 */
 
 :root {
-  --mpanel-bg: #f6f8fa;
+  --mpanel-bg: #eef1f5;
   --mpanel-surface: #ffffff;
-  --mpanel-surface-soft: #f6f8fa;
-  --mpanel-surface-inset: #eff2f5;
+  --mpanel-surface-soft: #f5f7fa;
+  --mpanel-surface-inset: #e9edf2;
+  --mpanel-surface-sunken: #e2e7ee;
   --mpanel-border: #d1d9e0;
   --mpanel-border-muted: #d8dee4;
   --mpanel-text: #1f2328;
@@ -15,23 +17,26 @@
   --mpanel-attention: #9a6700;
   --mpanel-danger: #cf222e;
   --mpanel-shadow: 0 1px 0 rgb(31 35 40 / 4%), 0 1px 3px rgb(31 35 40 / 6%);
+  --mpanel-shadow-raised: 0 1px 2px rgb(31 35 40 / 6%), 0 4px 12px rgb(31 35 40 / 6%);
 }
 
 html.dark {
   --mpanel-bg: #010409;
-  --mpanel-surface: #0d1117;
-  --mpanel-surface-soft: #151b23;
-  --mpanel-surface-inset: #161b22;
+  --mpanel-surface: #10151c;
+  --mpanel-surface-soft: #171d25;
+  --mpanel-surface-inset: #1c232c;
+  --mpanel-surface-sunken: #05080d;
   --mpanel-border: #3d444d;
-  --mpanel-border-muted: #30363d;
+  --mpanel-border-muted: #29313a;
   --mpanel-text: #e6edf3;
   --mpanel-muted: #9198a1;
   --mpanel-accent: #4493f8;
-  --mpanel-accent-soft: #121d2f;
+  --mpanel-accent-soft: #16263c;
   --mpanel-success: #3fb950;
   --mpanel-attention: #d29922;
   --mpanel-danger: #f85149;
   --mpanel-shadow: 0 1px 0 rgb(1 4 9 / 40%), 0 1px 3px rgb(1 4 9 / 60%);
+  --mpanel-shadow-raised: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 45%);
 }
 
 * {
@@ -146,9 +151,9 @@ pre,
 .code-block {
   margin: 0;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--mpanel-surface-inset);
-  border: 1px solid var(--mpanel-border-muted);
+  border: 0;
   overflow: auto;
   font-size: 12px;
   line-height: 1.55;
@@ -174,8 +179,7 @@ pre,
 }
 
 .workspace-tabs {
-  border-bottom: 1px solid var(--mpanel-border-muted);
-  background: var(--mpanel-surface);
+  background: var(--mpanel-bg);
 }
 
 /* 状态点：GitHub 语义色。 */
@@ -193,6 +197,118 @@ pre,
 
 .dot-info {
   background: var(--mpanel-accent);
+}
+
+/* Naive UI 局部去线：容器本身已靠底色区分，不再叠边框。 */
+.n-card.n-card--bordered {
+  border: 0;
+}
+
+/* 表格只保留行间极淡分隔，列与列之间靠留白区分。 */
+.n-table:not(.n-table--bordered) th,
+.n-table:not(.n-table--bordered) td {
+  border-right: 0;
+}
+
+.n-table th {
+  border-color: transparent;
+}
+
+.n-table td {
+  border-color: color-mix(in srgb, var(--mpanel-muted) 13%, transparent);
+}
+
+.n-table tbody tr:hover td {
+  background-color: color-mix(in srgb, var(--mpanel-accent) 5%, transparent);
+}
+
+.n-descriptions.n-descriptions--bordered .n-descriptions-table-wrapper {
+  border: 0;
+}
+
+.n-descriptions.n-descriptions--bordered .n-descriptions-table-header,
+.n-descriptions.n-descriptions--bordered .n-descriptions-table-content {
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.n-descriptions.n-descriptions--bordered .n-descriptions-table-header {
+  background-color: var(--mpanel-surface-soft);
+}
+
+.n-drawer .n-drawer-header,
+.n-drawer .n-drawer-footer {
+  border: 0;
+}
+
+.n-drawer .n-drawer-header {
+  background-color: var(--mpanel-surface-soft);
+}
+
+/* tab 一律用分段底色，而不是下划线切割页面。 */
+.n-tabs .n-tabs-nav--line-type .n-tabs-nav-scroll-content,
+.n-tabs .n-tabs-nav--line-type .n-tabs-nav__prefix,
+.n-tabs .n-tabs-nav--line-type .n-tabs-nav__suffix {
+  border-bottom: 0;
+}
+
+.n-tabs .n-tabs-bar {
+  display: none;
+}
+
+.n-tabs .n-tabs-nav {
+  margin-bottom: 12px;
+}
+
+.n-tabs .n-tabs-pane-wrapper,
+.n-tabs .n-tab-pane {
+  padding: 0;
+}
+
+/* 分段型 tab：胶囊宽度跟随文字，整条不拉满页面。 */
+.n-tabs.n-tabs--segment-type .n-tabs-nav {
+  height: auto;
+}
+
+.n-tabs.n-tabs--segment-type .n-tabs-rail {
+  width: auto;
+  display: inline-flex;
+}
+
+.n-tabs.n-tabs--segment-type .n-tabs-tab-wrapper {
+  flex: 0 0 auto;
+}
+
+.n-tabs.n-tabs--segment-type .n-tabs-tab {
+  padding: 5px 14px;
+  font-size: 12.5px;
+}
+
+/* 卡片型 tab（终端会话）也用块状选中态。 */
+.n-tabs.n-tabs--card-type .n-tabs-tab {
+  border-color: transparent;
+  background-color: transparent;
+}
+
+.n-tabs.n-tabs--card-type .n-tabs-tab--active {
+  background-color: var(--mpanel-surface);
+  border-color: transparent;
+  box-shadow: var(--mpanel-shadow);
+}
+
+.n-tabs.n-tabs--card-type .n-tabs-tab-pad,
+.n-tabs.n-tabs--card-type .n-tabs-pad,
+.n-tabs.n-tabs--card-type .n-tabs-nav-scroll-padding {
+  border-bottom: 0;
+}
+
+.n-alert .n-alert-border {
+  display: none;
+}
+
+.n-base-selection,
+.n-input {
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar {

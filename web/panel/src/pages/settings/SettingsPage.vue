@@ -225,7 +225,7 @@ const authLabel = computed(() => (isTokenAuth.value ? '访问令牌' : '账号�
       </template>
     </PageHeader>
 
-    <n-tabs type="line" animated>
+    <n-tabs type="segment" animated>
       <n-tab-pane name="connections" tab="服务器">
         <n-card size="small">
           <div class="toolbar" style="margin-bottom: 10px">
@@ -241,7 +241,12 @@ const authLabel = computed(() => (isTokenAuth.value ? '访问令牌' : '账号�
           </div>
 
           <div class="conn-list">
-            <div v-for="item in connections" :key="item.id" class="conn-item">
+            <div
+              v-for="item in connections"
+              :key="item.id"
+              class="conn-item"
+              :class="{ current: item.id === activeConnectionId }"
+            >
               <div class="conn-main">
                 <div class="conn-title">
                   <strong>{{ item.name }}</strong>
@@ -384,9 +389,11 @@ const authLabel = computed(() => (isTokenAuth.value ? '访问令牌' : '账号�
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--mpanel-border-muted);
-  border-radius: 6px;
-  background: var(--mpanel-surface);
+  border-radius: 9px;
+  background: var(--mpanel-surface-soft);
+}
+.conn-item.current {
+  background: color-mix(in srgb, var(--mpanel-accent) 9%, var(--mpanel-surface-soft));
 }
 .conn-main {
   min-width: 0;

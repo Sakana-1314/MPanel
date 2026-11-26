@@ -429,7 +429,7 @@ const resultText = computed(() => {
       @retry="machinesQuery.refetch()"
     />
 
-    <n-tabs v-model:value="tab" type="line" animated>
+    <n-tabs v-model:value="tab" type="segment" animated>
       <n-tab-pane name="nodes" :tab="`节点 ${edgeNodes.length}`">
         <div v-if="edgeNodes.length === 0 && !machinesQuery.isLoading.value" class="edge-empty">
           <div class="flow">
@@ -885,8 +885,7 @@ const resultText = computed(() => {
   width: 54px;
   height: 54px;
   border-radius: 16px;
-  background: var(--mpanel-surface-soft);
-  border: 1px solid var(--mpanel-border);
+  background: var(--mpanel-accent-soft);
   color: var(--mpanel-accent);
   font-size: 24px;
 }

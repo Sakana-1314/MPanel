@@ -543,8 +543,10 @@ const indexNamesText = computed({
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding-top: 4px;
-  border-top: 1px solid var(--mpanel-border);
+  padding: 8px 10px;
+  margin-top: 4px;
+  border-radius: 9px;
+  background: var(--mpanel-surface-soft);
 }
 .footer .spacer {
   flex: 1;

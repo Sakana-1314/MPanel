@@ -304,7 +304,7 @@ const insecure = computed(() => {
       @retry="configQuery.refetch()"
     />
 
-    <n-tabs v-model:value="tab" type="line">
+    <n-tabs v-model:value="tab" type="segment">
       <!-- 网络 -->
       <n-tab-pane name="networks" tab="网络">
         <n-card size="small">
@@ -488,8 +488,7 @@ const insecure = computed(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid var(--mpanel-border-muted);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--mpanel-surface-soft);
 }
 :deep(.cell) {
