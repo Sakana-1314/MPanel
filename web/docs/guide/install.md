@@ -61,6 +61,49 @@ go vet ./...
 go test ./...
 ```
 
+## 2.1 使用 CI 成品（测试机）
+
+main 每次更新后，`构建成品` 工作流会删除旧的 `dev` Release 并重新发布，产物为：
+
+| 资产 | 内容 |
+|---|---|
+| `mpanel-linux-amd64.tar.gz` | `mpanel-core`、`mpanel-agent`、`mpanelctl`、`web/` 面板产物、`LICENSE` |
+| `mpanel-linux-arm64.tar.gz` | 同上，ARM64 |
+| `SHA256SUMS` | 两个压缩包的 SHA-256 |
+
+下载并部署到测试机：
+
+```bash
+set -euo pipefail
+case "$(uname -m)" in
+  x86_64|amd64) arch=amd64 ;;
+  aarch64|arm64) arch=arm64 ;;
+  *) echo "不支持的架构: $(uname -m)"; exit 1 ;;
+esac
+
+gh release download dev --repo Sakana-1314/MPanel \
+  --pattern "mpanel-linux-${arch}.tar.gz" --pattern SHA256SUMS --clobber
+sha256sum -c SHA256SUMS --ignore-missing
+tar -xzf "mpanel-linux-${arch}.tar.gz"
+
+sudo install -m 0755 "mpanel-linux-${arch}"/mpanel-core \
+  "mpanel-linux-${arch}"/mpanel-agent "mpanel-linux-${arch}"/mpanelctl /usr/local/bin/
+sudo rm -rf /opt/mpanel/web
+sudo install -d -o mpanel -g mpanel -m 0755 /opt/mpanel/web
+sudo cp -R "mpanel-linux-${arch}/web/." /opt/mpanel/web/
+sudo systemctl restart mpanel-core mpanel-agent
+
+mpanel-core version
+mpanel-agent version
+```
+
+说明：
+
+- `dev` 是**可替换的预发布标签**，每次 main 更新都会重建；需要可重复部署时，记录 Release 标题里的 commit 短哈希并保留本地压缩包与 `SHA256SUMS`。
+- 升级只替换二进制与 `web/`；`conf/`、`data/`、`db/`、`backup/` 不要覆盖。
+- 测试机若没有 `gh`，也可以在 GitHub 的 Releases 页面下载同名资产。
+- 该产物只用于 Linux；Windows 开发机请从源码构建。
+
 ## 3. 放置二进制与创建目录
 
 ```bash
