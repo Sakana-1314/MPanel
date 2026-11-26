@@ -14,6 +14,7 @@ import {
   NTable,
   NTooltip,
   useDialog,
+  NTag,
 } from 'naive-ui';
 import {
   AddOutline,
@@ -34,7 +35,6 @@ import { describeError } from '@/api/errors';
 import { formatDay } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import StatCard from '@/components/common/StatCard.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
 import SiteStatusBadge from './SiteStatusBadge.vue';
@@ -206,10 +206,18 @@ const applyOutput = computed(() => {
 
 <template>
   <div class="page">
-    <PageHeader
-      title="站点"
-      subtitle="结构化 Caddy 站点草稿：保存只改 JSON，应用才会校验、备份并 reload 线上 Caddy。当前标签绑定一台机器，其它机器的站点可在其它标签同时打开。"
-    >
+    <PageHeader title="站点">
+      <template #meta>
+        <n-tag v-if="pendingCount > 0" size="small" type="warning" round :bordered="false">
+          {{ pendingCount }} 个待应用
+        </n-tag>
+        <n-tooltip v-if="!caddyAvailable">
+          <template #trigger>
+            <n-tag size="small" type="warning" round :bordered="false">Caddy 不可用</n-tag>
+          </template>
+          {{ caddy?.reason ?? 'capabilities.caddy.available=false' }}
+        </n-tooltip>
+      </template>
       <template #actions>
         <n-button size="small" secondary @click="importOpen = true">
           <template #icon><n-icon :component="CloudUploadOutline" /></template>
@@ -232,16 +240,6 @@ const applyOutput = computed(() => {
         </n-button>
       </template>
     </PageHeader>
-
-    <div class="stat-grid">
-      <stat-card label="站点总数" :value="sitesQuery.data.value?.total ?? sites.length" :hint="`已应用 ${appliedCount} 个`" :loading="sitesQuery.isLoading.value" />
-      <stat-card label="待应用" :value="pendingCount" :type="pendingCount > 0 ? 'warning' : 'success'" hint="有修改尚未写入 Caddy" :loading="sitesQuery.isLoading.value" />
-      <stat-card label="证书" :value="certs.length" hint="来自 Caddy 数据目录" :loading="certsQuery.isLoading.value" />
-    </div>
-
-    <n-alert v-if="!caddyAvailable" type="warning" :bordered="true" title="Caddy 不可用：只能编辑与预览">
-      {{ caddy?.reason ?? 'capabilities.caddy.available=false' }}。安装 Caddy 或设置 MPANEL_CADDY_BIN 后重试。
-    </n-alert>
 
     <n-alert v-if="sitesQuery.data.value?.available === false" type="error" :bordered="true" title="站点存储不可用">
       {{ sitesQuery.data.value.reason ?? '后端返回 available=false。' }}
@@ -275,18 +273,16 @@ const applyOutput = computed(() => {
           ]"
         />
         <div class="spacer" />
-        <span class="small muted">共 {{ filtered.length }} 个站点</span>
+        <span class="small muted">{{ filtered.length }} 个站点 · 已应用 {{ appliedCount }}</span>
       </div>
     </n-card>
 
     <error-state v-if="sitesQuery.isError.value" :error="sitesQuery.error.value" @retry="sitesQuery.refetch()" />
 
     <n-empty v-else-if="sites.length === 0 && !sitesQuery.isLoading.value" description="还没有站点">
+      <template #icon><n-icon :component="GlobeOutline" size="36" /></template>
       <template #extra>
-        <div class="stack-center">
-          <p class="small muted">创建第一个站点草稿，预览生成的 Caddyfile 后应用到 Caddy。</p>
-          <n-button type="primary" @click="createSite">新建站点</n-button>
-        </div>
+        <n-button type="primary" @click="createSite">新建站点</n-button>
       </template>
     </n-empty>
 

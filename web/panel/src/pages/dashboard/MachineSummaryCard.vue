@@ -110,7 +110,6 @@ const diskText = computed(() => {
         </span>
       </div>
     </div>
-    <div v-else class="no-snapshot tiny muted">core 尚未采集到该机器的节点快照。</div>
 
     <div v-if="capabilities.length > 0" class="caps">
       <n-tooltip v-for="cap in capabilities" :key="cap.label">

@@ -10,8 +10,9 @@ import {
   NSpin,
   NTag,
   useDialog,
+  NTooltip,
 } from 'naive-ui';
-import { ArrowBackOutline, RocketOutline, ShieldCheckmarkOutline } from '@vicons/ionicons5';
+import { ArrowBackOutline, RocketOutline } from '@vicons/ionicons5';
 import type { SiteApplyResult } from '@/api/types';
 import type { SitePreviewRequest } from '@/api/sites';
 import { useMachineApi } from '@/lib/api';
@@ -194,11 +195,16 @@ const applyOutput = computed(() => {
 
     <PageHeader
       :title="isNew ? '新建站点' : draft.name.length === 0 ? '未命名站点' : draft.name"
-      :subtitle="isNew ? '填写结构化配置；保存后进入编辑页，可预览 Caddyfile 并单站应用。' : '保存只更新 JSON 草稿；应用才会校验并 reload Caddy。'"
     >
       <template #meta>
         <SiteStatusBadge v-if="site" :status="site.status" />
         <n-tag v-if="dirty" size="small" type="warning" round :bordered="false">未保存</n-tag>
+        <n-tooltip v-if="!caddyAvailable">
+          <template #trigger>
+            <n-tag size="small" type="warning" round :bordered="false">Caddy 不可用</n-tag>
+          </template>
+          {{ caddy?.reason ?? 'capabilities.caddy.available=false' }}
+        </n-tooltip>
       </template>
       <template #actions>
         <n-button
@@ -214,10 +220,6 @@ const applyOutput = computed(() => {
         </n-button>
       </template>
     </PageHeader>
-
-    <n-alert v-if="!caddyAvailable" type="warning" :bordered="true" title="Caddy 不可用：只能编辑与预览">
-      {{ caddy?.reason ?? 'capabilities.caddy.available=false' }}；草稿仍可保存。
-    </n-alert>
 
     <n-alert
       v-if="site?.lastApply !== null && site?.lastApply !== undefined && !site.lastApply.ok"
@@ -279,14 +281,6 @@ const applyOutput = computed(() => {
             <template v-if="site?.lastApply?.caddyfileHash">
               <dt>配置哈希</dt><dd class="mono tiny">{{ site.lastApply.caddyfileHash }}</dd>
             </template>
-          </div>
-        </n-card>
-        <n-card size="small" title="应用说明">
-          <div class="notes small muted">
-            <p><n-icon :component="ShieldCheckmarkOutline" /> 应用会先保存草稿，再渲染片段、执行 caddy validate、备份并 reload；失败自动回滚。</p>
-            <p>删除已应用站点需要到列表页执行全量“应用全部更改”才会从 Caddy 移除。</p>
-            <p>证书在 Caddy 完成签发后出现在“证书”页；预览不会触发签发。</p>
-            <p>预览与保存都不会直接修改线上配置。</p>
           </div>
         </n-card>
       </template>

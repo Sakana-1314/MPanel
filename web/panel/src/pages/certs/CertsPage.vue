@@ -23,7 +23,6 @@ import { formatDate, formatDay, formatDaysRemaining } from '@/lib/format';
 import { certStatusLabel, certStatusType } from '@/lib/status';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import StatCard from '@/components/common/StatCard.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
 import CopyButton from '@/components/common/CopyButton.vue';
 
@@ -91,10 +90,15 @@ function displayDomains(cert: CertificateInfo): string[] {
 
 <template>
   <div class="page">
-    <PageHeader
-      title="证书"
-      subtitle="只读扫描 Caddy 数据目录下的证书（不读取私钥）。续期由 Caddy 负责；这里只展示状态与到期时间。"
-    >
+    <PageHeader title="证书">
+      <template #meta>
+        <n-tag v-if="counts.expiring30 > 0" size="small" type="warning" round :bordered="false">
+          {{ counts.expiring30 }} 张 30 天内到期
+        </n-tag>
+        <n-tag v-if="counts.expired > 0" size="small" type="error" round :bordered="false">
+          {{ counts.expired }} 张已过期
+        </n-tag>
+      </template>
       <template #actions>
         <n-button size="small" secondary :loading="certsQuery.isFetching.value" @click="certsQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
@@ -102,13 +106,6 @@ function displayDomains(cert: CertificateInfo): string[] {
         </n-button>
       </template>
     </PageHeader>
-
-    <div class="stat-grid">
-      <stat-card label="证书总数" :value="certs.length" hint="来自 Caddy 数据目录" :loading="certsQuery.isLoading.value" />
-      <stat-card label="有效" :value="counts.valid" type="success" :loading="certsQuery.isLoading.value" />
-      <stat-card label="30 天内到期" :value="counts.expiring30" :type="counts.expiring30 > 0 ? 'warning' : 'default'" :hint="`14 天 ${counts.expiring14} · 7 天 ${counts.expiring7}`" :loading="certsQuery.isLoading.value" />
-      <stat-card label="已过期" :value="counts.expired" :type="counts.expired > 0 ? 'error' : 'default'" :loading="certsQuery.isLoading.value" />
-    </div>
 
     <n-alert v-if="!available" type="warning" :bordered="true" title="Caddy 数据目录不可用">
       {{ certsQuery.data.value?.reason ?? '后端返回 available=false，无法扫描证书。' }}
@@ -132,15 +129,14 @@ function displayDomains(cert: CertificateInfo): string[] {
           ]"
         />
         <div class="spacer" />
-        <span class="small muted">共 {{ filtered.length }} 张</span>
+        <span class="small muted">{{ filtered.length }} 张证书</span>
       </div>
     </n-card>
 
     <n-empty v-if="certs.length === 0 && !certsQuery.isLoading.value" description="还没有证书">
+      <template #icon><n-icon :component="ShieldCheckmarkOutline" size="36" /></template>
       <template #extra>
-        <p class="small muted" style="max-width: 520px">
-          Caddy 完成签发后会在这里出现。证书只读，不能手动续期或删除。
-        </p>
+
       </template>
     </n-empty>
 

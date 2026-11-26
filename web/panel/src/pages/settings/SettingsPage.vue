@@ -215,7 +215,6 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
   <div class="page">
     <PageHeader
       title="设置"
-      subtitle="core 连接、会话与本地偏好。前端只连接 core：这里没有 agent 直连配置，也没有任何 agent token。"
     >
       <template #actions>
         <n-button size="small" secondary @click="toggle">
@@ -280,11 +279,6 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
               </div>
             </div>
           </div>
-
-          <n-alert type="info" :bordered="false" style="margin-top: 12px">
-            浏览器只通过 cookie 会话访问 core；agent 的 MPANEL_TOKEN / machine secret
-            不会写入前端存储。
-          </n-alert>
         </n-card>
       </n-tab-pane>
 
@@ -366,9 +360,6 @@ const isTokenAuth = computed(() => session.me?.authType === 'token');
         <n-form-item label="core 地址">
           <n-input v-model:value="formUrl" placeholder="https://panel.example.com 或 http://127.0.0.1:10086" />
         </n-form-item>
-        <p class="tiny muted" style="margin: 0">
-          只填 core 根地址（默认端口 10086）。前端不会连接 agent，也不会在浏览器保存 agent token。
-        </p>
         <n-alert v-if="formError" type="error" :bordered="true">{{ formError }}</n-alert>
       </div>
       <template #footer>

@@ -243,12 +243,10 @@ const indexNamesText = computed({
               </n-button>
             </div>
           </n-form-item>
-          <p class="tiny muted">支持多域名、localhost 与通配符 *.example.com；不要带协议或路径。</p>
 
           <n-form-item label="监听地址（可选）">
             <n-input v-model:value="listenText" placeholder="127.0.0.1:8080" />
           </n-form-item>
-          <p class="tiny muted">留空使用 Caddy 默认；多个地址用逗号分隔。</p>
         </n-card>
 
         <n-card size="small" title="处理方式">
@@ -287,7 +285,6 @@ const indexNamesText = computed({
                 </n-button>
               </div>
             </n-form-item>
-            <p class="tiny muted">例如 127.0.0.1:8080、http://10.0.0.2:3000；禁止空白/引号/花括号。</p>
 
             <div class="two">
               <n-form-item label="负载均衡">

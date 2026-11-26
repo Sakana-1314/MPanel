@@ -155,10 +155,15 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
 
 <template>
   <div class="page">
-    <PageHeader
-      title="容器"
-      subtitle="Docker 容器列表、状态、日志、统计与执行。容器请求经 core 代理到当前标签绑定的机器。"
-    >
+    <PageHeader title="容器">
+      <template #meta>
+        <n-tooltip v-if="!available">
+          <template #trigger>
+            <n-tag size="small" type="warning" round :bordered="false">Docker 不可用</n-tag>
+          </template>
+          {{ listQuery.data.value?.reason ?? 'agent 返回 available=false' }}
+        </n-tooltip>
+      </template>
       <template #actions>
         <n-button size="small" secondary :loading="listQuery.isFetching.value" @click="listQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
@@ -168,10 +173,6 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
         <n-button size="small" quaternary @click="router.push(`/m/${machineId}/stacks`)">Compose 栈</n-button>
       </template>
     </PageHeader>
-
-    <n-alert v-if="!available" type="warning" :bordered="true" title="Docker 不可用">
-      {{ listQuery.data.value?.reason ?? 'agent 返回 available=false。请确认 Docker CLI/daemon 可用。' }}
-    </n-alert>
 
     <error-state v-if="listQuery.isError.value" :error="listQuery.error.value" @retry="listQuery.refetch()" />
 
@@ -198,7 +199,7 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
 
     <n-empty v-if="containers.length === 0 && !listQuery.isLoading.value" description="没有容器">
       <template #extra>
-        <p class="small muted">当前没有容器；Docker 可用时可以创建容器或 Compose 栈。</p>
+
       </template>
     </n-empty>
 

@@ -62,6 +62,7 @@ const shellsQuery = useQuery({
 
 const sessions = computed(() => sessionsQuery.data.value?.items ?? []);
 const shells = computed(() => shellsQuery.data.value?.items ?? []);
+const terminalAvailable = computed(() => sessionsQuery.data.value?.available !== false);
 
 const live = ref<Record<string, LiveSession>>({});
 const tab = ref('');
@@ -227,14 +228,13 @@ const shellOptions = computed(() =>
   <div class="page">
     <PageHeader
       title="终端"
-      subtitle="经 core 代理的 PTY/管道会话。每个会话使用一次性 WS ticket；浏览器不直连 agent。"
     >
       <template #actions>
         <n-button size="small" secondary :loading="sessionsQuery.isFetching.value" @click="sessionsQuery.refetch()">
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" type="primary" @click="createOpen = true">
+        <n-button size="small" type="primary" :disabled="!terminalAvailable" @click="createOpen = true">
           <template #icon><n-icon :component="AddOutline" /></template>
           新建会话
         </n-button>
@@ -303,9 +303,9 @@ const shellOptions = computed(() =>
             />
           </n-tab-pane>
         </n-tabs>
-        <n-empty v-else description="选择左侧会话，或新建一个终端">
+        <n-empty v-else description="没有打开的终端">
           <template #extra>
-            <n-button type="primary" @click="createOpen = true">
+            <n-button type="primary" :disabled="!terminalAvailable" @click="createOpen = true">
               <template #icon><n-icon :component="TerminalOutline" /></template>
               新建会话
             </n-button>
@@ -331,7 +331,6 @@ const shellOptions = computed(() =>
             <template #prefix>rows</template>
           </n-input-number>
         </div>
-        <p class="tiny muted">Windows 上 PTY 不可用时自动降级为管道并标注 pty=false。</p>
       </div>
       <template #footer>
         <div class="toolbar" style="justify-content: flex-end">

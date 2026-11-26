@@ -27,7 +27,6 @@ import {
   MoonOutline,
   PersonOutline,
   RefreshOutline,
-  ServerOutline,
   SettingsOutline,
   SunnyOutline,
   TrashOutline,
@@ -232,18 +231,12 @@ function selectConnection(id: string): void {
 
       <n-card :bordered="true" class="login-card">
         <template v-if="connections.length === 0">
-          <n-empty description="还没有 core 连接">
+          <n-empty description="连接 core">
             <template #extra>
-              <div class="stack">
-                <p class="small muted">
-                  MPanel 前端只连接 core。agent 不直接暴露给浏览器；添加 core 地址后登录，
-                  再在机器工作台里打开多台机器。
-                </p>
-                <n-button type="primary" @click="openAdd">
-                  <template #icon><n-icon :component="AddOutline" /></template>
-                  新增 core 连接
-                </n-button>
-              </div>
+              <n-button type="primary" @click="openAdd">
+                <template #icon><n-icon :component="AddOutline" /></template>
+                新增 core 连接
+              </n-button>
             </template>
           </n-empty>
         </template>
@@ -288,7 +281,6 @@ function selectConnection(id: string): void {
             <template v-else-if="session.status === 'error'">
               <n-alert type="error" title="无法连接 core" :bordered="true" style="margin-top: 12px">
                 <div>{{ session.error?.message ?? '未知错误' }}</div>
-                <div class="small muted">{{ session.error?.hint }}</div>
                 <div style="margin-top: 8px">
                   <n-button size="small" secondary @click="ensureSession(true)">
                     <template #icon><n-icon :component="RefreshOutline" /></template>
@@ -347,10 +339,7 @@ function selectConnection(id: string): void {
         </template>
       </n-card>
 
-      <p class="footer tiny muted">
-        <n-icon :component="ServerOutline" />
-        浏览器 → core → 目标机器。前端不保存 agent token，也不直连 agent。
-      </p>
+
     </div>
 
     <!-- 连接管理 -->
@@ -415,9 +404,6 @@ function selectConnection(id: string): void {
             <template #prefix><n-icon :component="KeyOutline" /></template>
           </n-input>
         </n-form-item>
-        <p class="tiny muted" style="margin: 0">
-          只填 core 服务根地址（默认端口 10086），不要填 agent 地址或 /api/v1。前端不会直连 agent。
-        </p>
 
         <div class="toolbar">
           <n-button size="small" secondary :loading="testing" @click="testForm">

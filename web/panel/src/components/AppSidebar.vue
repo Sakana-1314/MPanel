@@ -15,7 +15,6 @@ import {
   ShieldCheckmarkOutline,
   TerminalOutline,
   TimeOutline,
-  PulseOutline,
   AddOutline,
 } from '@vicons/ionicons5';
 import { useMachinesQuery } from '@/lib/machines';
@@ -121,9 +120,7 @@ function goArea(area: string): void {
         </div>
 
         <n-spin v-if="machinesQuery.isLoading.value && machines.length === 0" size="small" />
-        <div v-else-if="machines.length === 0" class="empty small muted">
-          还没有机器。前往“机器”页添加，或使用边缘节点入网密钥。
-        </div>
+        <div v-else-if="machines.length === 0" class="empty small muted">暂无机器</div>
         <div v-else class="machine-list">
           <button
             v-for="machine in machines"
@@ -136,20 +133,14 @@ function goArea(area: string): void {
           >
             <span class="status-dot" :class="`dot-${machineStatusType(machine.status)}`" />
             <span class="machine-name truncate">{{ machine.name }}</span>
-            <span class="tiny muted">{{ machine.transport === 'reverse-ws' ? 'edge' : machine.transport }}</span>
+            <span v-if="machine.transport === 'reverse-ws'" class="tiny muted">edge</span>
           </button>
         </div>
       </div>
 
       <div v-if="activeMachineId !== null" class="section">
         <div class="section-title">
-          <span class="truncate">当前标签 · {{ activeMachine?.name ?? activeMachineId }}</span>
-          <n-tooltip>
-            <template #trigger>
-              <n-icon :component="PulseOutline" class="muted" />
-            </template>
-            当前标签页绑定的机器；切换其它机器会新开标签，不会替换本标签。
-          </n-tooltip>
+          <span class="truncate">{{ activeMachine?.name ?? activeMachineId }}</span>
         </div>
         <nav class="nav">
           <button
@@ -165,14 +156,7 @@ function goArea(area: string): void {
           </button>
         </nav>
       </div>
-      <div v-else class="section hint small muted">
-        从上方选择一台机器，或打开新标签页；多台机器的页面可以同时在标签栏中混合打开。
-      </div>
     </n-scrollbar>
-
-    <div class="sidebar-footer tiny muted">
-      前端只连接 core · 所有机器请求经代理转发
-    </div>
   </div>
 </template>
 
@@ -250,7 +234,6 @@ function goArea(area: string): void {
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--mpanel-muted);
-  text-transform: uppercase;
 }
 .machine-list {
   display: flex;
