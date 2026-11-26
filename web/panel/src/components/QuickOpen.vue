@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { NButton, NModal, NSelect, NSwitch, NTag } from 'naive-ui';
-import { MACHINE_AREAS, openMachinePage } from '@/lib/navigation';
+import {
+  MACHINE_NAV_GROUPS,
+  MACHINE_NAV_ITEMS,
+  openMachineNavItem,
+} from '@/lib/navigation';
 import { useMachinesQuery } from '@/lib/machines';
 import { activeTab } from '@/lib/workspace';
 import { machineStatusLabel, machineStatusType } from '@/lib/status';
@@ -11,7 +15,7 @@ const emit = defineEmits<{ 'update:show': [value: boolean] }>();
 
 const machinesQuery = useMachinesQuery();
 const machineId = ref<string | null>(null);
-const area = ref('sites');
+const selectedKey = ref('sites');
 const forceNew = ref(true);
 
 const machines = computed(() => machinesQuery.data.value?.items ?? []);
@@ -23,9 +27,11 @@ const machineOptions = computed(() =>
   })),
 );
 
-const areaOptions = MACHINE_AREAS.map((item) => ({
-  label: `${item.title} — ${item.description}`,
-  value: item.area,
+const areaOptions = MACHINE_NAV_GROUPS.map((group) => ({
+  type: 'group' as const,
+  key: group.title,
+  label: group.title,
+  children: group.items.map((item) => ({ label: item.title, value: item.key })),
 }));
 
 watch(
@@ -39,14 +45,14 @@ watch(
         machines.value[0]?.id ??
         null;
     }
-    area.value = routeArea();
+    selectedKey.value = routeArea();
   },
 );
 
 function routeArea(): string {
   const title = activeTab.value?.pageTitle;
-  const matched = MACHINE_AREAS.find((item) => item.title === title);
-  return matched?.area ?? 'sites';
+  const matched = MACHINE_NAV_ITEMS.find((item) => item.title === title);
+  return matched?.key ?? 'sites';
 }
 
 function close(): void {
@@ -55,7 +61,9 @@ function close(): void {
 
 function submit(): void {
   if (machineId.value === null) return;
-  openMachinePage(machineId.value, area.value, { forceNew: forceNew.value });
+  const item = MACHINE_NAV_ITEMS.find((entry) => entry.key === selectedKey.value);
+  if (item === undefined) return;
+  openMachineNavItem(machineId.value, item, { forceNew: forceNew.value });
   close();
 }
 
@@ -97,16 +105,12 @@ const selectedMachine = computed(() =>
 
       <div class="field">
         <span class="label">页面</span>
-        <n-select v-model:value="area" :options="areaOptions" />
+        <n-select v-model:value="selectedKey" :options="areaOptions" />
       </div>
 
       <div class="field row">
         <n-switch v-model:value="forceNew" />
         <span class="small">总是新建标签页（同一机器也可同时打开多个页面）</span>
-      </div>
-
-      <div class="tip small muted">
-        每个标签页绑定一台机器；切换机器不会替换当前标签。已打开相同路径时会自动聚焦。
       </div>
     </div>
 
@@ -143,12 +147,6 @@ const selectedMachine = computed(() =>
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.tip {
-  line-height: 1.6;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--mpanel-surface-soft);
 }
 .footer {
   display: flex;

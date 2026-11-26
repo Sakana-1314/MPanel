@@ -6,6 +6,7 @@ import {
   AddOutline,
   CloseOutline,
   EllipsisHorizontalOutline,
+  MenuOutline,
   ServerOutline,
 } from '@vicons/ionicons5';
 import { useMachinesQuery } from '@/lib/machines';
@@ -19,7 +20,9 @@ import {
 } from '@/lib/workspace';
 import { machineStatusType } from '@/lib/status';
 
-const emit = defineEmits<{ quickOpen: [] }>();
+withDefaults(defineProps<{ mobile?: boolean }>(), { mobile: false });
+
+const emit = defineEmits<{ quickOpen: []; menu: [] }>();
 
 const route = useRoute();
 const router = useRouter();
@@ -79,6 +82,16 @@ const menuOptions = [
 
 <template>
   <div class="workspace-tabs">
+    <n-button
+      v-if="mobile"
+      size="tiny"
+      quaternary
+      circle
+      title="菜单"
+      @click="emit('menu')"
+    >
+      <template #icon><n-icon :component="MenuOutline" /></template>
+    </n-button>
     <div class="tabs-scroll">
       <div
         v-for="tab in items"

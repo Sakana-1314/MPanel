@@ -117,7 +117,7 @@ function openDetail(stack: StackSummary): void {
 
 <template>
   <div class="page">
-    <PageHeader title="Compose 栈">
+    <PageHeader title="编排">
       <template #meta>
         <n-tooltip v-if="!available">
           <template #trigger>
@@ -150,7 +150,7 @@ function openDetail(stack: StackSummary): void {
       </div>
     </n-card>
 
-    <n-empty v-if="stacks.length === 0 && !stacksQuery.isLoading.value" description="还没有 Compose 栈">
+    <n-empty v-if="stacks.length === 0 && !stacksQuery.isLoading.value" description="还没有编排">
       <template #icon><n-icon :component="LayersOutline" size="36" /></template>
       <template #extra>
         <n-button type="primary" :disabled="!available" @click="createOpen = true">新建栈</n-button>

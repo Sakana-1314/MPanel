@@ -63,13 +63,16 @@ export function restoreWorkspace(connectionId: string | null): void {
     if (raw === null) return;
     const parsed = JSON.parse(raw) as WorkspaceState;
     if (parsed.connectionId !== connectionId || !Array.isArray(parsed.tabs)) return;
+    const seenPaths = new Set<string>();
     state.tabs = parsed.tabs.filter(
       (tab): tab is WorkspaceTab =>
         typeof tab === 'object' &&
         tab !== null &&
         typeof tab.id === 'string' &&
         typeof tab.path === 'string' &&
-        (tab.machineId === null || typeof tab.machineId === 'string'),
+        (tab.machineId === null || typeof tab.machineId === 'string') &&
+        !seenPaths.has(tab.path) &&
+        Boolean(seenPaths.add(tab.path)),
     );
     state.activeId =
       typeof parsed.activeId === 'string' && state.tabs.some((tab) => tab.id === parsed.activeId)
@@ -198,4 +201,28 @@ export function closeAllTabs(): void {
 /** 工作台内是否已有该机器页面。 */
 export function tabsForMachine(machineId: string): WorkspaceTab[] {
   return state.tabs.filter((tab) => tab.machineId === machineId);
+}
+
+/** 机器删除/后端重置后清理失效标签；返回当前标签是否被移除及应跳转的路径。 */
+export function pruneMissingMachines(machineIds: Set<string>): {
+  removedActive: boolean;
+  nextPath: string | null;
+} {
+  const remaining = state.tabs.filter(
+    (tab) => tab.machineId === null || machineIds.has(tab.machineId),
+  );
+  if (remaining.length === state.tabs.length) {
+    return { removedActive: false, nextPath: null };
+  }
+  const activeRemoved =
+    state.activeId !== null && !remaining.some((tab) => tab.id === state.activeId);
+  state.tabs = remaining;
+  if (activeRemoved) {
+    state.activeId = remaining[0]?.id ?? null;
+  }
+  persist();
+  return {
+    removedActive: activeRemoved,
+    nextPath: remaining[0]?.path ?? null,
+  };
 }

@@ -16,7 +16,7 @@ import { useCoreApi } from '@/lib/api';
 import { useAction } from '@/composables/use-action';
 import { coreKey } from '@/lib/query-keys';
 import { formatBytes, formatDate, formatUptime } from '@/lib/format';
-import { MACHINE_AREAS, openMachinePage } from '@/lib/navigation';
+import { MACHINE_NAV_ITEMS, openMachineNavItem, openMachinePage } from '@/lib/navigation';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
@@ -199,13 +199,13 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
         <n-card size="small" title="打开该机器的页面">
           <div class="area-grid">
             <n-button
-              v-for="area in MACHINE_AREAS"
-              :key="area.area"
+              v-for="item in MACHINE_NAV_ITEMS"
+              :key="item.key"
               size="small"
               secondary
-              @click="openMachinePage(machineId, area.area)"
+              @click="openMachineNavItem(machineId, item)"
             >
-              {{ area.title }}
+              {{ item.title }}
             </n-button>
           </div>
         </n-card>
