@@ -11,7 +11,6 @@ import {
 } from 'naive-ui';
 import AppSidebar from './AppSidebar.vue';
 import WorkspaceTabs from './WorkspaceTabs.vue';
-import MachineContextBar from './MachineContextBar.vue';
 import QuickOpen from './QuickOpen.vue';
 import { activeConnectionId } from '@/lib/connection-store';
 import { useMachinesQuery } from '@/lib/machines';
@@ -138,9 +137,8 @@ watch(
 
       <n-layout-content
         :native-scrollbar="false"
-        content-style="height: calc(100vh - 42px); overflow: auto"
+        content-style="height: calc(100vh - 48px); overflow: auto"
       >
-        <MachineContextBar v-if="machineId !== null" :machine-id="machineId" />
         <div class="content-inner">
           <router-view v-slot="{ Component }">
             <keep-alive :max="24">
