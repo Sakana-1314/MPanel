@@ -118,6 +118,7 @@ export function mergeRuntimeConfig(
   return {
     appName: file.appName ?? 'MPanel',
     dbxUrl: file.dbxUrl ?? env.VITE_DBX_URL,
+    storeUrl: file.storeUrl ?? env.VITE_STORE_URL,
     allowUserConnections: file.allowUserConnections ?? true,
     backendSeeds,
     defaultBackend: first === undefined ? undefined : { url: first.baseUrl, label: first.name },

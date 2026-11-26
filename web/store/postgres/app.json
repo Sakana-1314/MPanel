@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "postgres",
+  "name": "PostgreSQL",
+  "category": "database",
+  "tagline": "关系型数据库，一键运行在 127.0.0.1",
+  "description": "创建一个只监听宿主机回环地址的 PostgreSQL 16 容器，数据落在数据目录的 postgres 子目录。安装完成后自动创建连接档案，可直接测试、查看统计、备份和用 dbx 查询。",
+  "version": "16-alpine",
+  "stack": "mpanel-postgres",
+  "service": "postgres",
+  "compose": "postgres/compose.yaml",
+  "profile": {
+    "kind": "postgres",
+    "name": "本机 PostgreSQL",
+    "host": "127.0.0.1",
+    "portVariable": "POSTGRES_PORT",
+    "usernameVariable": "POSTGRES_USER",
+    "passwordVariable": "POSTGRES_PASSWORD",
+    "databaseVariable": "POSTGRES_DB"
+  },
+  "variables": [
+    {
+      "key": "MPANEL_DATA_DIR",
+      "label": "数据根目录",
+      "default": "/opt/mpanel/data",
+      "description": "宿主机数据目录；PostgreSQL 数据写入其 postgres 子目录。"
+    },
+    {
+      "key": "POSTGRES_USER",
+      "label": "用户名",
+      "default": "mpanel"
+    },
+    {
+      "key": "POSTGRES_PASSWORD",
+      "label": "密码",
+      "default": "",
+      "secret": true,
+      "generate": { "length": 28 }
+    },
+    {
+      "key": "POSTGRES_DB",
+      "label": "数据库名",
+      "default": "mpanel"
+    },
+    {
+      "key": "POSTGRES_PORT",
+      "label": "宿主端口",
+      "default": "5432",
+      "description": "只绑定 127.0.0.1，不对公网开放。"
+    }
+  ],
+  "links": [
+    {
+      "label": "PostgreSQL 官方镜像",
+      "url": "https://hub.docker.com/_/postgres"
+    }
+  ]
+}

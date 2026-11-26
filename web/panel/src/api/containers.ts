@@ -159,6 +159,8 @@ export function createStacksApi(http: ApiTransport): StacksApi {
       http.request<{ ok: true; output: string }>(`${base(name)}/${action}`, {
         method: 'POST',
         body,
+        // 首次 up 可能要拉镜像，与 agent 的 620s 超时保持一致。
+        timeoutMs: action === 'up' ? 620_000 : undefined,
       }),
     delete: (name, force) =>
       http.request<{ deleted: true; name: string }>(base(name), {

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"strings"
 	"sync"
@@ -42,14 +43,71 @@ func (p *Prober) Get(refresh bool) protocol.Capabilities {
 func (p *Prober) probe() protocol.Capabilities {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	docker := p.probeTool(ctx, p.cfg.Agent.DockerBin, "docker", []string{"version", "--format", "{{.Server.Version}}"})
 	caps := protocol.Capabilities{
-		Caddy:    p.probeTool(ctx, p.cfg.Agent.CaddyBin, "caddy", []string{"version"}),
-		Docker:   p.probeTool(ctx, p.cfg.Agent.DockerBin, "docker", []string{"version", "--format", "{{.Server.Version}}"}),
+		Caddy:    p.probeCaddy(ctx, docker),
+		Docker:   docker,
 		Postgres: p.probePostgres(ctx),
 		Redis:    p.probeTool(ctx, p.cfg.Agent.RedisCLIBin, "redis-cli", []string{"--version"}),
 		PTY:      platformPTY(),
 	}
 	return caps
+}
+
+// probeCaddy reports whether the managed Caddy container is running. Caddy is
+// deployed as a Docker Compose stack (web/store), never as a host binary, so
+// the capability mirrors container health instead of a PATH lookup.
+func (p *Prober) probeCaddy(ctx context.Context, docker protocol.CapabilityStatus) protocol.CapabilityStatus {
+	if !docker.Available {
+		reason := "Caddy 以 Docker 容器运行，需要先启用 Docker"
+		if strings.TrimSpace(docker.Reason) != "" {
+			reason += "：" + docker.Reason
+		}
+		return protocol.CapabilityStatus{Available: false, Reason: reason}
+	}
+	container, err := FindRunningContainer(ctx, p.runner, p.cfg.Agent.DockerBin,
+		config.CaddyStackName, config.CaddyServiceName)
+	if err != nil {
+		if errors.Is(err, ErrContainerNotFound) {
+			return protocol.CapabilityStatus{
+				Available: false,
+				Reason:    "Caddy 容器未部署；在面板「站点」页一键安装 Docker 编排。",
+			}
+		}
+		return protocol.CapabilityStatus{
+			Available: false,
+			Reason:    "无法查询 Caddy 容器：" + firstLine(err.Error()),
+		}
+	}
+	bin := strings.TrimSpace(p.cfg.Agent.DockerBin)
+	if bin == "" {
+		bin = "docker"
+	}
+	res, err := p.runner.RunTimeout(ctx, 8*time.Second, bin, "exec", container.ID, "caddy", "version")
+	if err != nil {
+		return protocol.CapabilityStatus{
+			Available: false,
+			Reason:    "Caddy 容器运行中，但 caddy 命令不可用：" + firstLine(err.Error()),
+		}
+	}
+	if res.Code != 0 {
+		message := firstLine(res.Stderr)
+		if message == "" {
+			message = firstLine(res.Stdout)
+		}
+		if message == "" {
+			message = "caddy version 退出码非 0"
+		}
+		return protocol.CapabilityStatus{
+			Available: false,
+			Reason:    "Caddy 容器运行中，但 caddy 命令不可用：" + message,
+		}
+	}
+	version := firstLine(res.Stdout)
+	if version == "" {
+		version = firstLine(res.Stderr)
+	}
+	return protocol.CapabilityStatus{Available: true, Version: version}
 }
 
 func (p *Prober) probeTool(ctx context.Context, bin, label string, args []string) protocol.CapabilityStatus {

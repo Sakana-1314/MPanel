@@ -434,7 +434,7 @@ func TestModuleHTTPRoutes(t *testing.T) {
 	base := t.TempDir()
 	cfg := config.NewAgent(base)
 	cfg.Agent.DataDir = filepath.Join(base, "data")
-	runner := agent.NewRunner()
+	runner := &fakeRunner{}
 	ctx := &agent.Context{
 		Mux:    http.NewServeMux(),
 		Cfg:    cfg,

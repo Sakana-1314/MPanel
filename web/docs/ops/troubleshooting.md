@@ -9,10 +9,18 @@
 
 ## 站点 apply 失败
 
-- 站点页会给出 `caddy validate` 的输出尾部。常见原因：域名重复、上游不可达、root 不在
+- 站点页会给出容器内 `caddy validate` 的输出尾部。常见原因：域名重复、上游不可达、root 不在
   `MPANEL_SITES_ROOTS` 白名单、基础认证缺少 bcrypt 工具。
 - apply 失败会回滚到上一份 `Caddyfile`；`$MPANEL_AGENT_DATA_DIR/caddy/sites.d/<id>.caddy` 可手工检查。
-- 未安装 Caddy 时，编辑与预览仍可用，apply 返回 `UNAVAILABLE`。
+- Caddy 容器未部署时，站点全功能不可用，只能一键安装；安装后 `capabilities.caddy` 才会变为可用。
+- 容器启动失败时到「编排」页查看 `mpanel-caddy` 日志，常见原因是 80/443 被占用或挂载路径无权访问。
+
+## 一键初始化失败
+
+- 商店模板来自 GitHub：默认 `https://raw.githubusercontent.com/Sakana-1314/MPanel/main/web/store`。
+  无法访问时在面板 `config.json` 设置 `storeUrl` 指向 jsDelivr 或同源 `/store`。
+- 安装需要 Docker Engine 与 Compose v2；错误输出会显示 `docker compose` 的原始信息。
+- 数据库端口默认只绑定 `127.0.0.1`，端口冲突时修改安装向导中的宿主端口。
 
 ## 证书看不到
 

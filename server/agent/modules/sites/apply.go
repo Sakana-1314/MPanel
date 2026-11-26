@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sakana-1314/mpanel/server/agent"
 	"github.com/sakana-1314/mpanel/server/core/config"
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
@@ -34,7 +33,11 @@ func managedCaddyfile(admin string) string {
 	b.WriteString("{\n")
 	b.WriteString("\tadmin ")
 	b.WriteString(admin)
-	b.WriteString("\n}\n\n")
+	b.WriteString("\n")
+	// Pin storage to the container /data mount so certificate scanning has a
+	// deterministic host path (<caddy_data>/certificates).
+	b.WriteString("\tstorage file_system /data\n")
+	b.WriteString("}\n\n")
 	b.WriteString("import sites.d/*.caddy\n")
 	return b.String()
 }
@@ -50,28 +53,8 @@ func adminAddress(cfg *config.Agent) string {
 	return addr
 }
 
-func (m *Module) caddyBin() string {
-	bin := strings.TrimSpace(m.ctx.Cfg.Agent.CaddyBin)
-	if bin == "" {
-		return "caddy"
-	}
-	return bin
-}
-
 func (m *Module) caddyAvailable() bool {
 	return m.ctx.Caps.Get(false).Caddy.Available
-}
-
-func caddyUnavailable() *protocol.PanelError {
-	return protocol.Unavailable(
-		"Caddy 不可用，无法应用站点配置",
-		"安装 Caddy，或在 conf/agent.yaml 将 caddy_bin 指向 caddy 可执行文件后重启 agent。",
-	)
-}
-
-// runCaddy executes a caddy subcommand with a timeout and argument array.
-func (m *Module) runCaddy(ctx context.Context, args ...string) (agent.Result, error) {
-	return m.ctx.Runner.RunTimeout(ctx, caddyTimeout, m.caddyBin(), args...)
 }
 
 type applyPlan struct {
@@ -92,7 +75,11 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 	defer m.applyMu.Unlock()
 
 	if !m.caddyAvailable() {
-		return SiteApplyResult{}, caddyUnavailable()
+		return SiteApplyResult{}, m.caddyUnavailable()
+	}
+	container, perr := m.caddyContainer(rctx)
+	if perr != nil {
+		return SiteApplyResult{}, perr
 	}
 
 	all := m.store.List()
@@ -212,6 +199,9 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 			return SiteApplyResult{}, internalFailure("无法写入 staging 站点片段", err)
 		}
 	}
+	if err := ensureCaddyPlaceholder(stagingSites); err != nil {
+		return SiteApplyResult{}, internalFailure("无法写入站点占位片段", err)
+	}
 
 	admin := adminAddress(m.ctx.Cfg)
 	rootContent := managedCaddyfile(admin)
@@ -236,7 +226,7 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 		}, nil
 	}
 
-	validateOutput, err := m.validateConfigFile(rctx, stagingRoot)
+	validateOutput, err := m.validateConfigFile(rctx, container.ID, stagingRoot)
 	if err != nil {
 		return SiteApplyResult{}, err
 	}
@@ -281,11 +271,15 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 		return SiteApplyResult{}, m.failApply(revision, at, rendered, "写入 Caddyfile 失败: "+err.Error(), "reload", true, "")
 	}
 
-	reloadArgs := []string{"reload", "--config", rootPath, "--adapter", "caddyfile"}
+	containerRoot, perr := m.containerPath(rootPath)
+	if perr != nil {
+		return SiteApplyResult{}, perr
+	}
+	reloadArgs := []string{"reload", "--config", containerRoot, "--adapter", "caddyfile"}
 	if adminCfg := strings.TrimSpace(m.ctx.Cfg.Agent.CaddyAdmin); adminCfg != "" {
 		reloadArgs = append(reloadArgs, "--address", adminCfg)
 	}
-	reloadResult, reloadErr := m.runCaddy(rctx, reloadArgs...)
+	reloadResult, reloadErr := m.runCaddy(rctx, container.ID, reloadArgs...)
 	reloadOutput := joinOutput(reloadResult.Stdout, reloadResult.Stderr)
 	if reloadErr != nil {
 		reloadOutput = joinOutput(reloadOutput, reloadErr.Error())
@@ -294,7 +288,7 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 		if rollbackErr := restoreBackup(backupPath, liveDir, rootPath); rollbackErr != nil {
 			return SiteApplyResult{}, m.internalAfterFailure(revision, at, rendered, "caddy reload 失败且回滚失败", reloadErr, rollbackErr)
 		}
-		restoreResult, restoreErr := m.runCaddy(rctx, reloadArgs...)
+		restoreResult, restoreErr := m.runCaddy(rctx, container.ID, reloadArgs...)
 		if restoreErr != nil || restoreResult.Code != 0 {
 			restoreOutput := joinOutput(restoreResult.Stdout, restoreResult.Stderr)
 			if restoreErr != nil {
@@ -360,8 +354,12 @@ func (m *Module) applyChanged(plan applyPlan, stagingSites, liveDir, rootPath, r
 	return false
 }
 
-func (m *Module) validateConfigFile(ctx context.Context, configPath string) (string, error) {
-	result, err := m.runCaddy(ctx, "validate", "--config", configPath, "--adapter", "caddyfile")
+func (m *Module) validateConfigFile(ctx context.Context, containerID, configPath string) (string, error) {
+	containerConfig, perr := m.containerPath(configPath)
+	if perr != nil {
+		return "", perr
+	}
+	result, err := m.runCaddy(ctx, containerID, "validate", "--config", containerConfig, "--adapter", "caddyfile")
 	output := joinOutput(result.Stdout, result.Stderr)
 	if err != nil {
 		output = joinOutput(output, err.Error())

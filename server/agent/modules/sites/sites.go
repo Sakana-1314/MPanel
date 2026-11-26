@@ -4,6 +4,7 @@
 package sites
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/sakana-1314/mpanel/server/agent"
+	"github.com/sakana-1314/mpanel/server/core/config"
 	"github.com/sakana-1314/mpanel/server/core/httpapi"
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
@@ -40,6 +42,7 @@ func (m *Module) Register(ctx *agent.Context) error {
 
 	ctx.Mux.HandleFunc("GET /api/v1/sites", m.handleList)
 	ctx.Mux.HandleFunc("POST /api/v1/sites", m.handleCreate)
+	ctx.Mux.HandleFunc("POST /api/v1/sites/bootstrap", m.handleBootstrap)
 	ctx.Mux.HandleFunc("POST /api/v1/sites/preview", m.handlePreview)
 	ctx.Mux.HandleFunc("POST /api/v1/sites/apply", m.handleApply)
 	ctx.Mux.HandleFunc("GET /api/v1/sites/export", m.handleExport)
@@ -99,6 +102,10 @@ type applyAliasInput struct {
 func (m *Module) roots() []string { return siteRoots(m.ctx.Cfg) }
 
 func (m *Module) handleList(w http.ResponseWriter, r *http.Request) {
+	if !m.ctx.Caps.Get(false).Caddy.Available {
+		httpapi.OK(w, protocol.UnavailableList[Site](m.caddyReason()))
+		return
+	}
 	query := r.URL.Query()
 	var enabledFilter *bool
 	if raw := query.Get("enabled"); raw != "" {
@@ -151,7 +158,81 @@ func siteMatches(site Site, q string) bool {
 	return false
 }
 
+// handleBootstrap prepares the managed Caddy directory layout before the
+// store compose stack is created. It is the one site endpoint that works
+// while Caddy is still undeployed.
+func (m *Module) handleBootstrap(w http.ResponseWriter, r *http.Request) {
+	confDir, dataDir := m.ctx.Cfg.CaddyDirs()
+	sitesDir := filepath.Join(m.ctx.DataDir(), "sites")
+	for _, dir := range []string{confDir, filepath.Join(confDir, "sites.d"), dataDir, sitesDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			httpapi.Fail(w, internalFailure("无法创建 Caddy 目录", err))
+			return
+		}
+	}
+	rootPath := filepath.Join(confDir, "Caddyfile")
+	if err := config.WriteFileAtomic(rootPath, []byte(managedCaddyfile(adminAddress(m.ctx.Cfg))), 0o644); err != nil {
+		httpapi.Fail(w, internalFailure("无法写入 Caddyfile", err))
+		return
+	}
+	if err := ensureCaddyPlaceholder(filepath.Join(confDir, "sites.d")); err != nil {
+		httpapi.Fail(w, internalFailure("无法写入站点占位片段", err))
+		return
+	}
+	httpapi.OK(w, SiteBootstrapResult{
+		ConfigDir:     canonicalPath(confDir),
+		DataDir:       canonicalPath(dataDir),
+		CaddyfilePath: canonicalPath(rootPath),
+		SitesRoot:     canonicalPath(sitesDir),
+		Mounts:        bootstrapMounts(confDir, dataDir, m.roots()),
+		Ready:         m.caddyAvailable(),
+	})
+}
+
+// bootstrapMounts lists the host paths the Caddy container must see. Caddy
+// config/data get fixed container paths; every readable site root is mounted
+// at the same absolute path so Caddyfile roots stay valid inside the
+// container.
+func bootstrapMounts(confDir, dataDir string, roots []string) []BootstrapMount {
+	mounts := []BootstrapMount{
+		{Source: canonicalPath(confDir), Target: caddyContainerConfigRoot},
+		{Source: canonicalPath(dataDir), Target: caddyContainerDataRoot},
+	}
+	seenTarget := map[string]bool{
+		caddyContainerConfigRoot: true,
+		caddyContainerDataRoot:   true,
+	}
+	seenSource := map[string]bool{
+		canonicalPath(confDir): true,
+		canonicalPath(dataDir): true,
+	}
+	for _, root := range roots {
+		target, err := filepath.Abs(root)
+		if err != nil {
+			continue
+		}
+		target = filepath.Clean(target)
+		source := canonicalPath(target)
+		if source == "" || seenSource[source] || !pathIsDir(source) {
+			continue
+		}
+		// Mount at the path written in the Caddyfile (not the symlink target),
+		// so file_server roots stay valid inside the container.
+		if seenTarget[target] {
+			continue
+		}
+		seenSource[source] = true
+		seenTarget[target] = true
+		mounts = append(mounts, BootstrapMount{Source: source, Target: filepath.ToSlash(target), ReadOnly: true})
+	}
+	return mounts
+}
+
 func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	var input createInput
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
@@ -183,6 +264,10 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) handleGet(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	site, ok := m.store.Get(r.PathValue("id"))
 	if !ok {
 		httpapi.Fail(w, protocol.NotFound("站点", r.PathValue("id")))
@@ -192,6 +277,10 @@ func (m *Module) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	var input updateInput
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
@@ -230,6 +319,10 @@ func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) handleDelete(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	id := r.PathValue("id")
 	site, perr := m.store.Delete(id)
 	if perr != nil {
@@ -244,6 +337,10 @@ func (m *Module) handleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) handlePreview(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	var input previewInput
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
@@ -268,6 +365,10 @@ func (m *Module) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 // handlePreviewByID is the additive POST /sites/{id}/preview alias.
 func (m *Module) handlePreviewByID(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	id := r.PathValue("id")
 	var input previewInput
 	if !httpapi.DecodeJSON(w, r, &input) {
@@ -292,14 +393,11 @@ func (m *Module) previewConfig(w http.ResponseWriter, r *http.Request, cfg SiteC
 	}
 	result := SitePreviewResult{Caddyfile: content, Warnings: warnings}
 	if validate {
-		if !m.caddyAvailable() {
-			reason := m.ctx.Caps.Get(false).Caddy.Reason
-			if reason == "" {
-				reason = "Caddy 不可用"
-			}
-			result.ValidationUnavailableReason = reason
+		container, perr := m.caddyContainer(r.Context())
+		if perr != nil {
+			result.ValidationUnavailableReason = panelErrorMessage(perr)
 		} else {
-			ok, output, err := m.previewValidate(r, content)
+			ok, output, err := m.previewValidate(r, container.ID, content)
 			if err != nil {
 				result.ValidationUnavailableReason = err.Error()
 			} else {
@@ -310,10 +408,25 @@ func (m *Module) previewConfig(w http.ResponseWriter, r *http.Request, cfg SiteC
 	httpapi.OK(w, result)
 }
 
-// previewValidate runs caddy validate against a throwaway staging directory.
-// It never touches the live sites.d or Caddyfile.
-func (m *Module) previewValidate(r *http.Request, fragment string) (bool, string, error) {
-	dir, err := os.MkdirTemp("", "mpanel-site-preview-*")
+func panelErrorMessage(err *protocol.PanelError) string {
+	if err == nil {
+		return ""
+	}
+	if reason, ok := err.Details["reason"].(string); ok && strings.TrimSpace(reason) != "" {
+		return reason
+	}
+	return err.Message
+}
+
+// previewValidate runs caddy validate against a throwaway staging directory
+// inside the mounted config dir. It never touches the live sites.d or
+// Caddyfile.
+func (m *Module) previewValidate(r *http.Request, containerID, fragment string) (bool, string, error) {
+	confDir, _ := m.ctx.Cfg.CaddyDirs()
+	if err := os.MkdirAll(confDir, 0o755); err != nil {
+		return false, "", err
+	}
+	dir, err := os.MkdirTemp(confDir, ".preview-*")
 	if err != nil {
 		return false, "", err
 	}
@@ -329,7 +442,11 @@ func (m *Module) previewValidate(r *http.Request, fragment string) (bool, string
 	if err := os.WriteFile(root, []byte(managedCaddyfile(adminAddress(m.ctx.Cfg))), 0o644); err != nil {
 		return false, "", err
 	}
-	result, err := m.runCaddy(r.Context(), "validate", "--config", root, "--adapter", "caddyfile")
+	containerRoot, perr := m.containerPath(root)
+	if perr != nil {
+		return false, "", errors.New(panelErrorMessage(perr))
+	}
+	result, err := m.runCaddy(r.Context(), containerID, "validate", "--config", containerRoot, "--adapter", "caddyfile")
 	output := joinOutput(result.Stdout, result.Stderr)
 	if err != nil {
 		output = joinOutput(output, err.Error())
@@ -338,6 +455,10 @@ func (m *Module) previewValidate(r *http.Request, fragment string) (bool, string
 }
 
 func (m *Module) handleApply(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	var input applyInput
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
@@ -356,6 +477,10 @@ func (m *Module) handleApply(w http.ResponseWriter, r *http.Request) {
 
 // handleApplyByID is the additive POST /sites/{id}/apply alias.
 func (m *Module) handleApplyByID(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	var input applyAliasInput
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
@@ -370,6 +495,10 @@ func (m *Module) handleApplyByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) handleExport(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	all := m.store.List()
 	bundle := SiteExportBundle{
 		Version:    1,
@@ -388,6 +517,10 @@ func (m *Module) handleExport(w http.ResponseWriter, r *http.Request) {
 
 // handleExportByID is the additive GET /sites/{id}/export alias.
 func (m *Module) handleExportByID(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	site, ok := m.store.Get(r.PathValue("id"))
 	if !ok {
 		httpapi.Fail(w, protocol.NotFound("站点", r.PathValue("id")))
@@ -401,6 +534,10 @@ func (m *Module) handleExportByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) handleImport(w http.ResponseWriter, r *http.Request) {
+	if !m.requireCaddy(w) {
+		return
+	}
+
 	var input importInput
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return

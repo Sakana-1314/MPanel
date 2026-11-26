@@ -119,6 +119,14 @@ type Agent struct {
 // Version is the release version, overridable at build time with -ldflags.
 var Version = "0.3.0"
 
+// Managed Docker Compose stacks installed from web/store. The names are part
+// of the deployment contract: web/store compose templates use them as the
+// project/container name so the agent can find the running Caddy container.
+const (
+	CaddyStackName   = "mpanel-caddy"
+	CaddyServiceName = "caddy"
+)
+
 // CorePath returns the config file path for core.
 func CorePath(baseDir string) string { return filepath.Join(baseDir, "conf", "app.yaml") }
 

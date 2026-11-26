@@ -5,9 +5,33 @@ MPanel 的数据库能力分两层：
 - **档案与运维**：agent 保存 PostgreSQL / Redis 连接档案，提供连通性测试、运行统计、备份与恢复。
 - **查询界面**：不在面板内实现 SQL/Redis 控制台，而是把一次性凭据交给外部 dbx，通过 iframe 嵌入。
 
-::: tip 实现状态
-数据库档案、测试、统计、备份恢复与 handoff 的接口契约已冻结（见 [REST API 契约](/api/contract)）；Go 版数据库模块仍在移植。`pg_dump_bin`、`psql_bin`、`redis_cli_bin` 配置字段已实现。
+::: tip 一键初始化
+数据库页支持从 `web/store` 拉取 PostgreSQL / Redis 编排模板，一键创建 Docker Compose 部署并自动生成连接档案。模板路径与字段见 `web/store/README.md`。
 :::
+
+## 0. 一键初始化（容器编排）
+
+适合还没有数据库、希望像 1Panel 一样点一下就得到可管理实例的场景。
+
+| 应用 | 镜像 | 默认端口 | 数据目录 | 认证 |
+|---|---|---|---|---|
+| PostgreSQL | `postgres:16-alpine` | `127.0.0.1:5432` | `${data_dir}/postgres` | 自动生成用户名/密码/库名 |
+| Redis | `redis:7-alpine` | `127.0.0.1:6379` | `${data_dir}/redis` | 自动生成密码 + AOF |
+
+流程：
+
+1. 面板从 GitHub 读取 `web/store/index.json`、`postgres|redis/app.json` 与对应 `compose.yaml`；
+2. 在浏览器本地生成 28 位随机密码，填入 `{{POSTGRES_PASSWORD}}` / `{{REDIS_PASSWORD}}`；
+3. `POST /stacks` 创建 `mpanel-postgres` / `mpanel-redis` 编排，再 `POST /stacks/<name>/up`；
+4. 等待容器运行后，用清单里的 `profile` 映射自动 `POST /databases/profiles`，密码只写入、不回显；
+5. 自动执行一次连接测试，成功后即可在统计、备份与 dbx 中使用。
+
+说明：
+
+- 端口只绑定 `127.0.0.1`，不直接对公网开放；需要远程访问时到「编排」页改 compose 并自行加防火墙。
+- 已存在同名编排时只执行启动，不覆盖 compose 与密码；此时不会自动创建档案，请按实际密码手动新建。
+- 商店来源可在 `config.json` 用 `storeUrl` 覆盖；默认是 `https://raw.githubusercontent.com/Sakana-1314/MPanel/main/web/store`。
+- 备份/恢复仍需要宿主机的 `pg_dump`、`psql`、`redis-cli`；容器化数据库默认没有这些客户端，缺少时按 `UNAVAILABLE` 降级。
 
 ## 1. 档案模型
 

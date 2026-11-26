@@ -359,6 +359,22 @@ export interface SitePreviewResult {
   validationUnavailableReason?: string;
 }
 
+/** POST /sites/bootstrap：安装 Caddy 容器前准备宿主目录与挂载。 */
+export interface SiteBootstrapMount {
+  source: string;
+  target: string;
+  readOnly?: boolean;
+}
+
+export interface SiteBootstrapResult {
+  configDir: string;
+  dataDir: string;
+  caddyfilePath: string;
+  sitesRoot: string;
+  mounts: SiteBootstrapMount[];
+  ready: boolean;
+}
+
 export interface SiteApplyResult {
   revision: number;
   appliedAt: string;
@@ -1057,6 +1073,8 @@ export interface ConnectionSecret {
 export interface RuntimeConfig {
   appName?: string;
   dbxUrl?: string;
+  /** web/store 模板来源；默认走 GitHub raw，可换成 jsdelivr 或同源 /store。 */
+  storeUrl?: string;
   /** 默认 core 地址；kind 字段仅为兼容旧 config.json，前端忽略。 */
   defaultBackend?: { url: string; kind?: 'core'; label?: string };
   backends?: { id?: string; url: string; kind?: 'core'; label?: string }[];

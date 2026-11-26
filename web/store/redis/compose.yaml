@@ -1,0 +1,24 @@
+# MPanel 商店编排模板：Redis
+# 只绑定 127.0.0.1，开启 AOF 与密码认证。
+name: mpanel-redis
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: mpanel-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "{{REDIS_PASSWORD}}"
+    ports:
+      - "127.0.0.1:{{REDIS_PORT}}:6379"
+    volumes:
+      - "{{MPANEL_DATA_DIR}}/redis:/data"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a '{{REDIS_PASSWORD}}' ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 24

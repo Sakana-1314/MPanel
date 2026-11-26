@@ -2,8 +2,10 @@ package sites
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,12 +18,14 @@ import (
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
 
-// fakeRunner simulates the caddy binary. Prober probing (`version`) and apply
-// (`validate`, `reload`) both go through it.
+// fakeRunner simulates docker + the Caddy container. Capability probing
+// (`docker version`, `docker ps`, `docker exec ... caddy version`) and apply
+// (`docker exec ... caddy validate/reload`) all go through it.
 type fakeRunner struct {
 	mu           sync.Mutex
 	failValidate bool
 	failReloads  int
+	noContainer  bool
 	calls        [][]string
 }
 
@@ -40,18 +44,31 @@ func (f *fakeRunner) handle(args []string) (agent.Result, error) {
 	}
 	switch args[0] {
 	case "version":
-		return agent.Result{Stdout: "v2.8.4"}, nil
-	case "validate":
-		if f.failValidate {
-			return agent.Result{Stdout: "Error: invalid caddyfile", Stderr: "line 1: bad", Code: 1}, nil
+		return agent.Result{Stdout: "v27.0.0"}, nil
+	case "ps":
+		if f.noContainer {
+			return agent.Result{Stdout: ""}, nil
 		}
-		return agent.Result{Stdout: "Valid configuration"}, nil
-	case "reload":
-		if f.failReloads > 0 {
-			f.failReloads--
-			return agent.Result{Stderr: "reload failed: connection refused", Code: 1}, nil
+		return agent.Result{Stdout: `{"ID":"caddycid","Names":"mpanel-caddy","Image":"caddy:2-alpine","State":"running","Labels":"com.docker.compose.project=mpanel-caddy,com.docker.compose.service=caddy"}` + "\n"}, nil
+	case "exec":
+		if len(args) < 4 || args[2] != "caddy" {
+			return agent.Result{Stderr: "unexpected exec", Code: 1}, nil
 		}
-		return agent.Result{Stdout: "config reloaded"}, nil
+		switch args[3] {
+		case "version":
+			return agent.Result{Stdout: "v2.8.4"}, nil
+		case "validate":
+			if f.failValidate {
+				return agent.Result{Stdout: "Error: invalid caddyfile", Stderr: "line 1: bad", Code: 1}, nil
+			}
+			return agent.Result{Stdout: "Valid configuration"}, nil
+		case "reload":
+			if f.failReloads > 0 {
+				f.failReloads--
+				return agent.Result{Stderr: "reload failed: connection refused", Code: 1}, nil
+			}
+			return agent.Result{Stdout: "config reloaded"}, nil
+		}
 	}
 	return agent.Result{}, nil
 }
@@ -80,6 +97,19 @@ func (f *fakeRunner) setFailReloads(count int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.failReloads = count
+}
+
+// caddyExecCount counts `docker exec <id> caddy <sub>` invocations.
+func (f *fakeRunner) caddyExecCount(sub string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	count := 0
+	for _, call := range f.calls {
+		if len(call) >= 5 && call[1] == "exec" && call[3] == "caddy" && call[4] == sub {
+			count++
+		}
+	}
+	return count
 }
 
 func newTestModule(t *testing.T) (*Module, *agent.Context, *fakeRunner, string) {
@@ -161,7 +191,7 @@ func TestApplyPipelineWithFakeCaddy(t *testing.T) {
 	}
 
 	// A second apply without force is a no-op and must not reload caddy.
-	before := len(runner.calls)
+	before := runner.caddyExecCount("reload")
 	noop, err := module.apply(context.Background(), applyPlan{})
 	if err != nil {
 		t.Fatalf("第二次 apply 失败: %v", err)
@@ -169,8 +199,8 @@ func TestApplyPipelineWithFakeCaddy(t *testing.T) {
 	if noop.Reloaded || noop.Revision != 1 || noop.BackupPath != nil {
 		t.Fatalf("无变化 apply 应跳过: %+v", noop)
 	}
-	if len(runner.calls) != before {
-		t.Fatal("无变化 apply 不应调用 caddy")
+	if runner.caddyExecCount("reload") != before {
+		t.Fatal("无变化 apply 不应 reload caddy")
 	}
 
 	// force rewrites even without a revision change.
@@ -270,5 +300,86 @@ func TestApplyNotFoundAndEmptySiteIDs(t *testing.T) {
 	}
 	if _, err := module.apply(context.Background(), applyPlan{partial: true, siteIDs: []string{}}); err == nil {
 		t.Fatal("空 siteIds 应返回 BAD_REQUEST")
+	}
+}
+
+func TestBootstrapPreparesDirsAndMounts(t *testing.T) {
+	module, ctx, _, _ := newTestModule(t)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/sites/bootstrap", strings.NewReader("{}"))
+	module.handleBootstrap(recorder, request)
+
+	var envelope struct {
+		OK   bool                `json:"ok"`
+		Data SiteBootstrapResult `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("响应不是信封 JSON: %v\n%s", err, recorder.Body.String())
+	}
+	if !envelope.OK {
+		t.Fatalf("bootstrap 失败: %s", recorder.Body.String())
+	}
+	result := envelope.Data
+	confDir, dataDir := ctx.Cfg.CaddyDirs()
+	if result.ConfigDir == "" || result.DataDir == "" || result.CaddyfilePath == "" {
+		t.Fatalf("bootstrap 返回路径不完整: %+v", result)
+	}
+	content, err := os.ReadFile(filepath.Join(confDir, "Caddyfile"))
+	if err != nil {
+		t.Fatalf("Caddyfile 未写入: %v", err)
+	}
+	if !strings.Contains(string(content), "import sites.d/*.caddy") {
+		t.Fatalf("Caddyfile 内容错误: %s", content)
+	}
+	if !pathIsDir(filepath.Join(confDir, "sites.d")) || !pathIsDir(dataDir) {
+		t.Fatal("bootstrap 未创建 sites.d 或 data 目录")
+	}
+	targets := map[string]bool{}
+	for _, mount := range result.Mounts {
+		targets[mount.Target] = true
+	}
+	if !targets["/etc/caddy"] || !targets["/data"] {
+		t.Fatalf("缺少 Caddy config/data 挂载: %+v", result.Mounts)
+	}
+	if !targets[strings.ReplaceAll(result.SitesRoot, "\\", "/")] {
+		t.Fatalf("缺少站点根挂载: %+v", result.Mounts)
+	}
+}
+
+func TestSitesUnavailableWithoutCaddyContainer(t *testing.T) {
+	_, ctx, runner, root := newTestModule(t)
+	runner.mu.Lock()
+	runner.noContainer = true
+	runner.mu.Unlock()
+
+	list := doRequest(t, ctx.Mux, http.MethodGet, "/api/v1/sites", "")
+	if !list.OK {
+		t.Fatalf("列表信封错误: %+v", list.Error)
+	}
+	var listData struct {
+		Available bool   `json:"available"`
+		Reason    string `json:"reason"`
+		Items     []Site `json:"items"`
+	}
+	if err := json.Unmarshal(list.Data, &listData); err != nil {
+		t.Fatal(err)
+	}
+	if listData.Available || len(listData.Items) != 0 || listData.Reason == "" {
+		t.Fatalf("未部署时应返回 available=false: %+v", listData)
+	}
+
+	createBody, err := json.Marshal(map[string]any{
+		"name": "blocked",
+		"config": map[string]any{
+			"domains": []string{"example.com"},
+			"handler": map[string]any{"type": "file_server", "root": root},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := doRequest(t, ctx.Mux, http.MethodPost, "/api/v1/sites", string(createBody))
+	if created.OK || created.Error == nil || created.Error.Code != "UNAVAILABLE" {
+		t.Fatalf("未部署时创建站点应返回 UNAVAILABLE: %+v", created)
 	}
 }

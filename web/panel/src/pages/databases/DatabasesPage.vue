@@ -48,7 +48,7 @@ import { buildHandoffFrameUrl, resolveRedeemUrl } from '@/lib/paths';
 import { downloadFrom } from '@/lib/download';
 import { describeError } from '@/api/errors';
 import PageHeader from '@/components/common/PageHeader.vue';
-import ContainerRunModal, { type ContainerRunPreset } from '@/pages/containers/ContainerRunModal.vue';
+import StoreInstallModal from '@/components/store/StoreInstallModal.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
@@ -396,38 +396,29 @@ const frameUrl = computed(() => {
   return buildHandoffFrameUrl(dbxUrl.value, endpoint, ticket.value.ticket);
 });
 
-/* --------------------------- 一键容器化 --------------------------- */
+/* --------------------------- 一键初始化（compose） --------------------------- */
 
-const runOpen = ref(false);
-const runPreset = ref<ContainerRunPreset | undefined>(undefined);
+const installApp = ref<'postgres' | 'redis' | null>(null);
+const installOpen = computed({
+  get: () => installApp.value !== null,
+  set: (value: boolean) => {
+    if (!value) installApp.value = null;
+  },
+});
 
-function openContainer(mode: 'postgres' | 'redis'): void {
-  runPreset.value =
-    mode === 'postgres'
-      ? {
-          title: '运行 PostgreSQL 容器',
-          hint: '创建后把连接信息记到「新建档案」里，即可在统计、备份与 dbx 中使用。',
-          input: {
-            image: 'postgres:16-alpine',
-            name: '',
-            restart: 'unless-stopped',
-            ports: ['5432:5432'],
-            env: { POSTGRES_PASSWORD: 'change-me', POSTGRES_USER: 'postgres' },
-            volumes: ['/opt/mpanel/data/postgres:/var/lib/postgresql/data'],
-          },
-        }
-      : {
-          title: '运行 Redis 容器',
-          hint: '默认开启 AOF 持久化，数据落在 /opt/mpanel/data/redis。',
-          input: {
-            image: 'redis:7-alpine',
-            restart: 'unless-stopped',
-            ports: ['6379:6379'],
-            volumes: ['/opt/mpanel/data/redis:/data'],
-            command: ['redis-server', '--appendonly', 'yes'],
-          },
-        };
-  runOpen.value = true;
+function openInstall(kind: 'postgres' | 'redis'): void {
+  installApp.value = kind;
+}
+
+function onStoreInstalled(payload: {
+  createdProfile: DatabaseProfile | null;
+  startedExisting: boolean;
+}): void {
+  if (payload.createdProfile !== null) selectedId.value = payload.createdProfile.id;
+  void profilesQuery.refetch();
+  if (payload.startedExisting) {
+    message.info('已有编排已启动；密码未改写，请按实际密码新建档案。');
+  }
 }
 
 async function openDbx(): Promise<void> {
@@ -458,12 +449,12 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
         <n-dropdown
           trigger="click"
           :options="[
-            { label: '运行 PostgreSQL 容器', key: 'postgres' },
-            { label: '运行 Redis 容器', key: 'redis' },
+            { label: '一键部署 PostgreSQL 容器', key: 'postgres' },
+            { label: '一键部署 Redis 容器', key: 'redis' },
           ]"
-          @select="(key: string) => openContainer(key as 'postgres' | 'redis')"
+          @select="(key: string) => openInstall(key as 'postgres' | 'redis')"
         >
-          <n-button size="small" type="primary">一键容器化</n-button>
+          <n-button size="small" type="primary">一键初始化</n-button>
         </n-dropdown>
         <n-button size="small" secondary :disabled="!profilesAvailable" @click="openCreate">
           <template #icon><n-icon :component="AddOutline" /></template>
@@ -481,7 +472,23 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
     <n-empty v-if="pageEmpty" :description="emptyDescription">
       <template #icon><n-icon :component="LayersOutline" size="36" /></template>
       <template #extra>
-        <n-button type="primary" :disabled="!profilesAvailable" @click="openCreate">新建档案</n-button>
+        <div class="empty-actions">
+          <n-button
+            v-if="fixedKind !== 'redis'"
+            type="primary"
+            @click="openInstall('postgres')"
+          >
+            一键部署 PostgreSQL
+          </n-button>
+          <n-button
+            v-if="fixedKind !== 'postgres'"
+            type="primary"
+            @click="openInstall('redis')"
+          >
+            一键部署 Redis
+          </n-button>
+          <n-button secondary :disabled="!profilesAvailable" @click="openCreate">新建档案</n-button>
+        </div>
       </template>
     </n-empty>
 
@@ -761,10 +768,13 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
       </template>
     </n-modal>
 
-    <ContainerRunModal
-      v-model:show="runOpen"
+    <StoreInstallModal
+      v-if="installApp !== null"
+      v-model:show="installOpen"
       :machine-id="machineId"
-      :preset="runPreset"
+      :app-id="installApp"
+      :title="installApp === 'postgres' ? '一键部署 PostgreSQL' : '一键部署 Redis'"
+      @installed="onStoreInstalled"
     />
   </div>
 </template>
@@ -831,6 +841,12 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
 .actions {
   display: flex;
   gap: 2px;
+}
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 .form {
   display: flex;

@@ -18,12 +18,12 @@ Linux 上默认安装根为 `/opt/mpanel`；非 Linux 开发机回退到 `~/.mpa
 │  └─ bootstrap-token     # 首次初始化用，完成后删除
 ├─ data/                  # core 数据根（system.data_dir）
 │  ├─ agent/              # agent 数据（agent.data_dir）
-│  │  ├─ caddy/           # 受管 Caddy 配置（可通过 caddy_config 改）
+│  │  ├─ caddy/           # 宿主 Caddy 配置，容器挂载到 /etc/caddy（可通过 caddy_config 改）
 │  │  │  ├─ Caddyfile
 │  │  │  ├─ sites.d/*.caddy
-│  │  │  ├─ staging/
-│  │  │  └─ data/         # Caddy 证书与数据（可通过 caddy_data 改）
+│  │  │  └─ data/         # Caddy 证书与数据，容器挂载到 /data（可通过 caddy_data 改）
 │  │  ├─ sites/           # 默认站点根
+│  │  ├─ stacks/          # Docker Compose 编排（mpanel-caddy、mpanel-postgres…）
 │  │  ├─ backups/         # 数据库与站点回滚备份
 │  │  ├─ trash/           # 文件回收站
 │  │  └─ tasks/           # 计划任务输出
@@ -38,7 +38,7 @@ Linux 上默认安装根为 `/opt/mpanel`；非 Linux 开发机回退到 `~/.mpa
 
 - `data/`、`log/`、`db/`、`backup/`、`tmp/` 在 `app.yaml` 中有独立字段，可以分别指向不同磁盘。
 - `db/` 是 1Panel 同名目录。1Panel 在这里放 SQLite 的 `core.db`；MPanel 的控制面使用原子 JSON 文档（`server/core/store`），按 1Panel 习惯放在同一棵树里，备份时直接打包整个 `db/`。
-- agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${agent.data_dir}/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。
+- agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${agent.data_dir}/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。两者分别挂载到容器 `/etc/caddy` 与 `/data`；`caddy_bin` 已弃用，Caddy 只以容器运行。
 - 目录创建权限：core 的 `conf/`、`data/`、`log/`、`db/`、`backup/`、`tmp/` 为 `0700`；agent 的目录为 `0755`（站点/文件根需要被 Web 服务器读取），配置文件统一 `0600`。
 
 ## 2. `conf/app.yaml`（core）
@@ -161,10 +161,10 @@ log:
 | `data_dir` | string | `${base_dir}/data/agent` | agent 数据根 |
 | `log_path` | string | `${base_dir}/log` | 日志目录 |
 | `version` | string | 构建版本 | 版本号 |
-| `caddy_bin` | string | `caddy` | Caddy 可执行文件；可写绝对路径 |
-| `caddy_config` | string | `${data_dir}/caddy` | 受管 Caddy 配置目录（`Caddyfile`、`sites.d/`、`staging/`） |
-| `caddy_data` | string | `${caddy_config}/data` | Caddy 数据目录（证书扫描来源） |
-| `caddy_admin` | string | 空 | Caddy admin API 地址；留空时按 Caddy 默认 `127.0.0.1:2019` |
+| `caddy_bin` | string | `caddy` | **已弃用**：Caddy 只以容器运行，该字段保留仅为兼容旧配置，agent 不读取 |
+| `caddy_config` | string | `${data_dir}/caddy` | 宿主受管 Caddy 配置目录（`Caddyfile`、`sites.d/`），挂载到容器 `/etc/caddy` |
+| `caddy_data` | string | `${caddy_config}/data` | 宿主 Caddy 数据目录（证书扫描来源），挂载到容器 `/data` |
+| `caddy_admin` | string | 空 | 写入主 Caddyfile 的 **容器内** admin 地址；留空用 `127.0.0.1:2019` |
 | `docker_bin` | string | `docker` | Docker CLI 路径 |
 | `docker_config` | string | `/etc/docker/daemon.json` | Docker daemon 配置路径；容器配置页读取/写入该文件，rootless 部署改为 `~/.config/docker/daemon.json` |
 | `pg_dump_bin` | string | `pg_dump` | PostgreSQL 备份工具 |
@@ -239,10 +239,10 @@ export MPANEL_FILES_ROOTS='files=/opt/mpanel/data/files,www=/var/www'
 | `MPANEL_MACHINE_SECRET` | `agent.machine_secret` | 预建 reverse-ws |
 | `MPANEL_EDGE_KEY` | `agent.edge_key` | 边缘入网 |
 | `MPANEL_AGENT_DATA_DIR` | `agent.data_dir` | |
-| `MPANEL_CADDY_BIN` | `agent.caddy_bin` | |
-| `MPANEL_CADDY_CONFIG` | `agent.caddy_config` | |
-| `MPANEL_CADDY_DATA` | `agent.caddy_data` | |
-| `MPANEL_CADDY_ADMIN` | `agent.caddy_admin` | |
+| `MPANEL_CADDY_BIN` | `agent.caddy_bin` | 已弃用，保留兼容 |
+| `MPANEL_CADDY_CONFIG` | `agent.caddy_config` | 容器 `/etc/caddy` 挂载源 |
+| `MPANEL_CADDY_DATA` | `agent.caddy_data` | 容器 `/data` 挂载源 |
+| `MPANEL_CADDY_ADMIN` | `agent.caddy_admin` | 写入主 Caddyfile 的容器内地址 |
 | `MPANEL_DOCKER_BIN` | `agent.docker_bin` | |
 | `MPANEL_DOCKER_CONFIG` | `agent.docker_config` | |
 | `MPANEL_PG_DUMP_BIN` | `agent.pg_dump_bin` | |
