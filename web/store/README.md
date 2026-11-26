@@ -35,7 +35,7 @@ web/store/
 | `id` | 应用唯一 id，与目录名一致 |
 | `stack` | Compose 项目名，同时作为 `/stacks/:name` 的编排名 |
 | `service` | Compose 服务名，agent 用它定位运行中的容器 |
-| `compose` | 相对本清单或商店根目录的 Compose 模板路径 |
+| `compose` | 相对商店根目录（`index.json` 所在目录）的 Compose 模板路径 |
 | `bootstrap` | `sites` 表示安装前调用 `POST /sites/bootstrap`，用返回的挂载填充变量 |
 | `capability` | 安装后轮询的 `system/info.capabilities` 键 |
 | `variables[]` | `key`、`label`、`default`、`secret`、`hidden`、`generate.length` |
