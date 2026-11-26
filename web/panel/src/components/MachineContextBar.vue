@@ -128,7 +128,7 @@ function onPageSelect(key: string): void {
     v-if="machine && machine.status !== 'online'"
     type="warning"
     :bordered="false"
-    style="margin: 0 16px 8px"
+    style="margin: 8px 18px 0"
     :title="`机器当前为“${machine.status}”`"
   >
     页面请求会转发到该机器，离线时可能失败。
@@ -142,8 +142,11 @@ function onPageSelect(key: string): void {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
-  border-bottom: 1px dashed var(--mpanel-border);
+  margin: 8px 16px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--mpanel-surface);
+  box-shadow: var(--mpanel-shadow);
   font-size: 12px;
   min-height: 38px;
 }

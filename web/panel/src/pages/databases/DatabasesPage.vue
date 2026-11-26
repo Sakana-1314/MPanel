@@ -516,7 +516,7 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
             </div>
           </div>
 
-          <n-tabs v-model:value="tab" type="line" animated>
+          <n-tabs v-model:value="tab" type="segment" animated>
             <n-tab-pane name="overview" tab="概览">
               <div class="kv">
                 <dt>ID</dt><dd class="mono">{{ selected.id }}</dd>
@@ -794,7 +794,7 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
 .dbx-frame {
   width: 100%;
   height: 620px;
-  border: 1px solid var(--mpanel-border);
+  border: 0;
   border-radius: 10px;
   background: #fff;
 }

@@ -260,7 +260,6 @@ async function onAccountSelect(key: string): Promise<void> {
   flex-direction: column;
   min-width: 0;
   background: var(--mpanel-bg);
-  border-right: 1px solid var(--mpanel-border-muted);
 }
 .brand {
   display: flex;
@@ -308,8 +307,9 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--mpanel-border-muted);
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--mpanel-surface-inset);
 }
 .machine-row {
   display: flex;
@@ -326,11 +326,11 @@ async function onAccountSelect(key: string): Promise<void> {
   cursor: pointer;
 }
 .machine-row:hover {
-  background: var(--mpanel-surface-soft);
+  background: color-mix(in srgb, var(--mpanel-surface) 55%, transparent);
 }
 .machine-row.active {
   background: var(--mpanel-surface);
-  box-shadow: inset 0 0 0 1px var(--mpanel-border);
+  box-shadow: var(--mpanel-shadow);
   font-weight: 600;
 }
 .machine-name {
@@ -400,9 +400,10 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 2px 0 4px 6px;
-  margin-left: 6px;
-  border-left: 1px solid var(--mpanel-border-muted);
+  padding: 3px;
+  margin: 2px 0 4px;
+  border-radius: 9px;
+  background: var(--mpanel-surface-inset);
 }
 .acc-item {
   display: flex;
@@ -433,8 +434,10 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding-top: 8px;
-  border-top: 1px solid var(--mpanel-border-muted);
+  padding: 6px;
+  margin-top: 2px;
+  border-radius: 10px;
+  background: var(--mpanel-surface-inset);
 }
 .flat-item {
   display: flex;
@@ -469,7 +472,6 @@ async function onAccountSelect(key: string): Promise<void> {
   align-items: center;
   gap: 4px;
   padding: 8px;
-  border-top: 1px solid var(--mpanel-border-muted);
 }
 .account-btn {
   display: flex;

@@ -128,7 +128,7 @@ async function submitImport(): Promise<void> {
     style="width: 860px; max-width: calc(100vw - 24px)"
     @update:show="emit('update:show', $event)"
   >
-    <n-tabs v-model:value="tab" type="line">
+    <n-tabs v-model:value="tab" type="segment">
       <n-tab-pane name="export" tab="导出">
         <div class="panel">
           <n-alert type="info" :bordered="false" title="导出内容">
