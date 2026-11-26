@@ -212,13 +212,13 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
       <n-table :single-line="false" size="small">
         <thead>
           <tr>
-            <th style="min-width: 190px">容器</th>
-            <th style="min-width: 190px">镜像</th>
-            <th style="width: 100px">状态</th>
-            <th style="min-width: 150px">端口</th>
-            <th style="min-width: 130px">创建</th>
-            <th style="min-width: 120px">Compose</th>
-            <th style="width: 170px">操作</th>
+            <th style="min-width: 160px">容器</th>
+            <th style="min-width: 160px">镜像</th>
+            <th style="width: 90px">状态</th>
+            <th style="min-width: 120px">端口</th>
+            <th style="width: 100px">创建</th>
+            <th style="width: 100px">Compose</th>
+            <th style="width: 116px">操作</th>
           </tr>
         </thead>
         <tbody>

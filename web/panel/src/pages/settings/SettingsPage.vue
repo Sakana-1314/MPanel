@@ -384,9 +384,9 @@ const authLabel = computed(() => (isTokenAuth.value ? '访问令牌' : '账号�
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--mpanel-border);
-  border-radius: 10px;
-  background: var(--mpanel-surface-soft);
+  border: 1px solid var(--mpanel-border-muted);
+  border-radius: 6px;
+  background: var(--mpanel-surface);
 }
 .conn-main {
   min-width: 0;
