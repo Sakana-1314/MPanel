@@ -34,6 +34,7 @@ import { useAction } from '@/composables/use-action';
 import { describeError } from '@/api/errors';
 import { formatDay } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
+import ContainerRunModal, { type ContainerRunPreset } from '@/pages/containers/ContainerRunModal.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
@@ -55,6 +56,8 @@ const importOpen = ref(false);
 const previewRequest = ref<PreviewRequest | null>(null);
 const applyResult = ref<SiteApplyResult | null>(null);
 const applyResultOpen = ref(false);
+const runOpen = ref(false);
+const runPreset = ref<ContainerRunPreset | undefined>(undefined);
 const applyError = ref<unknown>(null);
 
 const sitesQuery = useQuery({
@@ -190,6 +193,35 @@ function createSite(): void {
   void router.push(`/m/${machineId}/sites/new`);
 }
 
+/* --------------------------- 一键容器化 --------------------------- */
+
+function openContainer(mode: 'static' | 'wordpress'): void {
+  runPreset.value =
+    mode === 'static'
+      ? {
+          title: '用容器运行静态站点',
+          hint: '把站点文件放到 /opt/mpanel/data/www，再把域名反代到宿主端口即可。',
+          input: {
+            image: 'nginx:alpine',
+            restart: 'unless-stopped',
+            ports: ['8080:80'],
+            volumes: ['/opt/mpanel/data/www:/usr/share/nginx/html:ro'],
+          },
+        }
+      : {
+          title: '用容器运行 WordPress',
+          hint: '还需要一个 MySQL/MariaDB；数据库地址填容器名或宿主 IP。',
+          input: {
+            image: 'wordpress:latest',
+            restart: 'unless-stopped',
+            ports: ['8080:80'],
+            env: { WORDPRESS_DB_HOST: '127.0.0.1:3306', WORDPRESS_DB_NAME: 'wordpress' },
+            volumes: ['/opt/mpanel/data/wordpress:/var/www/html'],
+          },
+        };
+  runOpen.value = true;
+}
+
 function previewSite(site: Site): void {
   previewRequest.value = { siteId: site.id, validate: caddyAvailable.value };
 }
@@ -234,6 +266,16 @@ const applyOutput = computed(() => {
           <template #icon><n-icon :component="RocketOutline" /></template>
           应用全部更改
         </n-button>
+        <n-dropdown
+          trigger="click"
+          :options="[
+            { label: '用容器运行静态站点', key: 'static' },
+            { label: '用容器运行 WordPress', key: 'wordpress' },
+          ]"
+          @select="(key: string) => openContainer(key as 'static' | 'wordpress')"
+        >
+          <n-button size="small" secondary>容器化运行</n-button>
+        </n-dropdown>
         <n-button size="small" type="primary" @click="createSite">
           <template #icon><n-icon :component="AddOutline" /></template>
           新建站点
@@ -260,22 +302,20 @@ const applyOutput = computed(() => {
       <pre v-if="applyOutput" class="code-block" style="margin-top: 8px; max-height: 180px">{{ applyOutput }}</pre>
     </n-alert>
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-input v-model:value="search" placeholder="搜索站点或域名…" clearable style="max-width: 260px" />
-        <n-select
-          v-model:value="enabledFilter"
-          style="width: 130px"
-          :options="[
-            { label: '全部', value: 'all' },
-            { label: '启用', value: 'enabled' },
-            { label: '禁用', value: 'disabled' },
-          ]"
-        />
-        <div class="spacer" />
-        <span class="small muted">{{ filtered.length }} 个站点 · 已应用 {{ appliedCount }}</span>
-      </div>
-    </n-card>
+    <div class="filter-bar">
+      <n-input v-model:value="search" placeholder="搜索站点或域名…" clearable style="max-width: 260px" />
+      <n-select
+        v-model:value="enabledFilter"
+        style="width: 130px"
+        :options="[
+          { label: '全部', value: 'all' },
+          { label: '启用', value: 'enabled' },
+          { label: '禁用', value: 'disabled' },
+        ]"
+      />
+      <div class="spacer" />
+      <span class="small muted">{{ filtered.length }} 个站点 · 已应用 {{ appliedCount }}</span>
+    </div>
 
     <error-state v-if="sitesQuery.isError.value" :error="sitesQuery.error.value" @retry="sitesQuery.refetch()" />
 
@@ -371,6 +411,11 @@ const applyOutput = computed(() => {
       @update:show="previewRequest = $event ? previewRequest : null"
     />
     <SiteImportExportModal v-model:show="importOpen" :machine-id="machineId" />
+    <ContainerRunModal
+      v-model:show="runOpen"
+      :machine-id="machineId"
+      :preset="runPreset"
+    />
     <SiteApplyResultModal v-model:show="applyResultOpen" :result="applyResult" :machine-id="machineId" />
   </div>
 </template>

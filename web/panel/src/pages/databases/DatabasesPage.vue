@@ -48,6 +48,7 @@ import { buildHandoffFrameUrl, resolveRedeemUrl } from '@/lib/paths';
 import { downloadFrom } from '@/lib/download';
 import { describeError } from '@/api/errors';
 import PageHeader from '@/components/common/PageHeader.vue';
+import ContainerRunModal, { type ContainerRunPreset } from '@/pages/containers/ContainerRunModal.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
@@ -395,6 +396,40 @@ const frameUrl = computed(() => {
   return buildHandoffFrameUrl(dbxUrl.value, endpoint, ticket.value.ticket);
 });
 
+/* --------------------------- 一键容器化 --------------------------- */
+
+const runOpen = ref(false);
+const runPreset = ref<ContainerRunPreset | undefined>(undefined);
+
+function openContainer(mode: 'postgres' | 'redis'): void {
+  runPreset.value =
+    mode === 'postgres'
+      ? {
+          title: '运行 PostgreSQL 容器',
+          hint: '创建后把连接信息记到「新建档案」里，即可在统计、备份与 dbx 中使用。',
+          input: {
+            image: 'postgres:16-alpine',
+            name: '',
+            restart: 'unless-stopped',
+            ports: ['5432:5432'],
+            env: { POSTGRES_PASSWORD: 'change-me', POSTGRES_USER: 'postgres' },
+            volumes: ['/opt/mpanel/data/postgres:/var/lib/postgresql/data'],
+          },
+        }
+      : {
+          title: '运行 Redis 容器',
+          hint: '默认开启 AOF 持久化，数据落在 /opt/mpanel/data/redis。',
+          input: {
+            image: 'redis:7-alpine',
+            restart: 'unless-stopped',
+            ports: ['6379:6379'],
+            volumes: ['/opt/mpanel/data/redis:/data'],
+            command: ['redis-server', '--appendonly', 'yes'],
+          },
+        };
+  runOpen.value = true;
+}
+
 async function openDbx(): Promise<void> {
   const result = await handoffAction.run();
   if (result !== undefined) ticket.value = result;
@@ -420,7 +455,17 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
-        <n-button size="small" type="primary" :disabled="!profilesAvailable" @click="openCreate">
+        <n-dropdown
+          trigger="click"
+          :options="[
+            { label: '运行 PostgreSQL 容器', key: 'postgres' },
+            { label: '运行 Redis 容器', key: 'redis' },
+          ]"
+          @select="(key: string) => openContainer(key as 'postgres' | 'redis')"
+        >
+          <n-button size="small" type="primary">一键容器化</n-button>
+        </n-dropdown>
+        <n-button size="small" secondary :disabled="!profilesAvailable" @click="openCreate">
           <template #icon><n-icon :component="AddOutline" /></template>
           新建档案
         </n-button>
@@ -715,6 +760,12 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
         </div>
       </template>
     </n-modal>
+
+    <ContainerRunModal
+      v-model:show="runOpen"
+      :machine-id="machineId"
+      :preset="runPreset"
+    />
   </div>
 </template>
 

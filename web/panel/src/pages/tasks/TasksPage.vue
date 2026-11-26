@@ -158,22 +158,20 @@ const runningCount = computed(() => tasks.value.filter((task) => task.lastRun?.s
 
     <error-state v-if="tasksQuery.isError.value" :error="tasksQuery.error.value" @retry="tasksQuery.refetch()" />
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-input v-model:value="search" placeholder="搜索任务名称 / 描述…" clearable style="max-width: 260px" @keydown.enter="tasksQuery.refetch()" />
-        <n-select
-          v-model:value="enabledFilter"
-          style="width: 130px"
-          :options="[
-            { label: '全部', value: 'all' },
-            { label: '已启用', value: 'enabled' },
-            { label: '已禁用', value: 'disabled' },
-          ]"
-        />
-        <div class="spacer" />
-        <span class="small muted">共 {{ tasks.length }} 个<template v-if="runningCount > 0"> · 运行中 {{ runningCount }}</template></span>
-      </div>
-    </n-card>
+    <div class="filter-bar">
+      <n-input v-model:value="search" placeholder="搜索任务名称 / 描述…" clearable style="max-width: 260px" @keydown.enter="tasksQuery.refetch()" />
+      <n-select
+        v-model:value="enabledFilter"
+        style="width: 130px"
+        :options="[
+          { label: '全部', value: 'all' },
+          { label: '已启用', value: 'enabled' },
+          { label: '已禁用', value: 'disabled' },
+        ]"
+      />
+      <div class="spacer" />
+      <span class="small muted">共 {{ tasks.length }} 个<template v-if="runningCount > 0"> · 运行中 {{ runningCount }}</template></span>
+    </div>
 
     <n-empty v-if="tasks.length === 0 && !tasksQuery.isLoading.value" description="还没有计划任务">
       <template #icon><n-icon :component="CalendarOutline" size="36" /></template>

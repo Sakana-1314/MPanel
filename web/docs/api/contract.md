@@ -1157,6 +1157,7 @@ interface StackDetail extends StackSummary {
 | 方法 | 路径 | Query / Body | data |
 |---|---|---|---|
 | GET | `/containers` | `all?`(默认 false)、`status?`、`q?`、分页 | `ListResult<ContainerSummary>`，默认 `created desc` |
+| POST | `/containers` | `ContainerCreateInput` | `ContainerCreated`，201 |
 | GET | `/containers/:id` | — | `ContainerDetail` |
 | POST | `/containers/:id/start` | — | `{ ok:true, action:'start', id }` |
 | POST | `/containers/:id/stop` | `{ timeoutSec?: 0..600 }` | `{ ok:true, action:'stop', id }` |
@@ -1165,6 +1166,37 @@ interface StackDetail extends StackSummary {
 | GET | `/containers/:id/logs` | `tail?`(0..10000), `since?`, `timestamps?`, `stdout?`, `stderr?` | `{ logs: string, truncated: boolean }` |
 | GET | `/containers/:id/stats` | — | `{ stats: ContainerStats }` |
 | POST | `/containers/:id/exec` | `{ command: string[], timeoutMs?, workdir?, user? }` | `ExecResult` |
+
+#### `POST /containers`（创建并启动）
+
+面板的「一键容器化 / 运行容器」用它把可视化表单映射成 `docker run -d`。所有参数都以 argv 数组传给 docker，不经过 shell。
+
+```ts
+interface ContainerCreateInput {
+  image: string;                       // 必填，镜像名
+  name?: string;                       // 容器名，留空由 docker 生成
+  command?: string[];                  // 覆盖镜像 CMD
+  env?: Record<string, string>;        // --env KEY=VALUE
+  ports?: string[];                    // "8080:80"、"127.0.0.1:8080:80"、"8080:80/udp"
+  volumes?: string[];                  // "/host/path:/container/path[:ro|rw]"
+  network?: string;                    // --network
+  restart?: string;                    // no | always | unless-stopped | on-failure[:N]，默认 unless-stopped
+  labels?: Record<string, string>;
+}
+
+interface ContainerCreated {
+  id: string;
+  ok: true;
+  name?: string;
+  image: string;
+  ports: string[];
+  container?: ContainerDetail;
+}
+```
+
+- 上限：端口 32、卷 32、环境变量 64、标签 32、命令参数 32。
+- 不暴露 `--privileged`、`--cap-add`、`--pid=host` 等提权开关。
+- 错误：`BAD_REQUEST`（镜像名/端口/卷/重启策略不合法，带 `details.hint`）、`UNAVAILABLE`（Docker 不可用，带 `details.hint`）、`UPSTREAM_ERROR`（docker run 失败，`details.output` 为 docker 输出）。
 
 ```ts
 interface ExecResult {

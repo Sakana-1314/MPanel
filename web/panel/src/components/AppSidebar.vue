@@ -1,19 +1,25 @@
 <script setup lang="ts">
 import { computed, h, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NDropdown, NIcon, NScrollbar, NSpin, useMessage } from 'naive-ui';
+import {
+  NButton,
+  NIcon,
+  NMenu,
+  NPopover,
+  NScrollbar,
+  NSpin,
+  useMessage,
+} from 'naive-ui';
 import type { Component } from 'vue';
+import type { MenuOption } from 'naive-ui';
 import {
   AddOutline,
-  ChevronDownOutline,
   ChevronForwardOutline,
   ChevronUpOutline,
   CubeOutline,
   FlashOutline,
   FolderOpenOutline,
-  GitNetworkOutline,
   GlobeOutline,
-  GridOutline,
   LayersOutline,
   LogOutOutline,
   MoonOutline,
@@ -32,9 +38,8 @@ import {
   machineNavPath,
   openCorePage,
   openMachinePage,
-  type MachineNavItem,
 } from '@/lib/navigation';
-import { machineStatusLabel, machineStatusType } from '@/lib/status';
+import { machineStatusType } from '@/lib/status';
 import { activeConnection } from '@/lib/connection-store';
 import { logout, sessionSnapshot } from '@/lib/session';
 import { useTheme } from '@/lib/theme';
@@ -51,13 +56,15 @@ const { isDark, toggle } = useTheme();
 
 const machines = computed(() => machinesQuery.data.value?.items ?? []);
 const activeMachineId = computed(() => activeTab.value?.machineId ?? null);
-const activeMachine = computed(() =>
-  machines.value.find((machine) => machine.id === activeMachineId.value),
-);
 
 const user = computed(() => sessionSnapshot().user);
 const displayName = computed(() => user.value?.displayName ?? user.value?.username ?? '账户');
 const initial = computed(() => displayName.value.slice(0, 1).toUpperCase());
+const roleLabel = computed(() => (activeConnection.value?.name ? '管理员' : '未连接'));
+
+function renderIcon(component: Component): () => ReturnType<typeof h> {
+  return () => h(NIcon, { component, size: 17 });
+}
 
 const navIcons: Record<string, Component> = {
   sites: GlobeOutline,
@@ -73,84 +80,101 @@ const navIcons: Record<string, Component> = {
   tasks: TimeOutline,
 };
 
-/**
- * 手风琴：同一时刻只展开一个分组。
- * 默认展开当前路由命中的分组，切换机器时重新对齐。
- */
-const openGroup = ref<string | null>(null);
+/** 分组 key → 组内菜单项；用于「进哪个页面就展开哪个分组」。 */
+function groupKey(title: string): string {
+  return `group:${title}`;
+}
 
-function groupOfActiveItem(): string | null {
+const menuOptions = computed<MenuOption[]>(() =>
+  MACHINE_NAV_GROUPS.map((group) => ({
+    key: groupKey(group.title),
+    label: group.title,
+    children: group.items.map((item) => ({
+      key: item.key,
+      label: item.title,
+      icon: renderIcon(navIcons[item.key] ?? GlobeOutline),
+    })),
+  })),
+);
+
+/** 当前高亮的菜单项；不在机器页面时为空。 */
+const activeKey = computed<string | null>(() => {
   const machineId = activeMachineId.value;
   if (machineId === null) return null;
   for (const group of MACHINE_NAV_GROUPS) {
-    if (group.items.some((item) => isNavItemActive(machineId, item, route.path, route.query))) {
-      return group.title;
+    for (const item of group.items) {
+      if (isNavItemActive(machineId, item, route.path, route.query)) return item.key;
     }
   }
   return null;
-}
+});
+
+/**
+ * 展开的分组：受控维护，除了用户手动展开的，还要把当前路由所在分组一并展开，
+ * 否则直接打开某个页面时菜单里看不到自己在哪。
+ */
+const expandedKeys = ref<Array<string | number>>([]);
 
 watch(
   () => [route.fullPath, activeMachineId.value] as const,
   () => {
-    const current = groupOfActiveItem();
-    if (current !== null) openGroup.value = current;
+    const machineId = activeMachineId.value;
+    const keys = new Set<string | number>(expandedKeys.value);
+    if (machineId !== null) {
+      for (const group of MACHINE_NAV_GROUPS) {
+        if (group.items.some((item) => isNavItemActive(machineId, item, route.path, route.query))) {
+          keys.add(groupKey(group.title));
+        }
+      }
+    }
+    expandedKeys.value = [...keys];
   },
   { immediate: true },
 );
 
-function toggleGroup(title: string): void {
-  openGroup.value = openGroup.value === title ? null : title;
-}
-
-const accountOptions = [
-  { label: '机器总览', key: 'machines', icon: () => h(NIcon, { component: ServerOutline }) },
-  { label: '设置', key: 'settings', icon: () => h(NIcon, { component: SettingsOutline }) },
-  { label: '打开新页面', key: 'quick-open', icon: () => h(NIcon, { component: AddOutline }) },
-  { type: 'divider', key: 'divider' },
-  { label: '退出登录', key: 'logout', icon: () => h(NIcon, { component: LogOutOutline }) },
-];
-
-function navActive(item: MachineNavItem): boolean {
-  return isNavItemActive(activeMachineId.value, item, route.path, route.query);
+function onMenuSelect(key: string): void {
+  if (key.startsWith('group:')) return;
+  const machineId = activeMachineId.value;
+  if (machineId === null) {
+    emit('quickOpen');
+    return;
+  }
+  const item = MACHINE_NAV_GROUPS.flatMap((group) => group.items).find((entry) => entry.key === key);
+  if (item === undefined) return;
+  const path = machineNavPath(machineId, item);
+  if (route.fullPath !== path) void router.push(path);
 }
 
 function openMachine(machineId: string): void {
   openMachinePage(machineId, 'sites');
 }
 
-function goNav(item: MachineNavItem): void {
-  const machineId = activeMachineId.value;
-  if (machineId === null) {
-    emit('quickOpen');
-    return;
-  }
-  const path = machineNavPath(machineId, item);
-  if (route.fullPath !== path) void router.push(path);
+const accountOpen = ref(false);
+
+function goMachines(): void {
+  accountOpen.value = false;
+  openCorePage('/machines', '机器总览');
 }
 
-async function onAccountSelect(key: string): Promise<void> {
-  if (key === 'machines') {
-    openCorePage('/machines', '机器总览');
-    return;
+function goSettings(): void {
+  accountOpen.value = false;
+  openCorePage('/settings', '设置');
+}
+
+function goQuickOpen(): void {
+  accountOpen.value = false;
+  emit('quickOpen');
+}
+
+async function onLogout(): Promise<void> {
+  accountOpen.value = false;
+  try {
+    await logout();
+  } catch {
+    // 即使请求失败也清理本地登录态。
   }
-  if (key === 'settings') {
-    openCorePage('/settings', '设置');
-    return;
-  }
-  if (key === 'quick-open') {
-    emit('quickOpen');
-    return;
-  }
-  if (key === 'logout') {
-    try {
-      await logout();
-    } catch {
-      // 即使请求失败也清理本地登录态。
-    }
-    message.success('已退出登录');
-    void router.replace('/login');
-  }
+  message.success('已退出登录');
+  void router.replace('/login');
 }
 </script>
 
@@ -158,16 +182,13 @@ async function onAccountSelect(key: string): Promise<void> {
   <div class="sidebar">
     <div class="brand">
       <span class="logo"><img :src="logoMark" alt="MPanel" /></span>
-      <div class="brand-text">
-        <strong>MPanel</strong>
-        <span class="tiny muted">服务器管理面板</span>
-      </div>
+      <span class="brand-name">MPanel</span>
     </div>
 
     <n-scrollbar style="flex: 1">
       <div class="roll">
-        <!-- 机器切换器 -->
-        <section class="machine-switch">
+        <section class="machines" aria-label="机器">
+          <div class="section-label">机器</div>
           <button
             v-for="machine in machines"
             :key="machine.id"
@@ -179,68 +200,104 @@ async function onAccountSelect(key: string): Promise<void> {
           >
             <span class="status-dot" :class="`dot-${machineStatusType(machine.status)}`" />
             <span class="machine-name truncate">{{ machine.name }}</span>
-            <span class="tiny muted transport">{{ transportLabel(machine.transport) }}</span>
+            <span class="machine-transport">{{ transportLabel(machine.transport) }}</span>
           </button>
           <n-spin v-if="machinesQuery.isLoading.value && machines.length === 0" size="small" />
-          <div v-else-if="machines.length === 0" class="empty tiny muted">还没有机器</div>
+          <div v-else-if="machines.length === 0" class="machine-empty">还没有机器</div>
         </section>
 
-        <!-- 机器导航手风琴 -->
-        <nav v-if="activeMachineId !== null" class="accordion" aria-label="机器导航">
-          <div v-for="group in MACHINE_NAV_GROUPS" :key="group.title" class="acc-group">
-            <button
-              type="button"
-              class="acc-head"
-              :class="{ open: openGroup === group.title }"
-              :aria-expanded="openGroup === group.title"
-              @click="toggleGroup(group.title)"
-            >
-              <n-icon
-                :component="openGroup === group.title ? ChevronDownOutline : ChevronForwardOutline"
-                size="12"
-                class="acc-chevron"
-              />
-              <span class="acc-title">{{ group.title }}</span>
-              <span v-if="openGroup !== group.title" class="acc-count">{{ group.items.length }}</span>
-            </button>
-            <div v-show="openGroup === group.title" class="acc-body">
-              <button
-                v-for="item in group.items"
-                :key="item.key"
-                type="button"
-                class="acc-item"
-                :class="{ active: navActive(item) }"
-                @click="goNav(item)"
-              >
-                <n-icon :component="navIcons[item.key] ?? GlobeOutline" size="14" />
-                <span class="truncate">{{ item.title }}</span>
-              </button>
-            </div>
-          </div>
-        </nav>
+        <n-menu
+          v-if="activeMachineId !== null"
+          :value="activeKey ?? undefined"
+          :options="menuOptions"
+          :expanded-keys="expandedKeys"
+          :indent="16"
+          @update:value="onMenuSelect"
+          @update:expanded-keys="expandedKeys = $event"
+        />
       </div>
     </n-scrollbar>
 
     <div class="account-footer">
-      <!-- 当前节点状态只保留在这里：页面里不再重复展示。 -->
-      <div v-if="activeMachine" class="node-line">
-        <span class="status-dot" :class="`dot-${machineStatusType(activeMachine.status)}`" />
-        <span class="truncate">{{ activeMachine.name }}</span>
-        <span class="tiny muted node-state">{{ machineStatusLabel(activeMachine.status) }}</span>
-      </div>
-      <n-dropdown trigger="click" placement="top-start" :options="accountOptions" @select="onAccountSelect">
-        <button type="button" class="account-btn" title="账号与设置">
-          <span class="avatar">{{ initial }}</span>
-          <span class="account-meta">
-            <strong class="truncate">{{ displayName }}</strong>
-            <span class="tiny muted truncate">{{ activeConnection?.name ?? '未连接' }}</span>
-          </span>
-          <n-icon :component="ChevronUpOutline" size="14" class="account-caret" />
-        </button>
-      </n-dropdown>
-      <n-button quaternary circle size="medium" :title="isDark ? '浅色主题' : '深色主题'" @click="toggle">
-        <template #icon><n-icon :component="isDark ? SunnyOutline : MoonOutline" size="16" /></template>
-      </n-button>
+      <n-popover
+        v-model:show="accountOpen"
+        placement="right-end"
+        trigger="click"
+        :show-arrow="false"
+        :width="272"
+        raw
+      >
+        <template #trigger>
+          <button type="button" class="account-btn" title="账号与设置">
+            <span class="avatar">{{ initial }}</span>
+            <span class="account-meta">
+              <strong class="truncate">{{ displayName }}</strong>
+              <span class="account-sub truncate">{{ roleLabel }}</span>
+            </span>
+            <n-icon :component="ChevronUpOutline" size="14" class="account-caret" />
+          </button>
+        </template>
+
+        <div class="panel">
+          <div class="panel-identity">
+            <span class="avatar avatar-lg">{{ initial }}</span>
+            <span class="account-meta">
+              <strong class="truncate">{{ displayName }}</strong>
+              <span class="account-sub truncate">{{ activeConnection?.name ?? '未连接' }}</span>
+            </span>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-title">外观</div>
+            <div class="segmented" role="radiogroup" aria-label="外观">
+              <button
+                type="button"
+                role="radio"
+                class="segmented-item"
+                :class="{ on: !isDark }"
+                :aria-checked="!isDark"
+                @click="isDark && toggle()"
+              >
+                <n-icon :component="SunnyOutline" size="15" />
+                浅色
+              </button>
+              <button
+                type="button"
+                role="radio"
+                class="segmented-item"
+                :class="{ on: isDark }"
+                :aria-checked="isDark"
+                @click="!isDark && toggle()"
+              >
+                <n-icon :component="MoonOutline" size="15" />
+                深色
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-section panel-actions">
+            <button type="button" class="panel-action" @click="goMachines">
+              <n-icon :component="ServerOutline" size="16" />
+              机器总览
+            </button>
+            <button type="button" class="panel-action" @click="goSettings">
+              <n-icon :component="SettingsOutline" size="16" />
+              设置
+            </button>
+            <button type="button" class="panel-action" @click="goQuickOpen">
+              <n-icon :component="AddOutline" size="16" />
+              打开新页面
+            </button>
+          </div>
+
+          <div class="panel-footer">
+            <button type="button" class="panel-logout" @click="onLogout">
+              <n-icon :component="LogOutOutline" size="16" />
+              退出登录
+            </button>
+          </div>
+        </div>
+      </n-popover>
     </div>
   </div>
 </template>
@@ -251,20 +308,21 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* 侧栏是白底面，与浅灰内容区只靠明度区分，不画右边线。 */
   background: var(--mpanel-surface);
 }
+
+/* 品牌区与御坂学习管理端一致：64px 高、只留 logo 与产品名。 */
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   height: 64px;
-  padding: 0 18px;
+  padding: 0 20px;
   flex: 0 0 auto;
 }
 .logo {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -275,45 +333,48 @@ async function onAccountSelect(key: string): Promise<void> {
   height: 100%;
   object-fit: contain;
 }
-.brand-text {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  line-height: 1.25;
-  min-width: 0;
-}
-.brand-text strong {
+.brand-name {
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
+
 .roll {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 4px 10px 14px;
+  gap: 6px;
+  padding: 0 10px 16px;
 }
 
-/* --------------------------- machine switcher --------------------------- */
+/* ------------------------------ 机器切换器 ------------------------------ */
 
-.machine-switch {
+.section-label {
+  padding: 4px 10px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--mpanel-muted);
+}
+.machines {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 .machine-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
-  padding: 7px 10px;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--mpanel-text);
-  font-size: 12.5px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.14s ease;
+  transition: background-color 0.14s ease, color 0.14s ease;
 }
 .machine-row:hover {
   background: var(--mpanel-surface-soft);
@@ -327,12 +388,23 @@ async function onAccountSelect(key: string): Promise<void> {
   flex: 1;
   min-width: 0;
 }
-.transport {
+.machine-transport {
   flex: 0 0 auto;
-  opacity: 0.7;
+  font-size: 11px;
+  color: var(--mpanel-muted);
+  opacity: 0.8;
 }
-/* 状态灯只有两种颜色：主题蓝=在线，中性灰=离线/异常。
-   这里显式覆盖全局 dot-* 配色，因为 scoped 选择器特异性更高。 */
+.machine-row.active .machine-transport {
+  color: var(--mpanel-accent);
+  opacity: 0.75;
+}
+.machine-empty {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--mpanel-muted);
+}
+
+/* 状态灯只有两种颜色：主题蓝=在线，中性灰=离线/异常。 */
 .status-dot {
   width: 7px;
   height: 7px;
@@ -345,109 +417,42 @@ async function onAccountSelect(key: string): Promise<void> {
   background: var(--mpanel-status-online);
 }
 
-/* ------------------------------- accordion ------------------------------ */
+/* ------------------------------- 菜单微调 ------------------------------- */
 
-.accordion {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+:deep(.n-menu) {
+  --n-item-height: 34px;
+  font-size: 13px;
 }
-.acc-group {
-  display: flex;
-  flex-direction: column;
+/* 选中态是一块圆角色块，不是贴满侧栏的横条（与御坂学习一致）。 */
+:deep(.n-menu .n-menu-item-content) {
+  padding-left: 10px !important;
+  border-radius: 8px;
 }
-.acc-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--mpanel-muted);
+:deep(.n-menu .n-menu-item-content::before) {
+  left: 0;
+  right: 0;
+  border-radius: 8px;
+}
+:deep(.n-menu .n-menu-item-content-header) {
+  font-size: 13px;
+}
+/* 分组标题与机器区标题同一套字号/字重，层级才一致。 */
+:deep(.n-menu-item-group-title) {
+  padding: 10px 10px 6px !important;
   font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  text-align: left;
-  cursor: pointer;
+  letter-spacing: 0.04em;
+  color: var(--mpanel-muted);
 }
-.acc-head:hover {
-  color: var(--mpanel-text);
-  background: var(--mpanel-surface-soft);
-}
-.acc-head.open {
-  color: var(--mpanel-text);
-}
-.acc-chevron {
-  flex: 0 0 auto;
-  opacity: 0.8;
-}
-.acc-title {
-  flex: 1;
-}
-.acc-count {
-  font-size: 10.5px;
-  font-weight: 500;
-  opacity: 0.65;
-  font-variant-numeric: tabular-nums;
-}
-.acc-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 2px 0 4px 14px;
-}
-.acc-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--mpanel-text);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.14s ease, color 0.14s ease;
-}
-.acc-item:hover {
-  background: var(--mpanel-surface-soft);
-}
-.acc-item.active {
-  background: var(--mpanel-accent-soft);
-  color: var(--mpanel-accent);
-  font-weight: 600;
+:deep(.n-menu-item-group .n-menu-item-content) {
+  padding-left: 22px !important;
 }
 
-.empty {
-  padding: 6px 8px;
-}
-
-/* -------------------------------- footer -------------------------------- */
+/* ------------------------------- 账号区 -------------------------------- */
 
 .account-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex: 0 0 auto;
   padding: 10px 12px 12px;
-  flex: 0 0 auto;
-}
-/* 当前节点状态只在左下角出现，页面内容区不再重复。 */
-.node-line {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  padding: 0 4px;
-  font-size: 12px;
-  color: var(--mpanel-text);
-}
-.node-state {
-  margin-left: auto;
-  flex: 0 0 auto;
 }
 .account-btn {
   display: flex;
@@ -455,33 +460,34 @@ async function onAccountSelect(key: string): Promise<void> {
   gap: 10px;
   width: 100%;
   min-width: 0;
+  padding: 8px 10px;
   border: 0;
+  border-radius: 10px;
   background: var(--mpanel-surface-soft);
   color: var(--mpanel-text);
-  padding: 9px 10px;
-  border-radius: 10px;
-  cursor: pointer;
   text-align: left;
+  cursor: pointer;
   transition: background-color 0.15s ease;
 }
 .account-btn:hover {
   background: var(--mpanel-surface-inset);
 }
-.account-caret {
-  flex: 0 0 auto;
-  color: var(--mpanel-muted);
-}
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: var(--mpanel-accent);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   flex: 0 0 auto;
+}
+.avatar-lg {
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
 }
 .account-meta {
   display: flex;
@@ -493,5 +499,120 @@ async function onAccountSelect(key: string): Promise<void> {
 }
 .account-meta strong {
   font-size: 13px;
+  font-weight: 600;
+}
+.account-sub {
+  font-size: 11.5px;
+  color: var(--mpanel-muted);
+}
+.account-caret {
+  flex: 0 0 auto;
+  color: var(--mpanel-muted);
+}
+
+/* ------------------------------ 弹出面板 ------------------------------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--mpanel-surface);
+  box-shadow: var(--mpanel-shadow-raised);
+}
+.panel-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 10px;
+}
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+.panel-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--mpanel-muted);
+}
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--mpanel-surface-inset);
+}
+.segmented-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mpanel-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.segmented-item:hover {
+  color: var(--mpanel-text);
+}
+.segmented-item.on {
+  background: var(--mpanel-surface);
+  color: var(--mpanel-accent);
+  font-weight: 600;
+  box-shadow: var(--mpanel-shadow);
+}
+.panel-actions {
+  gap: 1px;
+  padding-top: 0;
+}
+.panel-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mpanel-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.panel-action:hover {
+  background: var(--mpanel-surface-soft);
+}
+.panel-footer {
+  display: flex;
+  padding: 4px 8px 0;
+}
+.panel-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mpanel-muted);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.panel-logout:hover {
+  background: var(--mpanel-surface-soft);
+  color: var(--mpanel-text);
 }
 </style>

@@ -1,5 +1,7 @@
 import type {
   ContainerActionInput,
+  ContainerCreated,
+  ContainerCreateInput,
   ContainerDaemonConfig,
   ContainerDetail,
   ContainerLogsQuery,
@@ -28,6 +30,7 @@ export type ContainerAction = 'start' | 'stop' | 'restart';
 
 export const containersKeys = {
   list: (params?: object) => scopedKey('containers', 'list', params ?? {}),
+  create: () => scopedKey('containers', 'create'),
   detail: (id: string) => scopedKey('containers', 'detail', id),
   stats: (id: string) => scopedKey('containers', 'stats', id),
   images: (params?: object) => scopedKey('images', 'list', params ?? {}),
@@ -37,6 +40,7 @@ export const containersKeys = {
 
 export interface ContainersApi {
   list(q?: PageQuery & { all?: boolean; status?: string; q?: string }): Promise<ListResult<ContainerSummary>>;
+  create(input: ContainerCreateInput): Promise<ContainerCreated>;
   get(id: string): Promise<ContainerDetail>;
   action(
     id: string,
@@ -82,6 +86,8 @@ export function createContainersApi(http: ApiTransport): ContainersApi {
   const base = (id: string): string => `/containers/${encodeURIComponent(id)}`;
   return {
     list: (q = {}) => http.request<ListResult<ContainerSummary>>('/containers', { query: q }),
+    create: (input) =>
+      http.request<ContainerCreated>('/containers', { method: 'POST', body: input }),
     get: (id) => http.request<ContainerDetail>(base(id)),
     action: (id, action, opts = {}) =>
       http.request<{ ok: true; action: ContainerAction; id: string }>(`${base(id)}/${action}`, {

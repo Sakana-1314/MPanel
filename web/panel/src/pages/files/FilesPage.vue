@@ -496,28 +496,27 @@ function typeIcon(item: FileItem): typeof DocumentOutline {
     <error-state v-if="rootsQuery.isError.value" :error="rootsQuery.error.value" @retry="rootsQuery.refetch()" />
     <error-state v-else-if="listQuery.isError.value" :error="listQuery.error.value" @retry="listQuery.refetch()" />
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-select
-          v-model:value="root"
-          style="width: 190px"
-          placeholder="选择文件根"
-          :options="roots.map((item) => ({ label: `${item.name}${item.writable ? '' : '（只读）'}`, value: item.name }))"
-        />
-        <n-button size="small" quaternary :disabled="path === '/'" title="上一级" @click="goUp">
-          <template #icon><n-icon :component="ArrowUpOutline" /></template>
-        </n-button>
-        <div class="breadcrumbs">
-          <button
-            v-for="(crumb, index) in breadcrumbs"
-            :key="crumb.path"
-            type="button"
-            class="crumb"
-            @click="goPath(crumb.path)"
-          >
-            {{ crumb.label }}
-            <span v-if="index < breadcrumbs.length - 1" class="muted">/</span>
-          </button>
+    <div class="filter-bar">
+      <n-select
+        v-model:value="root"
+        style="width: 190px"
+        placeholder="选择文件根"
+        :options="roots.map((item) => ({ label: `${item.name}${item.writable ? '' : '（只读）'}`, value: item.name }))"
+      />
+      <n-button size="small" quaternary :disabled="path === '/'" title="上一级" @click="goUp">
+        <template #icon><n-icon :component="ArrowUpOutline" /></template>
+      </n-button>
+      <div class="breadcrumbs">
+        <button
+          v-for="(crumb, index) in breadcrumbs"
+          :key="crumb.path"
+          type="button"
+          class="crumb"
+          @click="goPath(crumb.path)"
+        >
+          {{ crumb.label }}
+          <span v-if="index < breadcrumbs.length - 1" class="muted">/</span>
+        </button>
         </div>
         <div class="spacer" />
         <n-switch v-model:value="showHidden" size="small" />
@@ -532,8 +531,7 @@ function typeIcon(item: FileItem): typeof DocumentOutline {
         <span v-if="currentRoot.freeBytes !== null && currentRoot.freeBytes !== undefined">
           · 可用 {{ formatBytes(currentRoot.freeBytes) }} / {{ formatBytes(currentRoot.totalBytes ?? 0) }}
         </span>
-      </div>
-    </n-card>
+    </div>
 
     <n-empty v-if="roots.length === 0 && !rootsQuery.isLoading.value" description="没有可用的文件根">
       <template #icon><n-icon :component="FolderOutline" size="36" /></template>

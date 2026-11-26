@@ -71,6 +71,8 @@ func (m *Module) Register(ctx *agent.Context) error {
 
 	mux := ctx.Mux
 	mux.HandleFunc("GET /api/v1/containers", m.handleListContainers)
+	// 面板的「一键运行」：用可视化表单创建并启动容器。
+	mux.HandleFunc("POST /api/v1/containers", m.handleCreateContainer)
 	mux.HandleFunc("GET /api/v1/containers/{id}", m.handleGetContainer)
 	mux.HandleFunc("POST /api/v1/containers/{id}/start", m.handleContainerAction("start"))
 	mux.HandleFunc("POST /api/v1/containers/{id}/stop", m.handleContainerAction("stop"))

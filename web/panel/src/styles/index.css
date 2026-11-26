@@ -25,6 +25,16 @@
   --mpanel-status-offline: rgba(15, 23, 42, 0.32);
   --mpanel-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   --mpanel-shadow-raised: 0 2px 8px rgba(15, 23, 42, 0.08);
+
+  /* ---- 表格与控件密度：全局唯一定义，页面只引用不重复写 ---- */
+  --mpanel-table-font: 13px;
+  --mpanel-table-header-font: 12px;
+  --mpanel-table-row-height: 44px;
+  --mpanel-table-cell-padding-y: 10px;
+  --mpanel-table-cell-padding-x: 14px;
+  --mpanel-table-header-padding-y: 8px;
+  --mpanel-control-height: 34px;
+  --mpanel-toolbar-gap: 10px;
 }
 
 html.dark {
@@ -112,10 +122,26 @@ pre,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--mpanel-toolbar-gap);
+  min-height: var(--mpanel-control-height);
 }
 
 .toolbar .spacer {
+  flex: 1 1 auto;
+}
+
+/* 页面顶部的筛选行直接落在页面上，不再套一层卡片边框。 */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mpanel-toolbar-gap);
+  min-height: var(--mpanel-control-height);
+  padding: 0;
+  margin-bottom: 2px;
+}
+
+.filter-bar .spacer {
   flex: 1 1 auto;
 }
 
@@ -211,22 +237,32 @@ pre,
   box-shadow: none;
 }
 
+.n-table {
+  font-size: var(--mpanel-table-font);
+  line-height: 1.5;
+}
+
 .n-table:not(.n-table--bordered) th,
 .n-table:not(.n-table--bordered) td {
   border-right: 0;
 }
 
 .n-table th {
+  height: auto;
+  padding: var(--mpanel-table-header-padding-y) var(--mpanel-table-cell-padding-x);
   border-color: transparent;
   background-color: var(--mpanel-surface-soft);
-  font-size: 11.5px;
+  font-size: var(--mpanel-table-header-font);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: var(--mpanel-muted);
 }
 
 .n-table td {
+  height: var(--mpanel-table-row-height);
+  padding: var(--mpanel-table-cell-padding-y) var(--mpanel-table-cell-padding-x);
   border-color: var(--mpanel-border-muted);
+  vertical-align: middle;
 }
 
 .n-table tbody tr:hover td {
