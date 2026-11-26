@@ -159,7 +159,13 @@ const menuOptions = [
     </div>
     <n-tooltip>
       <template #trigger>
-        <n-badge :value="activeJobCount" :max="9" :show="activeJobCount > 0" :offset="[-4, 4]">
+        <n-badge
+          :value="activeJobCount"
+          :max="9"
+          :show="activeJobCount > 0"
+          :color="'var(--mpanel-accent)'"
+          :offset="[-4, 4]"
+        >
           <n-button
             size="tiny"
             quaternary

@@ -84,6 +84,9 @@ func (m *Module) handleCreateContainer(w http.ResponseWriter, r *http.Request) {
 				if pErr != nil {
 					return nil, pErr
 				}
+				// Job history is persisted; do not write container env/mounts
+				// (which may contain secrets) into jobs.json.
+				result.Info = nil
 				return result, nil
 			},
 		})
