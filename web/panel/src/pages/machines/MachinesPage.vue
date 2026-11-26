@@ -500,6 +500,7 @@ const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
 }
 .error-line {
   color: var(--mpanel-danger);
+  font-weight: 600;
 }
 .card-actions {
   display: flex;

@@ -690,8 +690,8 @@ html.dark .history-panel {
   cursor: pointer;
 }
 .history-delete:hover {
-  background: color-mix(in srgb, var(--mpanel-danger, #cf222e) 12%, transparent);
-  color: var(--mpanel-danger, #cf222e);
+  background: color-mix(in srgb, var(--mpanel-danger) 10%, transparent);
+  color: var(--mpanel-danger);
 }
 .form-foot {
   margin: 18px 0 0;

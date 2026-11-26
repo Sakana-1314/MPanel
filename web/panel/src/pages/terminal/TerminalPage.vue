@@ -403,5 +403,6 @@ const shellOptions = computed(() =>
 }
 .error-text {
   color: var(--mpanel-danger);
+  font-weight: 600;
 }
 </style>

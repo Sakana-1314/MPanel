@@ -36,7 +36,8 @@ const lightOverrides: GlobalThemeOverrides = {
     infoColor: '#2563eb',
     successColor: '#2563eb',
     warningColor: 'rgba(51, 54, 57, 0.78)',
-    errorColor: '#b4232f',
+    // 错误态同样走中性色：最深一档灰，配加粗字重表达强调。
+    errorColor: '#14181f',
     bodyColor: '#f3f5fa',
     cardColor: '#ffffff',
     modalColor: '#ffffff',
@@ -88,10 +89,18 @@ const lightOverrides: GlobalThemeOverrides = {
     tabFontWeightActive: '600',
     paneTextColor: '#14181f',
   },
-  Alert: { borderRadius: '12px' },
+  Alert: {
+    borderRadius: '12px',
+    // Alert 的错误色在组件内部由 errorColor 推导，需显式覆盖为中性色。
+    borderError: '1px solid transparent',
+    colorError: 'rgba(15, 23, 42, 0.06)',
+    iconColorError: '#14181f',
+    titleTextColorError: '#14181f',
+    contentTextColorError: 'rgba(51, 54, 57, 0.9)',
+  },
   Tag: {
     borderRadius: '999px',
-    // 状态标签也收进蓝/灰：成功与信息同为蓝色，提醒与默认用灰，只有错误保留红色。
+    // 状态标签只保留蓝/灰：成功与信息同为蓝色，提醒、默认、错误都用灰。
     textColorSuccess: '#1d4ed8',
     textColorInfo: '#1d4ed8',
     colorSuccess: 'rgba(37, 99, 235, 0.1)',
@@ -99,6 +108,8 @@ const lightOverrides: GlobalThemeOverrides = {
     textColorWarning: 'rgba(51, 54, 57, 0.78)',
     colorWarning: 'rgba(15, 23, 42, 0.06)',
     textColorDefault: 'rgba(51, 54, 57, 0.78)',
+    textColorError: '#14181f',
+    colorError: 'rgba(15, 23, 42, 0.08)',
   },
   Drawer: { headerBorderBottom: '0 solid transparent', footerBorderTop: '0 solid transparent', color: '#ffffff' },
   Descriptions: { thColor: 'transparent', tdColor: '#ffffff', borderColor: 'transparent' },
@@ -114,7 +125,7 @@ const darkOverrides: GlobalThemeOverrides = {
     infoColor: '#3b82f6',
     successColor: '#3b82f6',
     warningColor: 'rgba(255, 255, 255, 0.72)',
-    errorColor: '#e2666c',
+    errorColor: '#f2f4f8',
     bodyColor: '#0a0a0d',
     cardColor: '#1a1a20',
     modalColor: '#202028',
@@ -166,7 +177,14 @@ const darkOverrides: GlobalThemeOverrides = {
     tabFontWeightActive: '600',
     paneTextColor: '#f2f4f8',
   },
-  Alert: { borderRadius: '12px' },
+  Alert: {
+    borderRadius: '12px',
+    borderError: '1px solid transparent',
+    colorError: 'rgba(255, 255, 255, 0.08)',
+    iconColorError: '#f2f4f8',
+    titleTextColorError: '#f2f4f8',
+    contentTextColorError: 'rgba(255, 255, 255, 0.8)',
+  },
   Tag: {
     borderRadius: '999px',
     textColorSuccess: '#8ab4ff',
@@ -176,6 +194,8 @@ const darkOverrides: GlobalThemeOverrides = {
     textColorWarning: 'rgba(255, 255, 255, 0.72)',
     colorWarning: 'rgba(255, 255, 255, 0.08)',
     textColorDefault: 'rgba(255, 255, 255, 0.72)',
+    textColorError: '#f2f4f8',
+    colorError: 'rgba(255, 255, 255, 0.1)',
   },
   Drawer: { headerBorderBottom: '0 solid transparent', footerBorderTop: '0 solid transparent', color: '#1a1a20' },
   Descriptions: { thColor: 'transparent', tdColor: '#1a1a20', borderColor: 'transparent' },
