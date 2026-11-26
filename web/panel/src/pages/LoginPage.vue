@@ -59,7 +59,31 @@ onMounted(() => {
   password.value = '';
   // 没有连接时把会话状态从初始 checking 归位到 no-connection。
   void ensureSession();
+  // 静态托管（如纯前端站点）根路径没有面板服务，避免把无效地址当成默认服务器。
+  void probeDefaultServer();
 });
+
+async function probeDefaultServer(): Promise<void> {
+  const origin = window.location.origin;
+  if (server.value !== origin) return;
+  try {
+    const response = await fetch(`${origin}/healthz`, { cache: 'no-store' });
+    if (!response.ok) {
+      if (server.value === origin) server.value = '';
+      return;
+    }
+    const payload = (await response.json()) as {
+      role?: string;
+      data?: { role?: string };
+    };
+    const role = payload.data?.role ?? payload.role;
+    if (role !== 'core' && server.value === origin) {
+      server.value = '';
+    }
+  } catch {
+    if (server.value === origin) server.value = '';
+  }
+}
 
 /** 允许用户只填 host（自动沿用当前页面的协议），也接受完整 URL。 */
 function normalizeServer(raw: string): string {
@@ -146,6 +170,10 @@ async function submit(): Promise<void> {
     }
   } catch {
     loginError.value = '服务器地址格式不正确';
+    return;
+  }
+  if (window.location.protocol === 'https:' && normalized.startsWith('http://')) {
+    loginError.value = 'HTTPS 页面不能连接 HTTP 服务器，请直接打开面板地址';
     return;
   }
   if (username.value.trim().length === 0) {
