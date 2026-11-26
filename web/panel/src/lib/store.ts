@@ -3,10 +3,13 @@ import type { SiteBootstrapMount } from '@/api/types';
 
 /**
  * web/store 的应用索引与清单。模板通过 GitHub 链接获取：
- * 默认 raw.githubusercontent.com，可在 config.json 中覆盖 storeUrl。
+ * 默认 raw.githubusercontent.com，可在 config.json 中覆盖 storeUrl；
+ * 未显式配置时依次回退到 jsDelivr 与面板同源 /store。
  */
 export const DEFAULT_STORE_URL =
   'https://raw.githubusercontent.com/Sakana-1314/MPanel/main/web/store';
+export const FALLBACK_STORE_URL =
+  'https://cdn.jsdelivr.net/gh/Sakana-1314/MPanel@main/web/store';
 
 export interface StoreAppSummary {
   id: string;
@@ -20,6 +23,8 @@ export interface StoreIndex {
   schemaVersion?: number;
   updatedAt?: string;
   apps: StoreAppSummary[];
+  /** 实际成功读取索引的商店根地址。 */
+  baseUrl?: string;
 }
 
 export interface StoreVariable {
@@ -68,14 +73,23 @@ export interface StoreAppBundle {
   manifestUrl: string;
 }
 
-export function storeBaseUrl(): string {
+function sameOriginStoreBase(): string {
+  return `${(import.meta.env.BASE_URL || '/').replace(/\/+$/, '')}/store`;
+}
+
+/** 候选商店根地址：显式配置优先，否则 raw → jsDelivr → 同源。 */
+export function storeBaseUrls(): string[] {
   const configured = (getRuntimeConfig().storeUrl ?? '').trim();
-  return configured.length > 0 ? configured : DEFAULT_STORE_URL;
+  if (configured.length > 0) return [configured];
+  return [DEFAULT_STORE_URL, FALLBACK_STORE_URL, sameOriginStoreBase()];
+}
+
+export function storeBaseUrl(): string {
+  return storeBaseUrls()[0];
 }
 
 /** 把商店相对路径解析成绝对 URL；同源相对路径按面板 BASE_URL 处理。 */
-export function resolveStoreUrl(relative: string): string {
-  const base = storeBaseUrl();
+export function resolveStoreUrl(relative: string, base = storeBaseUrl()): string {
   if (/^https?:\/\//i.test(relative)) return relative;
   const clean = relative.replace(/^\/+/, '');
   if (/^https?:\/\//i.test(base)) {
@@ -89,23 +103,41 @@ export function resolveStoreUrl(relative: string): string {
   return new URL(clean, root).toString();
 }
 
-async function fetchJSON(url: string): Promise<unknown> {
-  let response: Response;
+async function fetchStoreResponse(url: string, timeoutMs = 10_000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    response = await fetch(url, { cache: 'no-cache', credentials: 'omit' });
-  } catch (error) {
-    throw new Error(
-      `无法获取应用商店模板：${error instanceof Error ? error.message : String(error)}`,
-    );
+    return await fetch(url, {
+      cache: 'no-cache',
+      credentials: 'omit',
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
   }
-  if (!response.ok) {
-    throw new Error(`应用商店模板请求失败（HTTP ${response.status}）`);
+}
+
+async function fetchStoreJSON(relative: string): Promise<{ payload: unknown; base: string; url: string }> {
+  const errors: string[] = [];
+  for (const base of storeBaseUrls()) {
+    const url = resolveStoreUrl(relative, base);
+    try {
+      const response = await fetchStoreResponse(url);
+      if (!response.ok) {
+        errors.push(`${url} → HTTP ${response.status}`);
+        continue;
+      }
+      const text = await response.text();
+      try {
+        return { payload: JSON.parse(text) as unknown, base, url };
+      } catch {
+        errors.push(`${url} → 不是合法 JSON`);
+      }
+    } catch (error) {
+      errors.push(`${url} → ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
-  try {
-    return await response.json();
-  } catch {
-    throw new Error('应用商店返回的不是合法 JSON');
-  }
+  throw new Error(`无法获取应用商店模板：${errors.join('；')}`);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -119,7 +151,8 @@ function asString(value: unknown): string | undefined {
 }
 
 export async function fetchStoreIndex(): Promise<StoreIndex> {
-  const payload = asRecord(await fetchJSON(resolveStoreUrl('index.json')));
+  const { payload: raw, base } = await fetchStoreJSON('index.json');
+  const payload = asRecord(raw);
   if (payload === null || !Array.isArray(payload.apps)) {
     throw new Error('应用商店索引格式不正确');
   }
@@ -137,7 +170,11 @@ export async function fetchStoreIndex(): Promise<StoreIndex> {
       manifest,
     });
   }
-  return { schemaVersion: typeof payload.schemaVersion === 'number' ? payload.schemaVersion : undefined, apps };
+  return {
+    schemaVersion: typeof payload.schemaVersion === 'number' ? payload.schemaVersion : undefined,
+    apps,
+    baseUrl: base,
+  };
 }
 
 export function findStoreApp(index: StoreIndex, id: string): StoreAppSummary {
@@ -146,9 +183,15 @@ export function findStoreApp(index: StoreIndex, id: string): StoreAppSummary {
   return app;
 }
 
-export async function fetchStoreApp(summary: StoreAppSummary): Promise<StoreAppBundle> {
-  const manifestUrl = resolveStoreUrl(summary.manifest);
-  const raw = asRecord(await fetchJSON(manifestUrl));
+export async function fetchStoreApp(
+  summary: StoreAppSummary,
+  baseUrl?: string,
+): Promise<StoreAppBundle> {
+  // 索引成功读取的那个 base 最可靠；没有时回退到候选列表。
+  const base = baseUrl ?? storeBaseUrl();
+  const manifestUrl = resolveStoreUrl(summary.manifest, base);
+  const manifestResult = await fetchStoreJSONFromBase(manifestUrl);
+  const raw = asRecord(manifestResult.payload);
   if (raw === null) throw new Error('应用清单格式不正确');
   const id = asString(raw.id);
   const stack = asString(raw.stack);
@@ -224,23 +267,29 @@ export async function fetchStoreApp(summary: StoreAppSummary): Promise<StoreAppB
       profile,
       links,
     },
-    compose: await fetchCompose(compose),
-    manifestUrl,
+    compose: await fetchTextURL(resolveStoreUrl(compose, base), '无法获取编排模板'),
+    manifestUrl: manifestResult.url,
   };
 }
 
-async function fetchCompose(composePath: string): Promise<string> {
-  const url = resolveStoreUrl(composePath);
+async function fetchTextURL(url: string, label: string): Promise<string> {
   let response: Response;
   try {
-    response = await fetch(url, { cache: 'no-cache', credentials: 'omit' });
+    response = await fetchStoreResponse(url);
   } catch (error) {
-    throw new Error(
-      `无法获取编排模板：${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`${label}：${error instanceof Error ? error.message : String(error)}`);
   }
-  if (!response.ok) throw new Error(`编排模板请求失败（HTTP ${response.status}）`);
+  if (!response.ok) throw new Error(`${label}：HTTP ${response.status}`);
   return response.text();
+}
+
+async function fetchStoreJSONFromBase(url: string): Promise<{ payload: unknown; url: string }> {
+  const text = await fetchTextURL(url, '无法获取应用清单');
+  try {
+    return { payload: JSON.parse(text) as unknown, url };
+  } catch {
+    throw new Error(`应用清单不是合法 JSON：${url}`);
+  }
 }
 
 /** 生成 YAML/Compose 中安全的随机密码（字母数字，避免引号转义问题）。 */

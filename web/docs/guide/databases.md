@@ -30,7 +30,7 @@ MPanel 的数据库能力分两层：
 
 - 端口只绑定 `127.0.0.1`，不直接对公网开放；需要远程访问时到「编排」页改 compose 并自行加防火墙。
 - 已存在同名编排时只执行启动，不覆盖 compose 与密码；此时不会自动创建档案，请按实际密码手动新建。
-- 商店来源可在 `config.json` 用 `storeUrl` 覆盖；默认是 `https://raw.githubusercontent.com/Sakana-1314/MPanel/main/web/store`。
+- 商店来源可在 `config.json` 用 `storeUrl` 覆盖；默认依次尝试 GitHub raw、jsDelivr 与同源 `/store`。
 - 备份/恢复仍需要宿主机的 `pg_dump`、`psql`、`redis-cli`；容器化数据库默认没有这些客户端，缺少时按 `UNAVAILABLE` 降级。
 
 ## 1. 档案模型

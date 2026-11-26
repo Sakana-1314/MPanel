@@ -115,7 +115,7 @@ async function load(): Promise<void> {
   try {
     const index = await fetchStoreIndex();
     const summary = findStoreApp(index, props.appId);
-    const data = await fetchStoreApp(summary);
+    const data = await fetchStoreApp(summary, index.baseUrl);
     bundle.value = data;
 
     let home: string | undefined;

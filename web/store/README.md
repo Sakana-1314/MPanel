@@ -6,7 +6,9 @@
 https://raw.githubusercontent.com/Sakana-1314/MPanel/main/web/store
 ```
 
-也可以在部署目录的 `config.json` 中覆盖 `storeUrl`（支持绝对 URL 或同源相对路径），例如：
+未显式配置 `storeUrl` 时，面板依次尝试 raw.githubusercontent.com、jsDelivr 镜像与同源 `/store`；每个地址最多等待 10 秒。
+
+也可以在部署目录的 `config.json` 中覆盖 `storeUrl`（支持绝对 URL 或同源相对路径），此时只使用该地址，例如：
 
 ```json
 {
