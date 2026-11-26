@@ -36,6 +36,7 @@ import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import ContainerDetailDrawer from './ContainerDetailDrawer.vue';
+import ContainerRunModal from './ContainerRunModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -49,6 +50,7 @@ const active = usePageActive();
 const search = ref('');
 const statusFilter = ref('all');
 const removeTarget = ref<ContainerSummary | null>(null);
+const runOpen = ref(false);
 const removeForce = ref(false);
 const removeVolumes = ref(false);
 
@@ -174,6 +176,7 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
           <template #icon><n-icon :component="RefreshOutline" /></template>
           刷新
         </n-button>
+        <n-button size="small" type="primary" @click="runOpen = true">运行容器</n-button>
         <n-button size="small" quaternary @click="router.push(`/m/${machineId}/images`)">镜像</n-button>
         <n-button size="small" quaternary @click="router.push(`/m/${machineId}/stacks`)">编排</n-button>
       </template>
@@ -181,26 +184,24 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
 
     <error-state v-if="listQuery.isError.value" :error="listQuery.error.value" @retry="listQuery.refetch()" />
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-input v-model:value="search" placeholder="搜索名称 / 镜像 / ID / compose…" clearable style="max-width: 300px" />
-        <n-select
-          v-model:value="statusFilter"
-          style="width: 140px"
-          :options="[
-            { label: '全部状态', value: 'all' },
-            { label: '运行中', value: 'running' },
-            { label: '已退出', value: 'exited' },
-            { label: '已暂停', value: 'paused' },
-            { label: '已创建', value: 'created' },
-            { label: '重启中', value: 'restarting' },
-            { label: '异常', value: 'dead' },
-          ]"
-        />
-        <div class="spacer" />
-        <span class="small muted">共 {{ containers.length }} 个 · 运行中 {{ runningCount }}</span>
-      </div>
-    </n-card>
+    <div class="filter-bar">
+      <n-input v-model:value="search" placeholder="搜索名称 / 镜像 / ID / compose…" clearable style="max-width: 300px" />
+      <n-select
+        v-model:value="statusFilter"
+        style="width: 140px"
+        :options="[
+          { label: '全部状态', value: 'all' },
+          { label: '运行中', value: 'running' },
+          { label: '已退出', value: 'exited' },
+          { label: '已暂停', value: 'paused' },
+          { label: '已创建', value: 'created' },
+          { label: '重启中', value: 'restarting' },
+          { label: '异常', value: 'dead' },
+        ]"
+      />
+      <div class="spacer" />
+      <span class="small muted">共 {{ containers.length }} 个 · 运行中 {{ runningCount }}</span>
+    </div>
 
     <n-empty v-if="containers.length === 0 && !listQuery.isLoading.value" description="没有容器">
       <template #extra>
@@ -294,6 +295,8 @@ function containerStateType(state: string): 'success' | 'warning' | 'error' | 'd
       </n-table>
       <div v-if="filtered.length === 0" class="empty-row small muted">没有匹配的容器。</div>
     </n-card>
+
+    <ContainerRunModal v-model:show="runOpen" :machine-id="machineId" />
 
     <ContainerDetailDrawer
       :show="containerId !== null"

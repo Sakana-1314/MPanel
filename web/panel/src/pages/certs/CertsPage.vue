@@ -114,24 +114,22 @@ function displayDomains(cert: CertificateInfo): string[] {
 
     <error-state v-if="certsQuery.isError.value" :error="certsQuery.error.value" @retry="certsQuery.refetch()" />
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-input v-model:value="search" placeholder="搜索域名或颁发者…" clearable style="max-width: 260px" />
-        <n-select
-          v-model:value="windowFilter"
-          style="width: 150px"
-          :options="[
-            { label: '全部', value: 'all' },
-            { label: '30 天内', value: '30' },
-            { label: '14 天内', value: '14' },
-            { label: '7 天内', value: '7' },
-            { label: '已过期', value: 'expired' },
-          ]"
-        />
-        <div class="spacer" />
-        <span class="small muted">{{ filtered.length }} 张证书</span>
-      </div>
-    </n-card>
+    <div class="filter-bar">
+      <n-input v-model:value="search" placeholder="搜索域名或颁发者…" clearable style="max-width: 260px" />
+      <n-select
+        v-model:value="windowFilter"
+        style="width: 150px"
+        :options="[
+          { label: '全部', value: 'all' },
+          { label: '30 天内', value: '30' },
+          { label: '14 天内', value: '14' },
+          { label: '7 天内', value: '7' },
+          { label: '已过期', value: 'expired' },
+        ]"
+      />
+      <div class="spacer" />
+      <span class="small muted">{{ filtered.length }} 张证书</span>
+    </div>
 
     <n-empty v-if="certs.length === 0 && !certsQuery.isLoading.value" description="还没有证书">
       <template #icon><n-icon :component="ShieldCheckmarkOutline" size="36" /></template>

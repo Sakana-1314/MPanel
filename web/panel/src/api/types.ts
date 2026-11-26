@@ -622,6 +622,28 @@ export interface ContainerNetworkCreateInput {
   attachable?: boolean;
 }
 
+/** 可视化表单映射到 docker run 的参数；不暴露 privileged 等高危开关。 */
+export interface ContainerCreateInput {
+  name?: string;
+  image: string;
+  command?: string[];
+  env?: Record<string, string>;
+  ports?: string[];
+  volumes?: string[];
+  network?: string;
+  restart?: string;
+  labels?: Record<string, string>;
+}
+
+export interface ContainerCreated {
+  id: string;
+  ok: true;
+  name?: string;
+  image: string;
+  ports: string[];
+  container?: ContainerDetail;
+}
+
 export interface RegistryAuth {
   registry: string;
   username: string;

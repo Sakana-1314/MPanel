@@ -142,13 +142,11 @@ function openDetail(stack: StackSummary): void {
 
     <error-state v-if="stacksQuery.isError.value" :error="stacksQuery.error.value" @retry="stacksQuery.refetch()" />
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-input v-model:value="search" placeholder="搜索栈名…" clearable style="max-width: 260px" />
-        <div class="spacer" />
-        <span class="small muted">共 {{ stacks.length }} 个栈</span>
-      </div>
-    </n-card>
+    <div class="filter-bar">
+      <n-input v-model:value="search" placeholder="搜索栈名…" clearable style="max-width: 260px" />
+      <div class="spacer" />
+      <span class="small muted">共 {{ stacks.length }} 个栈</span>
+    </div>
 
     <n-empty v-if="stacks.length === 0 && !stacksQuery.isLoading.value" description="还没有编排">
       <template #icon><n-icon :component="LayersOutline" size="36" /></template>

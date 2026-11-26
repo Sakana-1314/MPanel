@@ -147,22 +147,20 @@ function confirmPrune(): void {
 
     <error-state v-if="imagesQuery.isError.value" :error="imagesQuery.error.value" @retry="imagesQuery.refetch()" />
 
-    <n-card size="small">
-      <div class="toolbar">
-        <n-input v-model:value="search" placeholder="搜索 tag / digest / id…" clearable style="max-width: 300px" />
-        <n-select
-          v-model:value="filter"
-          style="width: 150px"
-          :options="[
-            { label: '全部镜像', value: 'all' },
-            { label: '有标签', value: 'tagged' },
-            { label: '悬空镜像', value: 'dangling' },
-          ]"
-        />
-        <div class="spacer" />
-        <span class="small muted">共 {{ images.length }} 个 · {{ formatBytes(totalSize) }}</span>
-      </div>
-    </n-card>
+    <div class="filter-bar">
+      <n-input v-model:value="search" placeholder="搜索 tag / digest / id…" clearable style="max-width: 300px" />
+      <n-select
+        v-model:value="filter"
+        style="width: 150px"
+        :options="[
+          { label: '全部镜像', value: 'all' },
+          { label: '有标签', value: 'tagged' },
+          { label: '悬空镜像', value: 'dangling' },
+        ]"
+      />
+      <div class="spacer" />
+      <span class="small muted">共 {{ images.length }} 个 · {{ formatBytes(totalSize) }}</span>
+    </div>
 
     <n-empty v-if="images.length === 0 && !imagesQuery.isLoading.value" description="没有镜像">
       <template #icon><n-icon :component="ImagesOutline" size="36" /></template>
