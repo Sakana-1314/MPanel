@@ -164,7 +164,7 @@ log:
 | `caddy_bin` | string | `caddy` | **已弃用**：Caddy 只以容器运行，该字段保留仅为兼容旧配置，agent 不读取 |
 | `caddy_config` | string | `${data_dir}/caddy` | 宿主受管 Caddy 配置目录（`Caddyfile`、`sites.d/`），挂载到容器 `/etc/caddy` |
 | `caddy_data` | string | `${caddy_config}/data` | 宿主 Caddy 数据目录（证书扫描来源），挂载到容器 `/data` |
-| `caddy_admin` | string | 空 | 写入主 Caddyfile 的 **容器内** admin 地址；留空用 `127.0.0.1:2019` |
+| `caddy_admin` | string | 空 | 写入主 Caddyfile 的 **容器内** admin 地址；留空用 `127.0.0.1:2019`，通配地址会收敛到回环 |
 | `docker_bin` | string | `docker` | Docker CLI 路径 |
 | `docker_config` | string | `/etc/docker/daemon.json` | Docker daemon 配置路径；容器配置页读取/写入该文件，rootless 部署改为 `~/.config/docker/daemon.json` |
 | `pg_dump_bin` | string | `pg_dump` | PostgreSQL 备份工具 |

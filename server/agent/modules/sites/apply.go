@@ -50,6 +50,11 @@ func adminAddress(cfg *config.Agent) string {
 	if hasUnsafeTokenRune(addr) || strings.ContainsAny(addr, "{}#") || strings.Contains(addr, "://") {
 		return defaultCaddyAdm
 	}
+	// The Caddyfile and `caddy reload` run inside the container; a wildcard
+	// admin listener is neither necessary nor dialable, so pin it to loopback.
+	if host, port, err := netSplitHostPort(addr); err == nil && (host == "0.0.0.0" || host == "::") {
+		return netJoinHostPort("127.0.0.1", port)
+	}
 	return addr
 }
 
@@ -277,7 +282,7 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 	}
 	reloadArgs := []string{"reload", "--config", containerRoot, "--adapter", "caddyfile"}
 	if adminCfg := strings.TrimSpace(m.ctx.Cfg.Agent.CaddyAdmin); adminCfg != "" {
-		reloadArgs = append(reloadArgs, "--address", adminCfg)
+		reloadArgs = append(reloadArgs, "--address", adminAddress(m.ctx.Cfg))
 	}
 	reloadResult, reloadErr := m.runCaddy(rctx, container.ID, reloadArgs...)
 	reloadOutput := joinOutput(reloadResult.Stdout, reloadResult.Stderr)
