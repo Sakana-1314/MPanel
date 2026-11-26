@@ -224,28 +224,30 @@ const menuOptions = [
   display: flex;
   align-items: center;
   gap: 5px;
+  /* 所有标签统一宽度，未激活时也保持同样占位，切换不跳动。 */
+  flex: 0 0 248px;
+  width: 248px;
   height: 33px;
-  max-width: 230px;
-  padding: 0 7px 0 10px;
-  border: 1px solid transparent;
+  padding: 0 9px 0 11px;
+  border: 1px solid var(--mpanel-border);
   border-bottom: 0;
   border-radius: 9px 9px 0 0;
+  background: color-mix(in srgb, var(--mpanel-surface) 46%, transparent);
   font-size: 12px;
   color: var(--mpanel-muted);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  flex: 0 0 auto;
-  transition: background-color 0.14s ease, color 0.14s ease;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 .tab:hover {
-  background: color-mix(in srgb, var(--mpanel-surface) 62%, transparent);
+  background: color-mix(in srgb, var(--mpanel-surface) 72%, transparent);
   color: var(--mpanel-text);
 }
 .tab.active {
   background: var(--mpanel-surface);
   color: var(--mpanel-text);
-  border-color: var(--mpanel-border-muted);
+  border-color: var(--mpanel-border);
   /* 底部一条同色盖住轨道底线，让选中标签与下方内容连成一体。 */
   box-shadow: 0 1px 0 0 var(--mpanel-surface);
 }
@@ -262,10 +264,12 @@ const menuOptions = [
 }
 .tab-machine {
   max-width: 78px;
+  flex: 0 1 auto;
   font-weight: 600;
 }
 .tab-title {
-  max-width: 92px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .tab.active .tab-title {
   font-weight: 600;
@@ -292,6 +296,7 @@ const menuOptions = [
 .tab-close {
   display: grid;
   place-items: center;
+  flex: 0 0 16px;
   width: 16px;
   height: 16px;
   margin-left: 1px;
