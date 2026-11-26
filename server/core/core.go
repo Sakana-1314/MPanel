@@ -65,7 +65,12 @@ func New(cfg *config.App, logger *slog.Logger) (*Core, error) {
 		started:  time.Now(),
 		mux:      http.NewServeMux(),
 		cancel:   cancel,
-		upgrader: websocket.Upgrader{ReadBufferSize: 32 * 1024, WriteBufferSize: 32 * 1024, CheckOrigin: func(*http.Request) bool { return true }},
+		upgrader: websocket.Upgrader{ReadBufferSize: 32 * 1024, WriteBufferSize: 32 * 1024},
+	}
+	// WS 不走 CORS 中间件，因此单独用同一套来源策略校验 Origin。
+	// agent 与脚本客户端不带 Origin，会被放行；浏览器跨站页面则被拒绝。
+	c.upgrader.CheckOrigin = func(r *http.Request) bool {
+		return c.corsConfig().OriginAllowed(r)
 	}
 	audit, err := NewAuditLog(filepath.Join(cfg.System.DBPath, "audit.jsonl"))
 	if err != nil {
@@ -228,24 +233,20 @@ func (c *Core) authenticate(r *http.Request) (auth.Principal, error) {
 	return auth.Principal{}, &protocol.PanelError{Code: protocol.CodeUnauthorized, Message: "未登录或会话已过期"}
 }
 
+// corsMiddleware 允许三类来源：显式白名单、与本次请求同源的 Origin/Referer、
+// 以及本机与内网地址。同源判定让前端既能被 core 自己托管，也能在本地
+// 任意端口（如 vite dev server 或反代）复用同一份 core 而不必先改配置。
 func (c *Core) corsMiddleware(next http.Handler) http.Handler {
-	allowed := parseOrigins(c.cfg.System.CorsOrigins)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin != "" && (allowed[origin] || allowed["*"]) {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token")
-			w.Header().Set("Access-Control-Max-Age", "600")
-			w.Header().Add("Vary", "Origin")
-		}
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+	return c.corsConfig().Middleware(next)
+}
+
+// corsConfig 是 REST 与 WS 共用的来源策略。
+func (c *Core) corsConfig() httpapi.CORSConfig {
+	return httpapi.CORSConfig{
+		Allowed:        httpapi.ParseCORSOrigins(c.cfg.System.CorsOrigins),
+		AllowLocal:     c.cfg.System.CorsAllowLocal,
+		TrustForwarded: c.cfg.System.CorsTrustForwarded,
+	}
 }
 
 func (c *Core) securityHeaders(next http.Handler) http.Handler {
@@ -255,17 +256,6 @@ func (c *Core) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		next.ServeHTTP(w, r)
 	})
-}
-
-func parseOrigins(value string) map[string]bool {
-	out := map[string]bool{}
-	for _, part := range strings.Split(value, ",") {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			out[trimmed] = true
-		}
-	}
-	return out
 }
 
 /* -------------------------------- system --------------------------------- */
