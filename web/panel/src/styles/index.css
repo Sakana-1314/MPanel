@@ -18,7 +18,8 @@
   /* 语义色收进蓝色与灰阶：成功=主题蓝，提醒=次要灰，只有错误保留一点红以示区别。 */
   --mpanel-success: #2563eb;
   --mpanel-attention: rgba(51, 54, 57, 0.78);
-  --mpanel-danger: #b4232f;
+  /* 错误也用中性色：靠「最深的一档 + 加粗」表达强调，不引入第三种色相。 */
+  --mpanel-danger: #14181f;
   /* 在线状态灯一律用主题色，离线用中性灰。 */
   --mpanel-status-online: #2563eb;
   --mpanel-status-offline: rgba(15, 23, 42, 0.32);
@@ -42,7 +43,8 @@ html.dark {
   --mpanel-accent-soft: rgba(59, 130, 246, 0.18);
   --mpanel-success: #3b82f6;
   --mpanel-attention: rgba(255, 255, 255, 0.72);
-  --mpanel-danger: #e2666c;
+  /* 深色下用最亮的一档中性色，配合加粗保证错误信息仍被一眼看到。 */
+  --mpanel-danger: #f2f4f8;
   --mpanel-status-online: #3b82f6;
   --mpanel-status-offline: rgba(255, 255, 255, 0.28);
   --mpanel-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);

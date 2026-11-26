@@ -299,6 +299,7 @@ function submit(): void {
 }
 .error-text {
   color: var(--mpanel-danger);
+  font-weight: 600;
 }
 .next-runs {
   display: flex;

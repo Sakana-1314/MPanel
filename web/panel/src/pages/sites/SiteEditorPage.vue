@@ -307,6 +307,7 @@ const applyOutput = computed(() => {
 }
 .bad {
   color: var(--mpanel-danger);
+  font-weight: 600;
 }
 .notes p {
   margin: 0 0 8px;

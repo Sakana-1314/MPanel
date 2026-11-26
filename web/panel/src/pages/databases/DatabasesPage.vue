@@ -800,5 +800,6 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
 }
 .error-text {
   color: var(--mpanel-danger);
+  font-weight: 600;
 }
 </style>
