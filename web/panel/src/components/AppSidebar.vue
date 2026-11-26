@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import { computed, h } from 'vue';
+import { computed, h, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import {
-  NButton,
-  NDropdown,
-  NIcon,
-  NScrollbar,
-  NSpin,
-  useMessage,
-} from 'naive-ui';
+import { NButton, NDropdown, NIcon, NScrollbar, NSpin, useMessage } from 'naive-ui';
 import type { Component } from 'vue';
 import {
   AddOutline,
-  ChevronUpOutline,
+  ChevronDownOutline,
+  ChevronForwardOutline,
   CubeOutline,
   FlashOutline,
   FolderOpenOutline,
@@ -43,6 +37,7 @@ import { machineStatusType } from '@/lib/status';
 import { activeConnection } from '@/lib/connection-store';
 import { logout, sessionSnapshot } from '@/lib/session';
 import { useTheme } from '@/lib/theme';
+import { transportLabel } from '@/lib/format';
 import logoMark from '@/assets/logo-mark.png';
 
 const emit = defineEmits<{ quickOpen: [] }>();
@@ -63,10 +58,9 @@ const user = computed(() => sessionSnapshot().user);
 const displayName = computed(() => user.value?.displayName ?? user.value?.username ?? '账户');
 const initial = computed(() => displayName.value.slice(0, 1).toUpperCase());
 
-const coreNav = [
-  { path: '/', title: '概览', icon: GridOutline },
-  { path: '/machines', title: '机器', icon: ServerOutline },
-  { path: '/edge', title: '边缘节点', icon: GitNetworkOutline },
+const machineNav = [
+  { path: '/machines', title: '机器总览', icon: ServerOutline },
+  { path: '/settings', title: '设置', icon: SettingsOutline },
 ];
 
 const navIcons: Record<string, Component> = {
@@ -75,30 +69,48 @@ const navIcons: Record<string, Component> = {
   postgres: LayersOutline,
   redis: FlashOutline,
   containers: CubeOutline,
+  'container-config': SettingsOutline,
+  images: LayersOutline,
   stacks: LayersOutline,
   files: FolderOpenOutline,
   terminal: TerminalOutline,
   tasks: TimeOutline,
 };
 
-const accountOptions = [
-  {
-    label: '设置',
-    key: 'settings',
-    icon: () => h(NIcon, { component: SettingsOutline }),
-  },
-  {
-    label: '退出登录',
-    key: 'logout',
-    icon: () => h(NIcon, { component: LogOutOutline }),
-  },
-];
+/**
+ * 手风琴：同一时刻只展开一个分组。
+ * 默认展开当前路由命中的分组，切换机器时重新对齐。
+ */
+const openGroup = ref<string | null>(null);
 
-function isCoreActive(path: string): boolean {
-  if (path === '/') return route.path === '/';
-  if (path === '/machines') return route.path.startsWith('/machines');
-  return route.path === path;
+function groupOfActiveItem(): string | null {
+  const machineId = activeMachineId.value;
+  if (machineId === null) return null;
+  for (const group of MACHINE_NAV_GROUPS) {
+    if (group.items.some((item) => isNavItemActive(machineId, item, route.path, route.query))) {
+      return group.title;
+    }
+  }
+  return null;
 }
+
+watch(
+  () => [route.fullPath, activeMachineId.value] as const,
+  () => {
+    const current = groupOfActiveItem();
+    if (current !== null) openGroup.value = current;
+  },
+  { immediate: true },
+);
+
+function toggleGroup(title: string): void {
+  openGroup.value = openGroup.value === title ? null : title;
+}
+
+const accountOptions = [
+  { label: '设置', key: 'settings', icon: () => h(NIcon, { component: SettingsOutline }) },
+  { label: '退出登录', key: 'logout', icon: () => h(NIcon, { component: LogOutOutline }) },
+];
 
 function navActive(item: MachineNavItem): boolean {
   return isNavItemActive(activeMachineId.value, item, route.path, route.query);
@@ -108,8 +120,8 @@ function openMachine(machineId: string): void {
   openMachinePage(machineId, 'sites');
 }
 
-function go(path: string): void {
-  openCorePage(path, coreNav.find((item) => item.path === path)?.title ?? 'MPanel');
+function go(path: string, title: string): void {
+  openCorePage(path, title);
 }
 
 function goNav(item: MachineNavItem): void {
@@ -150,65 +162,77 @@ async function onAccountSelect(key: string): Promise<void> {
     </div>
 
     <n-scrollbar style="flex: 1">
-      <nav class="nav">
-        <button
-          v-for="item in coreNav"
-          :key="item.path"
-          type="button"
-          class="nav-item"
-          :class="{ active: isCoreActive(item.path) }"
-          @click="go(item.path)"
-        >
-          <n-icon :component="item.icon" />
-          <span>{{ item.title }}</span>
-        </button>
-      </nav>
-
-      <div class="section">
-        <div class="section-title">
-          <span>机器工作台</span>
-          <n-button size="tiny" quaternary circle title="打开新页面" @click="emit('quickOpen')">
-            <template #icon><n-icon :component="AddOutline" /></template>
-          </n-button>
-        </div>
-
-        <n-spin v-if="machinesQuery.isLoading.value && machines.length === 0" size="small" />
-        <div v-else-if="machines.length === 0" class="empty small muted">暂无机器</div>
-        <div v-else class="machine-list">
+      <div class="roll">
+        <!-- 机器切换器 -->
+        <section class="machine-switch">
           <button
             v-for="machine in machines"
             :key="machine.id"
             type="button"
-            class="machine-item"
+            class="machine-row"
             :class="{ active: machine.id === activeMachineId }"
-            :title="`打开 ${machine.name} 的站点页（新标签）`"
+            :title="machine.name"
             @click="openMachine(machine.id)"
           >
             <span class="status-dot" :class="`dot-${machineStatusType(machine.status)}`" />
             <span class="machine-name truncate">{{ machine.name }}</span>
-            <span v-if="machine.edge || machine.transport === 'reverse-ws'" class="tiny muted">边缘</span>
+            <span class="tiny muted transport">{{ transportLabel(machine.transport) }}</span>
           </button>
-        </div>
-      </div>
+          <n-spin v-if="machinesQuery.isLoading.value && machines.length === 0" size="small" />
+          <div v-else-if="machines.length === 0" class="empty tiny muted">还没有机器</div>
+        </section>
 
-      <div v-if="activeMachineId !== null" class="section machine-nav">
-        <div class="section-title">
-          <span class="truncate">{{ activeMachine?.name ?? activeMachineId }}</span>
-        </div>
-        <div v-for="group in MACHINE_NAV_GROUPS" :key="group.title" class="nav-group">
-          <div class="nav-group-title">{{ group.title }}</div>
+        <!-- 机器导航手风琴 -->
+        <nav v-if="activeMachineId !== null" class="accordion" aria-label="机器导航">
+          <div v-for="group in MACHINE_NAV_GROUPS" :key="group.title" class="acc-group">
+            <button
+              type="button"
+              class="acc-head"
+              :class="{ open: openGroup === group.title }"
+              :aria-expanded="openGroup === group.title"
+              @click="toggleGroup(group.title)"
+            >
+              <n-icon
+                :component="openGroup === group.title ? ChevronDownOutline : ChevronForwardOutline"
+                size="12"
+                class="acc-chevron"
+              />
+              <span class="acc-title">{{ group.title }}</span>
+              <span v-if="openGroup !== group.title" class="acc-count">{{ group.items.length }}</span>
+            </button>
+            <div v-show="openGroup === group.title" class="acc-body">
+              <button
+                v-for="item in group.items"
+                :key="item.key"
+                type="button"
+                class="acc-item"
+                :class="{ active: navActive(item) }"
+                @click="goNav(item)"
+              >
+                <n-icon :component="navIcons[item.key] ?? GlobeOutline" size="14" />
+                <span class="truncate">{{ item.title }}</span>
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <nav class="bottom-nav">
           <button
-            v-for="item in group.items"
-            :key="item.key"
+            v-for="item in machineNav"
+            :key="item.path"
             type="button"
-            class="nav-item"
-            :class="{ active: navActive(item) }"
-            @click="goNav(item)"
+            class="flat-item"
+            :class="{ active: route.path === item.path }"
+            @click="go(item.path, item.title)"
           >
-            <n-icon :component="navIcons[item.key] ?? GlobeOutline" />
+            <n-icon :component="item.icon" size="15" />
             <span>{{ item.title }}</span>
           </button>
-        </div>
+          <button type="button" class="flat-item" @click="emit('quickOpen')">
+            <n-icon :component="AddOutline" size="15" />
+            <span>打开新页面</span>
+          </button>
+        </nav>
       </div>
     </n-scrollbar>
 
@@ -220,16 +244,9 @@ async function onAccountSelect(key: string): Promise<void> {
             <strong class="truncate">{{ displayName }}</strong>
             <span class="tiny muted truncate">{{ activeConnection?.name ?? '未连接' }}</span>
           </span>
-          <n-icon :component="ChevronUpOutline" size="12" class="muted" />
         </button>
       </n-dropdown>
-      <n-button
-        quaternary
-        circle
-        size="small"
-        :title="isDark ? '浅色主题' : '深色主题'"
-        @click="toggle"
-      >
+      <n-button quaternary circle size="small" :title="isDark ? '浅色主题' : '深色主题'" @click="toggle">
         <template #icon><n-icon :component="isDark ? SunnyOutline : MoonOutline" /></template>
       </n-button>
     </div>
@@ -242,25 +259,24 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: color-mix(in srgb, var(--mpanel-surface) 55%, transparent);
-  border-right: 1px solid var(--mpanel-border);
+  background: var(--mpanel-bg);
+  border-right: 1px solid var(--mpanel-border-muted);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px 4px;
+  gap: 9px;
+  padding: 14px 14px 10px;
 }
 .logo {
-  width: 46px;
-  height: 34px;
+  width: 34px;
+  height: 26px;
   display: grid;
   place-items: center;
-  padding: 3px 5px;
-  border-radius: 8px;
+  padding: 2px 4px;
+  border-radius: 6px;
   background: #fff;
-  border: 1px solid var(--mpanel-border);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+  border: 1px solid var(--mpanel-border-muted);
   flex: 0 0 auto;
 }
 .logo img {
@@ -273,130 +289,187 @@ async function onAccountSelect(key: string): Promise<void> {
   display: flex;
   flex-direction: column;
   line-height: 1.25;
+  min-width: 0;
 }
-.nav {
+.brand-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.roll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 8px 12px;
+}
+
+/* --------------------------- machine switcher --------------------------- */
+
+.machine-switch {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--mpanel-border-muted);
 }
-.nav-item {
+.machine-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 5px 10px;
+  padding: 6px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--mpanel-text);
   font-size: 12.5px;
   text-align: left;
   cursor: pointer;
 }
-.nav-item:hover {
-  background: color-mix(in srgb, var(--mpanel-accent) 10%, transparent);
+.machine-row:hover {
+  background: var(--mpanel-surface-soft);
 }
-.nav-item.active {
-  background: color-mix(in srgb, var(--mpanel-accent) 18%, transparent);
-  color: var(--mpanel-accent);
+.machine-row.active {
+  background: var(--mpanel-surface);
+  box-shadow: inset 0 0 0 1px var(--mpanel-border);
   font-weight: 600;
-}
-.section {
-  padding: 6px;
-  border-top: 1px solid var(--mpanel-border);
-  margin-top: 4px;
-}
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 6px 4px;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--mpanel-text);
-}
-.machine-nav {
-  padding-top: 6px;
-}
-.nav-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 2px;
-}
-.nav-group-title {
-  padding: 1px 10px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--mpanel-muted);
-}
-.nav-group .nav-item {
-  padding-left: 10px;
-}
-.machine-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 160px;
-  overflow-y: auto;
-}
-.machine-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 9px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--mpanel-text);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-.machine-item:hover {
-  background: color-mix(in srgb, var(--mpanel-accent) 8%, transparent);
-  border-color: color-mix(in srgb, var(--mpanel-accent) 25%, transparent);
-}
-.machine-item.active {
-  border-color: color-mix(in srgb, var(--mpanel-accent) 45%, transparent);
-  background: color-mix(in srgb, var(--mpanel-accent) 12%, transparent);
 }
 .machine-name {
   flex: 1;
+  min-width: 0;
+}
+.transport {
+  flex: 0 0 auto;
+  opacity: 0.75;
 }
 .status-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: var(--mpanel-muted);
   flex: 0 0 auto;
 }
-.dot-success {
-  background: #2fbf71;
+
+/* ------------------------------- accordion ------------------------------ */
+
+.accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.dot-warning {
-  background: #e6a23c;
+.acc-group {
+  display: flex;
+  flex-direction: column;
 }
-.dot-error {
-  background: #e05561;
+.acc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mpanel-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
 }
-.dot-info {
-  background: #4f7cff;
+.acc-head:hover {
+  color: var(--mpanel-text);
+  background: var(--mpanel-surface-soft);
+}
+.acc-head.open {
+  color: var(--mpanel-text);
+}
+.acc-chevron {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+.acc-title {
+  flex: 1;
+}
+.acc-count {
+  font-size: 10.5px;
+  font-weight: 500;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+.acc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px 6px;
+  margin-left: 6px;
+  border-left: 1px solid var(--mpanel-border-muted);
+}
+.acc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mpanel-text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.acc-item:hover {
+  background: var(--mpanel-surface-soft);
+}
+.acc-item.active {
+  background: var(--mpanel-accent-soft);
+  color: var(--mpanel-accent);
+  font-weight: 600;
+}
+
+/* ------------------------------ bottom nav ------------------------------ */
+
+.bottom-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 8px;
+  border-top: 1px solid var(--mpanel-border-muted);
+}
+.flat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mpanel-text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.flat-item:hover {
+  background: var(--mpanel-surface-soft);
+}
+.flat-item.active {
+  background: var(--mpanel-accent-soft);
+  color: var(--mpanel-accent);
+  font-weight: 600;
 }
 .empty {
-  padding: 8px;
-  line-height: 1.6;
+  padding: 6px 8px;
 }
+
+/* -------------------------------- footer -------------------------------- */
+
 .account-footer {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-top: 1px solid var(--mpanel-border);
+  padding: 8px;
+  border-top: 1px solid var(--mpanel-border-muted);
 }
 .account-btn {
   display: flex;
@@ -408,12 +481,12 @@ async function onAccountSelect(key: string): Promise<void> {
   background: transparent;
   color: var(--mpanel-text);
   padding: 4px 6px;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
 }
 .account-btn:hover {
-  background: color-mix(in srgb, var(--mpanel-accent) 8%, transparent);
+  background: var(--mpanel-surface-soft);
 }
 .avatar {
   width: 26px;
@@ -421,10 +494,10 @@ async function onAccountSelect(key: string): Promise<void> {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--mpanel-accent) 25%, transparent);
-  color: var(--mpanel-accent);
-  font-size: 12px;
-  font-weight: 700;
+  background: var(--mpanel-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
   flex: 0 0 auto;
 }
 .account-meta {

@@ -60,13 +60,14 @@ import { useAction } from '@/composables/use-action';
 import { openMachinePage } from '@/lib/navigation';
 import { formatDate, formatDuration, formatUptime } from '@/lib/format';
 import { edgeJobStatusLabel, edgeJobStatusType, machineStatusType } from '@/lib/status';
-import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
 import RelativeTime from '@/components/common/RelativeTime.vue';
 import CodeBlock from '@/components/common/CodeBlock.vue';
 import SecretReveal from '@/components/common/SecretReveal.vue';
 import CopyButton from '@/components/common/CopyButton.vue';
+
+const emit = defineEmits<{ quickOpen: [] }>();
 
 const api = useCoreApi();
 const active = usePageActive();
@@ -420,25 +421,7 @@ const resultText = computed(() => {
 </script>
 
 <template>
-  <div class="page">
-    <PageHeader
-      title="边缘节点"
-    >
-      <template #actions>
-        <n-button size="small" secondary :loading="refreshing" @click="refreshAll">
-          <template #icon><n-icon :component="RefreshOutline" /></template>
-          刷新
-        </n-button>
-        <n-button size="small" secondary @click="keyModal = true">
-          <template #icon><n-icon :component="KeyOutline" /></template>
-          新建密钥
-        </n-button>
-        <n-button size="small" type="primary" :disabled="edgeNodes.length === 0" @click="jobModal = true">
-          <template #icon><n-icon :component="AddOutline" /></template>
-          新建作业
-        </n-button>
-      </template>
-    </PageHeader>
+  <div class="edge-panel">
 
     <error-state
       v-if="machinesQuery.isError.value"
@@ -465,10 +448,13 @@ const resultText = computed(() => {
               <span>节点上线</span>
             </div>
           </div>
-          <n-button type="primary" size="large" @click="keyModal = true">
-            <template #icon><n-icon :component="KeyOutline" /></template>
-            创建入网密钥
-          </n-button>
+          <div class="toolbar" style="justify-content: center">
+            <n-button type="primary" size="large" @click="keyModal = true">
+              <template #icon><n-icon :component="KeyOutline" /></template>
+              创建入网密钥
+            </n-button>
+            <n-button size="large" secondary @click="emit('quickOpen')">直接新增机器</n-button>
+          </div>
         </div>
 
         <n-card v-else size="small" :content-style="{ padding: '0' }">
@@ -863,6 +849,11 @@ const resultText = computed(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+.edge-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 .edge-empty {
   display: flex;

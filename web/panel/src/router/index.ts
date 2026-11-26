@@ -16,10 +16,8 @@ declare module 'vue-router' {
 const AppShell = () => import('@/components/AppShell.vue');
 const LoginPage = () => import('@/pages/LoginPage.vue');
 const NotFoundPage = () => import('@/pages/NotFoundPage.vue');
-const DashboardPage = () => import('@/pages/dashboard/DashboardPage.vue');
 const MachinesPage = () => import('@/pages/machines/MachinesPage.vue');
 const MachineDetailPage = () => import('@/pages/machines/MachineDetailPage.vue');
-const EdgePage = () => import('@/pages/edge/EdgePage.vue');
 const SettingsPage = () => import('@/pages/settings/SettingsPage.vue');
 const SitesPage = () => import('@/pages/sites/SitesPage.vue');
 const SiteEditorPage = () => import('@/pages/sites/SiteEditorPage.vue');
@@ -27,6 +25,7 @@ const CertsPage = () => import('@/pages/certs/CertsPage.vue');
 const DatabasesPage = () => import('@/pages/databases/DatabasesPage.vue');
 const ContainersPage = () => import('@/pages/containers/ContainersPage.vue');
 const ImagesPage = () => import('@/pages/containers/ImagesPage.vue');
+const ContainersConfigPage = () => import('@/pages/containers/ContainersConfigPage.vue');
 const StacksPage = () => import('@/pages/containers/StacksPage.vue');
 const StackDetailPage = () => import('@/pages/containers/StackDetailPage.vue');
 const StackEditorPage = () => import('@/pages/containers/StackEditorPage.vue');
@@ -48,15 +47,14 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        name: 'dashboard',
-        component: DashboardPage,
-        meta: { title: '概览' },
-      },
-      {
-        path: 'machines',
         name: 'machines',
         component: MachinesPage,
         meta: { title: '机器' },
+      },
+      {
+        // 旧的「概览」与「边缘节点」已合并进机器总览。
+        path: 'machines',
+        redirect: '/',
       },
       {
         path: 'machines/:machineId',
@@ -65,10 +63,9 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '机器详情' },
       },
       {
+        // 旧的「边缘节点」页已合并进机器总览的边缘抽屉。
         path: 'edge',
-        name: 'edge',
-        component: EdgePage,
-        meta: { title: '边缘节点' },
+        redirect: '/',
       },
       {
         path: 'settings',
@@ -121,6 +118,12 @@ const routes: RouteRecordRaw[] = [
         name: 'container-detail',
         component: ContainersPage,
         meta: { title: '容器', machine: true },
+      },
+      {
+        path: 'm/:machineId/containers-config',
+        name: 'containers-config',
+        component: ContainersConfigPage,
+        meta: { title: '容器配置', machine: true },
       },
       {
         path: 'm/:machineId/images',

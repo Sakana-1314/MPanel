@@ -799,6 +799,6 @@ function engineLabel(kind: 'postgres' | 'redis'): string {
   background: #fff;
 }
 .error-text {
-  color: #e05561;
+  color: var(--mpanel-danger);
 }
 </style>

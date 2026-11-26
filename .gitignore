@@ -48,3 +48,4 @@ Thumbs.db
 # 站点发布用的双基路径产物（CI 生成，不入库）
 dist-root/
 .vitepress/dist-root/
+dist-deploy/
