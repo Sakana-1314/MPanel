@@ -29,6 +29,8 @@ import type { StackSummary } from '@/api/types';
 import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
+import { describeError } from '@/api/errors';
+import { openJobProgress } from '@/lib/job-center';
 import { formatDate } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -61,14 +63,23 @@ const filtered = computed(() => {
 
 const invalidate = computed(() => [machineKey(machineId, 'stacks'), machineKey(machineId, 'containers')]);
 
-const action = useAction(
-  (input: { name: string; kind: 'up' | 'down' | 'restart' }) =>
-    api.value.stacks.action(input.name, input.kind, {}),
-  {
-    success: (result, input) => `栈 ${input.name} ${input.kind === 'up' ? '已启动' : input.kind === 'down' ? '已停止' : '已重启'}`,
-    invalidate: invalidate.value,
-  },
-);
+async function runStackAction(input: { name: string; kind: 'up' | 'down' | 'restart' }): Promise<void> {
+  try {
+    const started = await api.value.stacks.actionAsync(input.name, input.kind, {});
+    openJobProgress({
+      machineId,
+      jobId: started.job.id,
+      title: started.job.title,
+      invalidate: invalidate.value,
+    });
+  } catch (error) {
+    dialog.error({
+      title: '无法启动编排任务',
+      content: describeError(error).description,
+      positiveText: '知道了',
+    });
+  }
+}
 
 const createAction = useAction(
   (input: { name: string; yaml: string }) =>
@@ -182,7 +193,7 @@ function openDetail(stack: StackSummary): void {
                 </n-button>
                 <n-tooltip>
                   <template #trigger>
-                    <n-button size="tiny" quaternary @click="action.run({ name: stack.name, kind: 'up' })">
+                    <n-button size="tiny" quaternary @click="runStackAction({ name: stack.name, kind: 'up' })">
                       <template #icon><n-icon :component="PlayOutline" /></template>
                     </n-button>
                   </template>
@@ -190,7 +201,7 @@ function openDetail(stack: StackSummary): void {
                 </n-tooltip>
                 <n-tooltip>
                   <template #trigger>
-                    <n-button size="tiny" quaternary @click="action.run({ name: stack.name, kind: 'restart' })">
+                    <n-button size="tiny" quaternary @click="runStackAction({ name: stack.name, kind: 'restart' })">
                       <template #icon><n-icon :component="ReloadOutline" /></template>
                     </n-button>
                   </template>
@@ -198,7 +209,7 @@ function openDetail(stack: StackSummary): void {
                 </n-tooltip>
                 <n-tooltip>
                   <template #trigger>
-                    <n-button size="tiny" quaternary @click="action.run({ name: stack.name, kind: 'down' })">
+                    <n-button size="tiny" quaternary @click="runStackAction({ name: stack.name, kind: 'down' })">
                       <template #icon><n-icon :component="StopOutline" /></template>
                     </n-button>
                   </template>

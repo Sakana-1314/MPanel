@@ -20,6 +20,8 @@ features:
     details: 安装根 /opt/mpanel，配置 conf/app.yaml 与 conf/agent.yaml，二进制放在 /usr/local/bin，服务用 mpanel-core.service / mpanel-agent.service。
   - title: Caddy 容器化
     details: Caddy 以 mpanel-caddy 编排运行，站点页一键安装；每站点生成 sites.d/*.caddy，apply 在容器内 validate → 备份 → 原子替换 → reload → 回滚。
+  - title: 长任务不阻塞
+    details: 站点应用、编排启停、镜像拉取等耗时操作转为后台任务，立即返回 202；进度弹窗与任务中心展示状态、日志与结果。
   - title: 能力缺失可降级
     details: 没有 Caddy 容器、Docker、PostgreSQL 客户端、Redis 客户端或 PTY 时进程照常启动；列表返回 available=false，写操作返回 UNAVAILABLE 与可执行提示。
 ---

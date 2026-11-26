@@ -26,6 +26,8 @@ import type { StackSummary } from '@/api/types';
 import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
+import { describeError } from '@/api/errors';
+import { openJobProgress } from '@/lib/job-center';
 import { formatDate } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -46,25 +48,36 @@ const stackQuery = useQuery({
 });
 
 const stack = computed(() => stackQuery.data.value);
+const acting = ref(false);
 const actionOutput = ref('');
 const outputOpen = ref(false);
 
 const invalidate = computed(() => [machineKey(machineId, 'stacks'), machineKey(machineId, 'containers')]);
 
-const action = useAction(
-  (kind: 'up' | 'down' | 'restart') => api.value.stacks.action(stackName, kind, {}),
-  {
-    success: (_result, kind) => `栈 ${stackName} ${kind === 'up' ? '已启动' : kind === 'down' ? '已停止' : '已重启'}`,
-    invalidate: invalidate.value,
-  },
-);
-
 async function runAction(kind: 'up' | 'down' | 'restart'): Promise<void> {
-  const result = await action.run(kind);
-  if (result !== undefined) {
-    actionOutput.value = result.output || '（无输出）';
-    outputOpen.value = true;
-    void stackQuery.refetch();
+  acting.value = true;
+  try {
+    const started = await api.value.stacks.actionAsync(stackName, kind, {});
+    openJobProgress({
+      machineId,
+      jobId: started.job.id,
+      title: started.job.title,
+      invalidate: invalidate.value,
+      onCompleted: (job) => {
+        const result = job.result as { output?: string } | undefined;
+        actionOutput.value = result?.output || '（无输出）';
+        outputOpen.value = true;
+        void stackQuery.refetch();
+      },
+    });
+  } catch (error) {
+    dialog.error({
+      title: '无法启动编排任务',
+      content: describeError(error).description,
+      positiveText: '知道了',
+    });
+  } finally {
+    acting.value = false;
   }
 }
 
@@ -121,15 +134,15 @@ function stateType(state: string): 'success' | 'warning' | 'error' | 'default' |
           <template #icon><n-icon :component="CreateOutline" /></template>
           编辑
         </n-button>
-        <n-button size="small" secondary :loading="action.pending.value" @click="runAction('up')">
+        <n-button size="small" secondary :loading="acting" @click="runAction('up')">
           <template #icon><n-icon :component="PlayOutline" /></template>
           启动
         </n-button>
-        <n-button size="small" secondary :loading="action.pending.value" @click="runAction('restart')">
+        <n-button size="small" secondary :loading="acting" @click="runAction('restart')">
           <template #icon><n-icon :component="ReloadOutline" /></template>
           重启
         </n-button>
-        <n-button size="small" quaternary :loading="action.pending.value" @click="runAction('down')">
+        <n-button size="small" quaternary :loading="acting" @click="runAction('down')">
           <template #icon><n-icon :component="StopOutline" /></template>
           停止
         </n-button>

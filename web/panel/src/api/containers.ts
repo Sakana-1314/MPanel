@@ -14,6 +14,7 @@ import type {
   ExecResult,
   ImagePruneRequest,
   ImageSummary,
+  JobStarted,
   ListResult,
   PageQuery,
   StackActionInput,
@@ -41,6 +42,7 @@ export const containersKeys = {
 export interface ContainersApi {
   list(q?: PageQuery & { all?: boolean; status?: string; q?: string }): Promise<ListResult<ContainerSummary>>;
   create(input: ContainerCreateInput): Promise<ContainerCreated>;
+  createAsync(input: ContainerCreateInput): Promise<JobStarted>;
   get(id: string): Promise<ContainerDetail>;
   action(
     id: string,
@@ -65,6 +67,7 @@ export interface ContainersApi {
 export interface ImagesApi {
   list(q?: PageQuery & { all?: boolean; dangling?: boolean; q?: string }): Promise<ListResult<ImageSummary>>;
   pull(reference: string): Promise<{ image: ImageSummary }>;
+  pullAsync(reference: string): Promise<JobStarted>;
   remove(id: string, force?: boolean): Promise<{ deleted: true; id: string }>;
   prune(body: ImagePruneRequest): Promise<{ deleted: number; reclaimedBytes: number }>;
 }
@@ -79,6 +82,11 @@ export interface StacksApi {
     action: 'up' | 'down' | 'restart',
     body: StackActionInput,
   ): Promise<{ ok: true; output: string }>;
+  actionAsync(
+    name: string,
+    action: 'up' | 'down' | 'restart' | 'pull',
+    body: StackActionInput,
+  ): Promise<JobStarted>;
   delete(name: string, force?: boolean): Promise<{ deleted: true; name: string }>;
 }
 
@@ -88,6 +96,12 @@ export function createContainersApi(http: ApiTransport): ContainersApi {
     list: (q = {}) => http.request<ListResult<ContainerSummary>>('/containers', { query: q }),
     create: (input) =>
       http.request<ContainerCreated>('/containers', { method: 'POST', body: input }),
+    createAsync: (input) =>
+      http.request<JobStarted>('/containers', {
+        method: 'POST',
+        body: input,
+        headers: { prefer: 'respond-async' },
+      }),
     get: (id) => http.request<ContainerDetail>(base(id)),
     action: (id, action, opts = {}) =>
       http.request<{ ok: true; action: ContainerAction; id: string }>(`${base(id)}/${action}`, {
@@ -134,6 +148,12 @@ export function createImagesApi(http: ApiTransport): ImagesApi {
         body: { reference },
         timeoutMs: 620_000,
       }),
+    pullAsync: (reference) =>
+      http.request<JobStarted>('/images/pull', {
+        method: 'POST',
+        body: { reference },
+        headers: { prefer: 'respond-async' },
+      }),
     remove: (id, force) =>
       http.request<{ deleted: true; id: string }>(`/images/${encodeURIComponent(id)}`, {
         method: 'DELETE',
@@ -161,6 +181,12 @@ export function createStacksApi(http: ApiTransport): StacksApi {
         body,
         // 首次 up 可能要拉镜像，与 agent 的 620s 超时保持一致。
         timeoutMs: action === 'up' ? 620_000 : undefined,
+      }),
+    actionAsync: (name, action, body) =>
+      http.request<JobStarted>(`${base(name)}/${action}`, {
+        method: 'POST',
+        body,
+        headers: { prefer: 'respond-async' },
       }),
     delete: (name, force) =>
       http.request<{ deleted: true; name: string }>(base(name), {

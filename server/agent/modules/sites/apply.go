@@ -70,6 +70,12 @@ type applyPlan struct {
 
 // apply implements contract §6.4.
 func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, error) {
+	return m.applyWithProgress(rctx, plan, nil)
+}
+
+// applyWithProgress is apply with coarse progress reporting for background
+// jobs. progress may be nil.
+func (m *Module) applyWithProgress(rctx context.Context, plan applyPlan, progress func(percent int, step string)) (SiteApplyResult, error) {
 	if !m.applyMu.TryLock() {
 		return SiteApplyResult{}, &protocol.PanelError{
 			Code:    protocol.CodeConflict,
@@ -86,6 +92,12 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 	if perr != nil {
 		return SiteApplyResult{}, perr
 	}
+	report := func(percent int, step string) {
+		if progress != nil {
+			progress(percent, step)
+		}
+	}
+	report(3, "渲染站点配置")
 
 	all := m.store.List()
 	byID := make(map[string]Site, len(all))
@@ -154,6 +166,7 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 			Details: map[string]any{"stage": "render", "issues": renderIssues},
 		}
 	}
+	report(25, "渲染完成，准备 staging")
 
 	confDir, _ := m.ctx.Cfg.CaddyDirs()
 	liveDir := filepath.Join(confDir, "sites.d")
@@ -231,11 +244,13 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 		}, nil
 	}
 
+	report(35, "校验 Caddyfile")
 	validateOutput, err := m.validateConfigFile(rctx, container.ID, stagingRoot)
 	if err != nil {
 		return SiteApplyResult{}, err
 	}
 
+	report(55, "备份并替换配置")
 	backupPath, err := m.backupCaddy(liveDir, rootPath, at)
 	if err != nil {
 		return SiteApplyResult{}, &protocol.PanelError{
@@ -280,6 +295,7 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 	if perr != nil {
 		return SiteApplyResult{}, perr
 	}
+	report(75, "重新加载 Caddy")
 	reloadArgs := []string{"reload", "--config", containerRoot, "--adapter", "caddyfile"}
 	if adminCfg := strings.TrimSpace(m.ctx.Cfg.Agent.CaddyAdmin); adminCfg != "" {
 		reloadArgs = append(reloadArgs, "--address", adminAddress(m.ctx.Cfg))
@@ -309,6 +325,7 @@ func (m *Module) apply(rctx context.Context, plan applyPlan) (SiteApplyResult, e
 		return SiteApplyResult{}, m.failApply(revision, at, rendered, "caddy reload 失败: "+tailOutput(reloadOutput, outputTailBytes), "reload", true, reloadOutput)
 	}
 
+	report(95, "记录应用状态")
 	records := make([]ApplyRecord, 0, len(rendered))
 	for _, item := range rendered {
 		records = append(records, ApplyRecord{

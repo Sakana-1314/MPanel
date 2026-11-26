@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sakana-1314/mpanel/server/agent"
 	"github.com/sakana-1314/mpanel/server/core/httpapi"
 	"github.com/sakana-1314/mpanel/server/core/protocol"
 )
@@ -847,56 +848,109 @@ func (m *Module) handleStackAction(action string) http.HandlerFunc {
 			httpapi.Fail(w, pErr)
 			return
 		}
-
-		args := []string{"compose", "-p", name, "-f", paths.ComposePath}
-		timeout := 300 * time.Second
-		switch action {
-		case "up":
-			args = append(args, "up", "-d")
-			if body.Build {
-				args = append(args, "--build")
-			}
-			if body.ForceRecreate {
-				args = append(args, "--force-recreate")
-			}
-			timeout = 620 * time.Second
-		case "down":
-			args = append(args, "down")
-			if body.RemoveVolumes {
-				args = append(args, "--volumes")
-			}
-			if body.RemoveImages {
-				args = append(args, "--rmi", "all")
-			}
-		case "restart":
-			args = append(args, "restart")
-		case "pull":
-			args = append(args, "pull")
-			timeout = 620 * time.Second
-		default:
-			httpapi.Fail(w, protocol.BadRequest("不支持的编排操作"))
+		args, timeout, pErr := stackActionCommand(name, paths, action, body)
+		if pErr != nil {
+			httpapi.Fail(w, pErr)
 			return
 		}
-
-		m.opMu.Lock()
-		res, err := m.docker.run(r.Context(), timeout, args...)
-		m.opMu.Unlock()
-		if err != nil {
-			httpapi.Fail(w, m.docker.unavailable("无法执行 docker compose "+action+"："+err.Error()))
-			return
-		}
-		if res.Code != 0 {
-			if isComposeMissing(res) {
-				httpapi.Fail(w, composeUnavailable(res))
+		if httpapi.WantsAsync(r) {
+			job, err := m.ctx.Jobs.Submit(agent.JobSpec{
+				Kind:  "stacks." + action,
+				Title: stackActionTitle(action, name),
+				Run: func(ctx context.Context, reporter agent.JobReporter) (any, error) {
+					result, pErr := m.runStackAction(ctx, action, args, timeout, reporter)
+					if pErr != nil {
+						return nil, pErr
+					}
+					return result, nil
+				},
+			})
+			if err != nil {
+				httpapi.Fail(w, internalPathError("无法创建编排任务", err))
 				return
 			}
-			httpapi.Fail(w, dockerCommandFailed("compose "+action, res))
+			httpapi.Accepted(w, protocol.JobStarted{Job: job})
 			return
 		}
-		output := strings.TrimSpace(res.Stdout + "\n" + res.Stderr)
-		output, _ = truncateText(output, maxLogBytes)
-		httpapi.OK(w, stackActionResult{OK: true, Output: output})
+		result, pErr := m.runStackAction(r.Context(), action, args, timeout, nil)
+		if pErr != nil {
+			httpapi.Fail(w, pErr)
+			return
+		}
+		httpapi.OK(w, result)
 	}
+}
+
+func stackActionTitle(action, name string) string {
+	switch action {
+	case "up":
+		return "启动编排 " + name
+	case "down":
+		return "停止编排 " + name
+	case "restart":
+		return "重启编排 " + name
+	case "pull":
+		return "拉取编排镜像 " + name
+	default:
+		return "编排操作 " + name
+	}
+}
+
+func stackActionCommand(name string, paths stackPaths, action string, body stackActionInput) ([]string, time.Duration, *protocol.PanelError) {
+	args := []string{"compose", "-p", name, "-f", paths.ComposePath}
+	timeout := 300 * time.Second
+	switch action {
+	case "up":
+		args = append(args, "up", "-d")
+		if body.Build {
+			args = append(args, "--build")
+		}
+		if body.ForceRecreate {
+			args = append(args, "--force-recreate")
+		}
+		timeout = 620 * time.Second
+	case "down":
+		args = append(args, "down")
+		if body.RemoveVolumes {
+			args = append(args, "--volumes")
+		}
+		if body.RemoveImages {
+			args = append(args, "--rmi", "all")
+		}
+	case "restart":
+		args = append(args, "restart")
+	case "pull":
+		args = append(args, "pull")
+		timeout = 620 * time.Second
+	default:
+		return nil, 0, protocol.BadRequest("不支持的编排操作")
+	}
+	return args, timeout, nil
+}
+
+func (m *Module) runStackAction(ctx context.Context, action string, args []string, timeout time.Duration, reporter agent.JobReporter) (stackActionResult, *protocol.PanelError) {
+	if reporter != nil {
+		reporter.SetIndeterminate(true)
+		reporter.SetProgress(5, "执行 docker compose "+action)
+	}
+	m.opMu.Lock()
+	res, err := m.docker.run(ctx, timeout, args...)
+	m.opMu.Unlock()
+	if err != nil {
+		return stackActionResult{}, m.docker.unavailable("无法执行 docker compose " + action + "：" + err.Error())
+	}
+	if res.Code != 0 {
+		if isComposeMissing(res) {
+			return stackActionResult{}, composeUnavailable(res)
+		}
+		return stackActionResult{}, dockerCommandFailed("compose "+action, res)
+	}
+	output := strings.TrimSpace(res.Stdout + "\n" + res.Stderr)
+	output, _ = truncateText(output, maxLogBytes)
+	if reporter != nil && output != "" {
+		reporter.Log(output)
+	}
+	return stackActionResult{OK: true, Output: output}, nil
 }
 
 /* -------------------------------- stack logs ------------------------------ */

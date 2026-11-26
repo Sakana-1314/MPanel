@@ -68,6 +68,16 @@ func Created(w http.ResponseWriter, data any) { writeEnvelope(w, http.StatusCrea
 // Accepted writes {ok:true,data} with HTTP 202.
 func Accepted(w http.ResponseWriter, data any) { writeEnvelope(w, http.StatusAccepted, data, nil) }
 
+// WantsAsync reports whether the caller asked a long-running endpoint to run
+// as a background job. Both the standard `Prefer: respond-async` header and a
+// simple `X-MPanel-Async: 1` switch are accepted.
+func WantsAsync(r *http.Request) bool {
+	if strings.Contains(strings.ToLower(r.Header.Get("Prefer")), "respond-async") {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(r.Header.Get("X-MPanel-Async")), "1")
+}
+
 func writeEnvelope(w http.ResponseWriter, status int, data any, apiErr *protocol.APIError) {
 	baseHeaders(w)
 	w.WriteHeader(status)

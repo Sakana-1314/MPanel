@@ -12,9 +12,11 @@ import {
 import AppSidebar from './AppSidebar.vue';
 import WorkspaceTabs from './WorkspaceTabs.vue';
 import QuickOpen from './QuickOpen.vue';
+import JobProgressModal from './jobs/JobProgressModal.vue';
 import { activeConnectionId } from '@/lib/connection-store';
 import { useMachinesQuery } from '@/lib/machines';
 import { pageTitleForRoute } from '@/lib/navigation';
+import { closeJobProgress, finishJobProgress, jobProgressState } from '@/lib/job-center';
 import {
   activeTab,
   createTab,
@@ -30,6 +32,7 @@ const machinesQuery = useMachinesQuery();
 const isMobile = useMediaQuery('(max-width: 900px)');
 const mobileOpen = ref(false);
 const quickOpen = ref(false);
+const jobState = jobProgressState();
 
 const machineId = computed<string | null>(() => {
   const value = route.params.machineId;
@@ -159,6 +162,16 @@ watch(
   </n-drawer>
 
   <QuickOpen v-model:show="quickOpen" />
+
+  <JobProgressModal
+    :show="jobState.open"
+    :machine-id="jobState.machineId"
+    :job-id="jobState.jobId"
+    :title="jobState.title"
+    :invalidate="jobState.invalidate"
+    @update:show="(value: boolean) => { if (!value) closeJobProgress(); }"
+    @completed="finishJobProgress"
+  />
 </template>
 
 <style scoped>

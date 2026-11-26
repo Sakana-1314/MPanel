@@ -20,6 +20,7 @@ import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
 import { describeError } from '@/api/errors';
+import { openJobProgress } from '@/lib/job-center';
 import { formatDate } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -119,21 +120,40 @@ const saveAction = useAction(async (value: SiteDraft) => {
   invalidate: invalidates.value,
 });
 
-const applyAction = useAction(async () => {
-  if (siteId === undefined) return null;
-  if (dirty.value) {
-    await api.value.sites.update(siteId, {
-      name: draft.value.name.trim(),
-      enabled: draft.value.enabled,
-      config: draft.value.config,
+const applying = ref(false);
+
+async function startApply(): Promise<void> {
+  if (siteId === undefined) return;
+  applyError.value = null;
+  applying.value = true;
+  try {
+    if (dirty.value) {
+      await api.value.sites.update(siteId, {
+        name: draft.value.name.trim(),
+        enabled: draft.value.enabled,
+        config: draft.value.config,
+      });
+    }
+    const started = await api.value.sites.applyAsync({ siteIds: [siteId] });
+    openJobProgress({
+      machineId,
+      jobId: started.job.id,
+      title: started.job.title,
+      invalidate: invalidates.value,
+      onCompleted: (job) => {
+        if (job.result !== undefined && job.result !== null) {
+          applyResult.value = job.result as SiteApplyResult;
+          applyResultOpen.value = true;
+          dirty.value = false;
+        }
+      },
     });
+  } catch (error) {
+    applyError.value = error;
+  } finally {
+    applying.value = false;
   }
-  return api.value.sites.apply({ siteIds: [siteId] });
-}, {
-  success: (result) => (result === null ? '未应用' : `应用成功（apply #${result.revision}）`),
-  successDescription: (result) => (result?.rolledBack ? '已回滚到应用前配置。' : undefined),
-  invalidate: invalidates.value,
-});
+}
 
 async function save(): Promise<void> {
   const saved = await saveAction.run(draft.value);
@@ -161,17 +181,7 @@ function confirmApply(): void {
     content: '将保存当前草稿并只把该站点渲染进 staging，随后 validate + reload Caddy；未选中的站点保留现有配置。',
     positiveText: '应用',
     negativeText: '取消',
-    onPositiveClick: async () => {
-      applyError.value = null;
-      const result = await applyAction.run();
-      if (result !== null && result !== undefined) {
-        applyResult.value = result;
-        applyResultOpen.value = true;
-        dirty.value = false;
-      } else {
-        applyError.value = applyAction.error.value;
-      }
-    },
+    onPositiveClick: startApply,
   });
 }
 
@@ -213,7 +223,7 @@ const applyOutput = computed(() => {
           size="small"
           secondary
           :disabled="!caddyAvailable"
-          :loading="applyAction.pending.value"
+          :loading="applying"
           @click="confirmApply"
         >
           <template #icon><n-icon :component="RocketOutline" /></template>

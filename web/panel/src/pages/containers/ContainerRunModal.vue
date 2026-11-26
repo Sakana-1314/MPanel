@@ -9,10 +9,11 @@ import {
   NSelect,
   useMessage,
 } from 'naive-ui';
-import { useQueryClient } from '@tanstack/vue-query';
-import type { ContainerCreateInput } from '@/api/types';
+import type { ContainerCreated, ContainerCreateInput } from '@/api/types';
 import { useMachineApi } from '@/lib/api';
 import { describeError } from '@/api/errors';
+import { machineKey } from '@/lib/query-keys';
+import { openJobProgress } from '@/lib/job-center';
 
 export interface ContainerRunPreset {
   /** 弹窗标题，例如「运行 PostgreSQL 容器」。 */
@@ -32,7 +33,6 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:show': [value: boolean]; created: [] }>();
 
 const api = useMachineApi(() => props.machineId);
-const queryClient = useQueryClient();
 const message = useMessage();
 
 interface PortRow {
@@ -142,11 +142,19 @@ async function submit(): Promise<void> {
   error.value = null;
   submitting.value = true;
   try {
-    const created = await api.value.containers.create(buildInput());
-    message.success(created.name ? `已启动容器 ${created.name}` : '容器已启动');
-    await queryClient.invalidateQueries({ queryKey: ['machines', props.machineId, 'containers'] });
-    emit('created');
+    const started = await api.value.containers.createAsync(buildInput());
     emit('update:show', false);
+    openJobProgress({
+      machineId: props.machineId,
+      jobId: started.job.id,
+      title: started.job.title,
+      invalidate: [machineKey(props.machineId, 'containers')],
+      onCompleted: (job) => {
+        const created = job.result as ContainerCreated | undefined;
+        message.success(created?.name ? `已启动容器 ${created.name}` : '容器已启动');
+        emit('created');
+      },
+    });
   } catch (err) {
     error.value = describeError(err).description;
   } finally {

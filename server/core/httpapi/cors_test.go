@@ -45,8 +45,12 @@ func TestCORSDoesNotAllowCredentials(t *testing.T) {
 
 func TestCORSAllowsAuthorizationHeader(t *testing.T) {
 	rec := serveCORS(CORSConfig{}, "https://any.example.com", "panel.example.com")
-	if got := rec.Header().Get("Access-Control-Allow-Headers"); !containsFold(got, "authorization") {
+	got := rec.Header().Get("Access-Control-Allow-Headers")
+	if !containsFold(got, "authorization") {
 		t.Fatalf("Allow-Headers = %q, want it to include Authorization", got)
+	}
+	if !containsFold(got, "prefer") {
+		t.Fatalf("Allow-Headers = %q, want it to include Prefer", got)
 	}
 }
 

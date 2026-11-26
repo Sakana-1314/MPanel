@@ -23,6 +23,7 @@ import (
 
 // Module implements the container, image and stack endpoints of contract §9.
 type Module struct {
+	ctx    *agent.Context
 	docker *dockerClient
 	stacks *stackManager
 	logger *slog.Logger
@@ -68,6 +69,7 @@ func (m *Module) Register(ctx *agent.Context) error {
 	m.stacks = newStackManager(dataDir)
 	m.daemonConfigPath = daemonConfig
 	m.logger = logger
+	m.ctx = ctx
 
 	mux := ctx.Mux
 	mux.HandleFunc("GET /api/v1/containers", m.handleListContainers)

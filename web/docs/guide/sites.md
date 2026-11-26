@@ -161,6 +161,8 @@ POST /api/v1/sites/apply
 - `siteIds` 给定 = 只把选中站点的当前草稿渲染进 staging；未选中的站点保留现有片段，revision 不变。删除站点后的清理必须走全量 apply。
 - `force=true` 即使没有 revision 变化也重写。
 
+面板以 `Prefer: respond-async` 提交，API 立即返回 `202 { job }`，进度弹窗与任务中心轮询任务状态；下面的 validate/备份/reload 在后台依次执行。
+
 执行顺序：
 
 1. **加锁**：已有 apply 在进行 → `409 CONFLICT`，`details.retryAfterMs`。

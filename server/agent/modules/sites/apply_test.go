@@ -124,6 +124,7 @@ func newTestModule(t *testing.T) (*Module, *agent.Context, *fakeRunner, string) 
 		Cfg:    cfg,
 		Runner: runner,
 		Caps:   agent.NewProber(cfg, runner),
+		Jobs:   agent.NewJobManager(filepath.Join(base, "jobs"), slog.Default()),
 		Logger: slog.Default(),
 	}
 	module := New()
@@ -394,4 +395,47 @@ func TestAdminAddressPinsWildcardToLoopback(t *testing.T) {
 	if got := adminAddress(cfg); got != "[::1]:2021" && got != "127.0.0.1:2021" {
 		t.Fatalf("adminAddress 通配 IPv6 = %q", got)
 	}
+}
+
+func TestApplyAsyncReturnsJob(t *testing.T) {
+	module, ctx, _, root := newTestModule(t)
+	createDemoSite(t, module, root)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/sites/apply", strings.NewReader(`{"force":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Prefer", "respond-async")
+	recorder := httptest.NewRecorder()
+	ctx.Mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("async apply status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var envelope struct {
+		OK   bool                `json:"ok"`
+		Data protocol.JobStarted `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("async response is not envelope JSON: %v", err)
+	}
+	if !envelope.OK || envelope.Data.Job.ID == "" {
+		t.Fatalf("async response missing job: %s", recorder.Body.String())
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		job, ok := ctx.Jobs.Get(envelope.Data.Job.ID)
+		if !ok {
+			t.Fatalf("job %s missing", envelope.Data.Job.ID)
+		}
+		if job.Status == protocol.JobStatusSucceeded {
+			if _, ok := job.Result.(SiteApplyResult); !ok {
+				t.Fatalf("job result type = %T, want SiteApplyResult", job.Result)
+			}
+			return
+		}
+		if job.Status == protocol.JobStatusFailed || job.Status == protocol.JobStatusCancelled {
+			t.Fatalf("job ended as %s: %+v", job.Status, job.Error)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("async apply job did not finish")
 }

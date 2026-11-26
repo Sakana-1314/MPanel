@@ -33,6 +33,7 @@ type Context struct {
 	Cfg     *config.Agent
 	Runner  Runner
 	Caps    *Prober
+	Jobs    *JobManager
 	Logger  *slog.Logger
 	Started time.Time
 	Version string

@@ -55,7 +55,7 @@ func (c CORSConfig) writeHeaders(w http.ResponseWriter, r *http.Request) {
 				// 显式 * 与默认策略等价，直接回 *。
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token,X-Requested-With,X-Request-Id")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,Prefer,X-MPanel-Async,X-MPanel-Token,X-Requested-With,X-Request-Id")
 				w.Header().Set("Access-Control-Max-Age", "600")
 				w.Header().Add("Vary", "Origin")
 				return
@@ -77,7 +77,7 @@ func (c CORSConfig) writeHeaders(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 	w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-MPanel-Token,X-Requested-With,X-Request-Id")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,Prefer,X-MPanel-Async,X-MPanel-Token,X-Requested-With,X-Request-Id")
 	w.Header().Set("Access-Control-Max-Age", "600")
 	w.Header().Add("Vary", "Origin")
 }

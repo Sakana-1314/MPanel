@@ -20,6 +20,7 @@ import {
 import { createFilesApi, type FilesApi } from './files';
 import { createTerminalApi, type TerminalApi } from './terminal';
 import { createTasksApi, type TasksApi } from './tasks';
+import { createJobsApi, type JobsApi } from './jobs';
 import { joinUrl, toWsUrl } from '../lib/paths';
 
 export { AppError, ApiError, describeError, isAppError, errorFromStatus } from './errors';
@@ -244,6 +245,7 @@ export interface ApiClient extends ApiTransport {
   files: FilesApi;
   terminal: TerminalApi;
   tasks: TasksApi;
+  jobs: JobsApi;
 }
 
 /**
@@ -347,6 +349,7 @@ export function createClient(options: CreateClientOptions): ApiClient {
     files: createFilesApi(transport),
     terminal: createTerminalApi(transport),
     tasks: createTasksApi(transport),
+    jobs: createJobsApi(transport),
   };
 }
 

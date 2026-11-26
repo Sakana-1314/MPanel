@@ -297,3 +297,47 @@ type EdgeJobCreateInput struct {
 	Kind      string         `json:"kind"`
 	Payload   map[string]any `json:"payload,omitempty"`
 }
+
+// JobStatus is the lifecycle state of a long-running agent job.
+type JobStatus string
+
+const (
+	JobStatusQueued    JobStatus = "queued"
+	JobStatusRunning   JobStatus = "running"
+	JobStatusSucceeded JobStatus = "succeeded"
+	JobStatusFailed    JobStatus = "failed"
+	JobStatusCancelled JobStatus = "cancelled"
+)
+
+// JobError is the terminal error of a failed job (mirrors PanelError).
+type JobError struct {
+	Code    ErrorCode      `json:"code"`
+	Message string         `json:"message"`
+	Hint    string         `json:"hint,omitempty"`
+	Details map[string]any `json:"details,omitempty"`
+}
+
+// Job is a long-running operation exposed by GET /jobs. Result is the same
+// payload the synchronous endpoint would have returned.
+type Job struct {
+	ID            string    `json:"id"`
+	Kind          string    `json:"kind"`
+	Title         string    `json:"title"`
+	Status        JobStatus `json:"status"`
+	Progress      int       `json:"progress"`
+	Indeterminate bool      `json:"indeterminate"`
+	Step          string    `json:"step,omitempty"`
+	Logs          string    `json:"logs,omitempty"`
+	Result        any       `json:"result,omitempty"`
+	Error         *JobError `json:"error,omitempty"`
+	Cancellable   bool      `json:"cancellable"`
+	CreatedAt     string    `json:"createdAt"`
+	StartedAt     *string   `json:"startedAt"`
+	FinishedAt    *string   `json:"finishedAt"`
+}
+
+// JobStarted is returned by POST endpoints when the client asked for async
+// execution with `Prefer: respond-async` or `X-MPanel-Async: 1`.
+type JobStarted struct {
+	Job Job `json:"job"`
+}

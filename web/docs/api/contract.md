@@ -265,6 +265,54 @@ const basePath = `${connection.url}/api/v1/machines/${machineId}/proxy`;
 3. `GET /api/v1/databases/backups/:backupId/download` → 同上。
 4. 上传请求体是 `multipart/form-data`，响应仍是信封。
 
+### 2.9 后台任务（异步长操作）
+
+耗时操作支持异步执行：请求带 `Prefer: respond-async`（或 `X-MPanel-Async: 1`）时，worker 立即返回 `202 Accepted` + `{ job }`，操作在后台继续，前端轮询 `GET /jobs/:id` 展示进度。
+
+```ts
+type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+interface JobError {
+  code: ErrorCode;
+  message: string;
+  hint?: string;
+  details?: unknown;
+}
+
+interface Job {
+  id: string;
+  kind: string;                 // sites.apply / stacks.up / images.pull …
+  title: string;
+  status: JobStatus;
+  progress: number;             // 0..100
+  indeterminate: boolean;       // 无法精确估算时前端显示进行中动画
+  step?: string;
+  logs?: string;                // 最近日志尾部（最多 16 KiB）
+  result?: unknown;             // 与同步端点 data 相同形状
+  error?: JobError | null;
+  cancellable: boolean;
+  createdAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
+interface JobStarted { job: Job; }
+```
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/jobs` | `status?`、`kind?`、分页；`ListResult<Job>`，默认 `createdAt desc` |
+| GET | `/jobs/:id` | 任务详情；`NOT_FOUND` |
+| POST | `/jobs/:id/cancel` | 请求取消；返回 `{ cancelled: true, job }`；终态任务幂等 |
+
+- 支持异步的端点：`POST /sites/apply`、`POST /containers`、`POST /images/pull`、`POST /stacks/:name/{up,down,restart,pull}`。
+- 未带异步头时保持原有同步行为与 `data` 形状；带异步头时 `data` 固定为 `{ job }`，HTTP 状态 `202`。
+- 任务结果写入 `job.result`，失败写入 `job.error`（`code/message/hint/details`，与错误信封一致）。
+- 并发上限 4，超出时任务为 `queued`；任务历史保留最近 100 条并持久化到 `${agent.data_dir}/jobs/jobs.json`。
+- worker 重启会把 `queued/running` 任务标记为 `failed`（`UNAVAILABLE`，`agent 重启，任务已中断`），不自动续跑。
+- 取消是尽力而为：已终止任务返回当前快照；不可取消任务不提供 `cancel` UI。
+- 面板在任务中心展示最近任务；操作触发后自动弹出进度弹窗，可关闭后从任务中心重新打开。
+
 ## 3. 认证端点
 
 ### 3.1 worker
@@ -828,6 +876,7 @@ interface SiteApplyResult {
 5. 成功：每个本次渲染站点 `appliedRevision=当前站点 revision`、`lastApply.revision=全局 apply 序号`、`lastApply.ok=true`。
 6. Caddy 容器未运行 → `503 UNAVAILABLE`；不生成 staging。
 7. `siteIds` 不存在 → `NOT_FOUND`。
+8. 带 `Prefer: respond-async` 时立即返回 `202 { job }`，结果写入 `job.result`（见 §2.9）。
 
 ### 6.5 Export / Import
 
@@ -1275,7 +1324,7 @@ interface ExecResult {
 | 方法 | 路径 | Query / Body | data |
 |---|---|---|---|
 | GET | `/images` | `all?`、`dangling?`、`q?`、分页 | `ListResult<ImageSummary>` |
-| POST | `/images/pull` | `{ reference }` | `{ image: ImageSummary }`，同步 620s |
+| POST | `/images/pull` | `{ reference }` | `{ image: ImageSummary }`，同步 620s；带 `Prefer: respond-async` 时 202 `{ job }` |
 | DELETE | `/images/:id` | `force?` | `{ deleted:true, id }` |
 | POST | `/images/prune` | `{ danglingOnly? }` | `{ deleted:number, reclaimedBytes:number }` |
 
@@ -1295,6 +1344,7 @@ interface ExecResult {
 | DELETE | `/stacks/:name` | `force?` | `{ deleted:true, name }` |
 
 - 文件固定在 `$MPANEL_AGENT_BASE_DIR/stacks/<name>/compose.yaml`；名称正则防穿越。
+- `up/down/restart` 支持 `Prefer: respond-async`（202 `{ job }`，见 §2.9）。
 - 创建/更新先 `docker compose -f <tmp> config` 校验；失败 `400 BAD_REQUEST`（`output`）。
 - 运行中的栈删除需先 down 或 `force=true`（force 只删文件不停止容器）。
 - Compose YAML 是可信属主功能（可挂载宿主/privileged），不向非属主开放。
@@ -1715,6 +1765,10 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 // SiteApplyResult
 // SiteExportBundle
 // SiteImportResult
+// JobStatus
+// JobError
+// Job
+// JobStarted
 // CertificateInfo
 // CertificateStatus
 // DatabaseProfile
@@ -1817,6 +1871,7 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 | `/databases/profiles/:id/handoff`、`/databases/handoff/redeem` | `NOT_FOUND`、`BAD_REQUEST`、`UNAUTHORIZED`（限速） |
 | `/databases/profiles/:id/backup`、`/restore` | `CONFLICT`、`BAD_REQUEST`、`UNAVAILABLE`、`NOT_FOUND` |
 | `/databases/backups/:id`、`/download`、`/jobs*` | `NOT_FOUND`、`UPSTREAM_ERROR`（下载） |
+| `/jobs`、`/jobs/:id`、`/jobs/:id/cancel` | `NOT_FOUND`、`BAD_REQUEST`（status 过滤） |
 | `/containers*` | `UNAVAILABLE`、`NOT_FOUND`、`BAD_REQUEST`、`UPSTREAM_ERROR` |
 | `/containers/networks*` | `UNAVAILABLE`、`NOT_FOUND`、`BAD_REQUEST`、`CONFLICT` |
 | `/containers/config` | `BAD_REQUEST`（JSON/已知键）、`UNAVAILABLE`（读写失败） |
@@ -1845,6 +1900,7 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 | `/containers`（logs 流/stats/exec/start/stop/restart/remove） | §9.2 |
 | `/containers/networks`、`/containers/config` | §9.5 |
 | `/stacks`、`/images` | §9.3、§9.4 |
+| `/jobs`（异步长操作） | §2.9 |
 | `/files`（list/stat/read/write/mkdir/rename/copy/chmod/delete/trash/upload/download/archive/extract/search） | §10 |
 | `/terminal/sessions`、`WS /ws/terminal/:id` | §11 |
 | `/tasks`（run-now/history/next-runs） | §12 |

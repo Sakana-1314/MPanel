@@ -27,6 +27,8 @@ import type { ImageSummary } from '@/api/types';
 import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
+import { describeError } from '@/api/errors';
+import { openJobProgress } from '@/lib/job-center';
 import { formatBytes, formatDate } from '@/lib/format';
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -68,19 +70,30 @@ const filtered = computed(() => {
 
 const totalSize = computed(() => images.value.reduce((sum, image) => sum + image.sizeBytes, 0));
 
-const pullAction = useAction((reference: string) => api.value.images.pull(reference), {
-  success: (result) => `已拉取 ${result.image.repoTags[0] ?? result.image.id.slice(0, 12)}`,
-  successDescription: '镜像已就绪，可用于容器或 Compose。',
-  invalidate: [machineKey(machineId, 'images')],
-});
+const pulling = ref(false);
 
 async function pull(): Promise<void> {
   const reference = pullReference.value.trim();
-  if (reference.length === 0) return;
-  const result = await pullAction.run(reference);
-  if (result !== undefined) {
+  if (reference.length === 0 || pulling.value) return;
+  pulling.value = true;
+  try {
+    const started = await api.value.images.pullAsync(reference);
     pullOpen.value = false;
     pullReference.value = '';
+    openJobProgress({
+      machineId,
+      jobId: started.job.id,
+      title: started.job.title,
+      invalidate: [machineKey(machineId, 'images')],
+    });
+  } catch (error) {
+    dialog.error({
+      title: '无法启动镜像任务',
+      content: describeError(error).description,
+      positiveText: '知道了',
+    });
+  } finally {
+    pulling.value = false;
   }
 }
 
@@ -222,7 +235,7 @@ function confirmPrune(): void {
       <template #footer>
         <div class="toolbar" style="justify-content: flex-end">
           <n-button quaternary @click="pullOpen = false">取消</n-button>
-          <n-button type="primary" :loading="pullAction.pending.value" :disabled="pullReference.trim().length === 0" @click="pull">拉取</n-button>
+          <n-button type="primary" :loading="pulling" :disabled="pullReference.trim().length === 0" @click="pull">拉取</n-button>
         </div>
       </template>
     </n-modal>
