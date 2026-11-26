@@ -117,9 +117,9 @@ func runServiceCommand(command, target, baseDir string) {
 		}
 		fmt.Printf("✅ %s %s 成功\n", service, command)
 	}
-	if command == "status" {
-		cfg, err := config.LoadApp(config.DefaultBaseDir())
-		if err == nil {
+	if command == "status" && target != "agent" {
+		// Read-only: never create app.yaml (an agent-only host has no core).
+		if cfg, err := loadExistingCoreConfig(baseDir); err == nil {
 			fmt.Printf("面板地址：http://<本机 IP>:%s\n", strconv.Itoa(cfg.System.Port))
 		}
 	}
