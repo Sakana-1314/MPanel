@@ -87,6 +87,7 @@ const menuOptions = [
       size="tiny"
       quaternary
       circle
+      class="tab-mobile-menu"
       title="菜单"
       @click="emit('menu')"
     >
@@ -268,6 +269,10 @@ const menuOptions = [
   margin: 0 2px 7px 3px;
 }
 .tab-menu {
+  flex: 0 0 auto;
+  margin-bottom: 7px;
+}
+.tab-mobile-menu {
   flex: 0 0 auto;
   margin-bottom: 7px;
 }
