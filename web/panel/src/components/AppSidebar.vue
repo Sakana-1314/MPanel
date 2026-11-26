@@ -14,21 +14,16 @@ import type { Component } from 'vue';
 import type { MenuOption } from 'naive-ui';
 import {
   AddOutline,
-  ChevronForwardOutline,
   ChevronUpOutline,
+  ConstructOutline,
   CubeOutline,
-  FlashOutline,
-  FolderOpenOutline,
   GlobeOutline,
   LayersOutline,
   LogOutOutline,
   MoonOutline,
   ServerOutline,
   SettingsOutline,
-  ShieldCheckmarkOutline,
   SunnyOutline,
-  TerminalOutline,
-  TimeOutline,
 } from '@vicons/ionicons5';
 import { useMachinesQuery } from '@/lib/machines';
 import { activeTab } from '@/lib/workspace';
@@ -66,18 +61,12 @@ function renderIcon(component: Component): () => ReturnType<typeof h> {
   return () => h(NIcon, { component, size: 17 });
 }
 
-const navIcons: Record<string, Component> = {
-  sites: GlobeOutline,
-  certs: ShieldCheckmarkOutline,
-  postgres: LayersOutline,
-  redis: FlashOutline,
-  containers: CubeOutline,
-  'container-config': SettingsOutline,
-  images: LayersOutline,
-  stacks: LayersOutline,
-  files: FolderOpenOutline,
-  terminal: TerminalOutline,
-  tasks: TimeOutline,
+const groupIcons: Record<string, Component> = {
+  网站: GlobeOutline,
+  数据库: LayersOutline,
+  容器: CubeOutline,
+  系统: SettingsOutline,
+  工具箱: ConstructOutline,
 };
 
 /** 分组 key → 组内菜单项；用于「进哪个页面就展开哪个分组」。 */
@@ -89,10 +78,10 @@ const menuOptions = computed<MenuOption[]>(() =>
   MACHINE_NAV_GROUPS.map((group) => ({
     key: groupKey(group.title),
     label: group.title,
+    icon: renderIcon(groupIcons[group.title] ?? GlobeOutline),
     children: group.items.map((item) => ({
       key: item.key,
       label: item.title,
-      icon: renderIcon(navIcons[item.key] ?? GlobeOutline),
     })),
   })),
 );
@@ -450,8 +439,9 @@ async function onLogout(): Promise<void> {
   letter-spacing: 0.04em;
   color: var(--mpanel-muted);
 }
-:deep(.n-menu-item-group .n-menu-item-content) {
-  padding-left: 22px !important;
+/* 子项没有图标，缩进到与分组标题文字对齐。 */
+:deep(.n-submenu-children .n-menu-item-content) {
+  padding-left: 30px !important;
 }
 
 /* ------------------------------- 账号区 -------------------------------- */
