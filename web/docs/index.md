@@ -18,10 +18,10 @@ features:
     details: web/panel 只负责界面；core 负责登录、机器注册、隧道与代理；agent 在目标主机执行站点、数据库、容器、文件、终端与计划任务。
   - title: 1Panel 风格部署
     details: 安装根 /opt/mpanel，配置 conf/app.yaml 与 conf/agent.yaml，二进制放在 /usr/local/bin，服务用 mpanel-core.service / mpanel-agent.service。
-  - title: Caddy 管理站点
-    details: 每站点生成 sites.d/*.caddy 片段，apply 走 validate → 备份 → 原子替换 → reload → 回滚，天然支持自动 HTTPS。
+  - title: Caddy 容器化
+    details: Caddy 以 mpanel-caddy 编排运行，站点页一键安装；每站点生成 sites.d/*.caddy，apply 在容器内 validate → 备份 → 原子替换 → reload → 回滚。
   - title: 能力缺失可降级
-    details: 没有 Caddy、Docker、PostgreSQL、Redis 或 PTY 时进程照常启动；列表返回 available=false，写操作返回 UNAVAILABLE 与可执行提示。
+    details: 没有 Caddy 容器、Docker、PostgreSQL 客户端、Redis 客户端或 PTY 时进程照常启动；列表返回 available=false，写操作返回 UNAVAILABLE 与可执行提示。
 ---
 
 ## 一句话定位

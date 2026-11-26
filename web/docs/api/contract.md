@@ -197,6 +197,7 @@ interface ListResult<T> {
 
 - 列表在能力不可用时返回 `200` + `{available:false,reason,items:[]}`，不返回 503。
 - 能力不可用时的写操作 → `503 UNAVAILABLE`，`details.hint` 必须可执行。
+- `capabilities.caddy` 表示受管 Caddy **容器**正在运行，而不是宿主机 `caddy` 二进制存在。Caddy 只以 Docker Compose 编排部署（模板见 `web/store`）；未部署时 `/sites` 全部端点不可用，唯一例外是 `POST /sites/bootstrap`（安装准备）。
 - 目标数据库/容器/机器本身不可达 ≠ 能力不可用：健康/测试返回业务结果（`ok:false`），统计返回 `UPSTREAM_ERROR`。
 - 模块通过 request-time `CapabilityProvider` 判断；`requires` 只做诊断，不得阻止 worker 启动。
 - `GET /system/info?refresh=1` 强制重新探测（worker）；core 忽略。
@@ -386,6 +387,7 @@ interface WorkerDescriptor {
 ```
 
 - core 五个能力全 `available:false`，`reason: "feature capabilities are provided by workers"`；`features.pty=false`。
+- worker 的 `capabilities.caddy` 只有在 `mpanel-caddy` 编排的 `caddy` 容器运行且容器内 `caddy version` 成功时为 `available:true`；`version` 来自容器内命令输出。
 - worker `paths` 只给已认证属主；前端不要写日志。
 
 ### 4.2 `GET /system/overview`（仅 core）
@@ -754,7 +756,8 @@ interface SiteConfig {
 
 | 方法 | 路径 | Query / Body | data |
 |---|---|---|---|
-| GET | `/sites` | `enabled?`, `q?`, 分页 | `ListResult<Site>`，默认 `updatedAt desc` |
+| GET | `/sites` | `enabled?`, `q?`, 分页 | `ListResult<Site>`，默认 `updatedAt desc`；Caddy 容器未部署时 `available=false` |
+| POST | `/sites/bootstrap` | `{}` | `SiteBootstrapResult`；安装 Caddy 容器前准备目录与挂载，未部署时唯一可用的站点端点 |
 | POST | `/sites` | `{ name, enabled?, config }` | `Site`，201 |
 | GET | `/sites/:id` | — | `Site` |
 | PUT | `/sites/:id` | `{ name?, enabled?, config? }`（至少一项） | `Site`（revision+1；不自动 apply） |
@@ -764,6 +767,7 @@ interface SiteConfig {
 | GET | `/sites/export` | — | `SiteExportBundle` |
 | POST | `/sites/import` | `{ bundle, mode?: 'merge'\|'replace' }` | `SiteImportResult` |
 
+- 可用性：`capabilities.caddy.available=true`（受管容器运行）是除 `/sites/bootstrap` 外所有 `/sites` 端点的前置条件。列表返回 `available:false`，其余端点返回 `503 UNAVAILABLE`，`details.reason` 说明容器/ Docker 状态，`details.hint` 指向一键安装。
 - 名称唯一 → `CONFLICT`；站点内域名重复 `BAD_REQUEST`。
 - 修改只改 JSON 草稿；删除已应用站点需全量 apply 才从 Caddy 移除。
 - 根目录若不在 `MPANEL_SITES_ROOTS` → `BAD_REQUEST`。
@@ -784,7 +788,8 @@ interface SitePreviewResult {
 ```
 
 - `siteId` 不存在 → `NOT_FOUND`；同时给 site/siteId → `BAD_REQUEST`。
-- caddy 不可用：仍返回片段，validation=null + reason，不返回 503。
+- Caddy 容器未部署 → `503 UNAVAILABLE`（此时只允许 `/sites/bootstrap`）。
+- `validate=true` 时在容器内对 staging 目录执行 `caddy validate`；容器内校验失败不写线上目录、不改 revision。
 - 不写线上目录、不改 revision。
 
 ### 6.4 Apply
@@ -816,10 +821,10 @@ interface SiteApplyResult {
 
 1. 已有 apply → `409 CONFLICT`（`details.retryAfterMs`）。
 2. staging 生成失败 → `400 BAD_REQUEST`（`stage='render'`）。
-3. `caddy validate` 失败 → `400 BAD_REQUEST`（`stage='validate'`、`output`）；线上不变。
-4. 备份/替换/`caddy reload` 失败 → 恢复备份并重载；`502 UPSTREAM_ERROR`（`stage='reload'`、`rolledBack=true`）；恢复也失败 → `500 INTERNAL`。
+3. 容器内 `caddy validate --config <staging>/Caddyfile --adapter caddyfile` 失败 → `400 BAD_REQUEST`（`stage='validate'`、`output`）；线上不变。
+4. 备份/替换/容器内 `caddy reload` 失败 → 恢复备份并重载；`502 UPSTREAM_ERROR`（`stage='reload'`、`rolledBack=true`）；恢复也失败 → `500 INTERNAL`。
 5. 成功：每个本次渲染站点 `appliedRevision=当前站点 revision`、`lastApply.revision=全局 apply 序号`、`lastApply.ok=true`。
-6. caddy 不可用 → `503 UNAVAILABLE`；不生成 staging。
+6. Caddy 容器未运行 → `503 UNAVAILABLE`；不生成 staging。
 7. `siteIds` 不存在 → `NOT_FOUND`。
 
 ### 6.5 Export / Import
@@ -837,6 +842,41 @@ interface SiteExportBundle {
 - `merge`（默认）：同名跳过计 `skipped`，其余创建；不修改同名。
 - `replace`：删除全部现有站点（仅 JSON）再创建。
 - 不自动 apply；运行中的 Caddy 不变。
+
+### 6.6 安装（容器编排）
+
+Caddy **只以容器运行**。安装由面板完成三步：读取 `web/store` 的清单与 Compose 模板、调用 `POST /sites/bootstrap` 准备宿主目录、通过通用 `/stacks` 端点创建并启动 `mpanel-caddy` 编排。agent 不提供单独的安装端点。
+
+#### `POST /sites/bootstrap`
+
+- Auth：需要。
+- Body：`{}`（可省略）。
+- 行为：创建 `caddy_config`、`caddy_config/sites.d`、`caddy_data` 与站点根目录；写入受管主 `Caddyfile`（`admin 127.0.0.1:2019` + `import sites.d/*.caddy`）。不启动容器，不改站点草稿。
+- 该端点不受 Caddy 能力门禁限制；其余 `/sites` 端点仍返回不可用。
+
+```ts
+interface SiteBootstrapMount {
+  source: string;             // 宿主路径
+  target: string;             // 容器内路径
+  readOnly?: boolean;
+}
+
+interface SiteBootstrapResult {
+  configDir: string;          // 宿主 caddy_config
+  dataDir: string;            // 宿主 caddy_data，挂载到容器 /data
+  caddyfilePath: string;      // 宿主受管 Caddyfile
+  sitesRoot: string;          // 默认站点根 ${agent.data_dir}/sites
+  mounts: SiteBootstrapMount[]; // 商店模板必须复现的挂载
+  ready: boolean;             // 当前 capabilities.caddy.available
+}
+```
+
+约定：
+
+- Compose 项目名与服务名固定为 `mpanel-caddy` / `caddy`；agent 用这两个标签定位容器并通过 `docker exec <container> caddy ...` 执行 validate/reload。
+- `caddy_config` 挂载到容器 `/etc/caddy`，`caddy_data` 挂载到 `/data`；站点根按相同绝对路径只读挂载，保证 `file_server.root` 在容器内仍有效。
+- 安装模板位于 `web/store/caddy/`，由面板通过 GitHub 链接读取；`storeUrl` 可在 `config.json` 覆盖。
+- 容器未运行时 `/sites` 全功能不可用，不尝试回退到宿主机二进制。
 
 ## 7. 证书（只读）
 
@@ -866,7 +906,7 @@ interface CertificateInfo {
 | GET | `/certs` | `domain?`, `status?`, `includeExpired?`(默认 true), 分页 | `ListResult<CertificateInfo>`，默认 `notAfter asc` |
 | GET | `/certs/:id` | — | `CertificateInfo` |
 
-- 可用性：`MPANEL_CADDY_DATA_DIR` 可读；不存在/不可读 → `available=false`。caddy 二进制缺失不影响。
+- 可用性：`MPANEL_CADDY_DATA_DIR` / `caddy_data` 可读；不存在/不可读 → `available=false`。Caddy 容器是否运行不影响证书扫描。
 - 扫描 `certificates/**/*.{crt,pem}`，只解析 X509，不读私钥；解析失败跳过并 warning。
 - 不提供手动续期/删除。
 
@@ -1575,6 +1615,8 @@ interface TaskCreateInput {
 interface RuntimeConfig {
   appName?: string;
   dbxUrl?: string;
+  /** web/store 模板来源；绝对 URL 或同源相对路径。 */
+  storeUrl?: string;
   /** kind 仅为兼容旧 config.json；面板忽略非 core 条目。 */
   defaultBackend?: { url: string; kind?: 'core'; label?: string };
   backends?: { id?: string; url: string; kind?: 'core'; label?: string }[];
@@ -1590,6 +1632,7 @@ interface RuntimeConfig {
 | `VITE_DEFAULT_BACKEND_KIND` | `worker` 或 `core` |
 | `VITE_DEFAULT_BACKEND_LABEL` | 显示名 |
 | `VITE_DBX_URL` | dbx iframe 基础地址 |
+| `VITE_STORE_URL` | `web/store` 模板来源；默认 GitHub raw |
 | `VITE_API_TIMEOUT_MS` | 普通请求超时，默认 120000 |
 | `VITE_BASE_PATH` | 构建期静态基路径，默认 `/` |
 
@@ -1664,6 +1707,8 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 // ReverseProxyHandler
 // FileServerHandler
 // RedirectHandler
+// SiteBootstrapMount
+// SiteBootstrapResult
 // SitePreviewResult
 // SiteApplyResult
 // SiteExportBundle
@@ -1760,10 +1805,9 @@ interface BackendConnection {          // 仅此对象进入 localStorage
 | `/machines/:id/secret/rotate` | `BAD_REQUEST`（非 reverse-ws）、`NOT_FOUND` |
 | `/machines/:id/proxy/*` | `UNAVAILABLE`（offline/stopped）、`UPSTREAM_ERROR`、`NOT_FOUND`；业务 envelope 透传 |
 | `WS /machines/:id/proxy/ws/*` | `UNAUTHORIZED`、`UNAVAILABLE`/`4502`、`4404` |
-| `/sites` CRUD | `CONFLICT`、`NOT_FOUND`、`BAD_REQUEST`（配置/根目录） |
-| `/sites/preview` | `NOT_FOUND`（siteId）、`BAD_REQUEST` |
+| `/sites` CRUD、`/sites/preview`、`/sites/export`、`/sites/import` | `UNAVAILABLE`（Caddy 容器未部署）、`CONFLICT`、`NOT_FOUND`、`BAD_REQUEST`（配置/根目录） |
+| `/sites/bootstrap` | `INTERNAL`（目录/写入失败） |
 | `/sites/apply` | `CONFLICT`、`BAD_REQUEST`（render/validate）、`UPSTREAM_ERROR`（reload）、`UNAVAILABLE`（caddy）、`NOT_FOUND` |
-| `/sites/import`、`/sites/export` | `BAD_REQUEST`（bundle） |
 | `/certs` | `NOT_FOUND`；列表不可用用 `available=false` |
 | `/databases/profiles` CRUD | `CONFLICT`、`NOT_FOUND`、`BAD_REQUEST`（kind/port） |
 | `/databases/profiles/:id/test` | `UNAVAILABLE`；连接失败 200 ok:false |

@@ -268,7 +268,7 @@ const indexNamesText = computed({
                 <div v-for="(_, index) in handler.upstreams" :key="index" class="row">
                   <n-input
                     v-model:value="handler.upstreams[index]"
-                    :placeholder="index === 0 ? '127.0.0.1:8080' : '10.0.0.2:3000'"
+                    :placeholder="index === 0 ? 'host.docker.internal:8080' : '容器名:3000'"
                   />
                   <n-button
                     quaternary
@@ -342,7 +342,7 @@ const indexNamesText = computed({
             <n-form-item label="根目录" required>
               <n-input
                 :value="handler.root"
-                placeholder="/var/www/site 或 C:\sites\www"
+                placeholder="/opt/mpanel/data/agent/sites/site"
                 @update:value="(value: string) => handler.type === 'file_server' && (handler.root = value)"
               />
             </n-form-item>

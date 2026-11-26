@@ -92,6 +92,9 @@ jobs:
           else
             echo "::warning::未找到 web/docs/.vitepress/dist，本次只发布面板"
           fi
+          # 应用商店模板：面板可直接把 storeUrl 设成同源 /store，避免依赖 GitHub raw。
+          cp -R web/store public/store
+          cp -R web/store public/MPanel/store
           cp public/index.html public/404.html
           # GitHub Pages 项目页的深链兜底必须用子路径产物，否则 router base 不匹配。
           cp public/MPanel/index.html public/MPanel/404.html

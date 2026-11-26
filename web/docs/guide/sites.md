@@ -1,29 +1,30 @@
 # 站点与 Caddy
 
-MPanel 用 Caddy 管理网站，而不是 nginx。站点只接受**结构化配置**，由 agent 生成 Caddyfile 片段；不支持粘贴原始 Caddyfile、`import` 或任意指令。
+MPanel 用 Caddy 管理网站，而不是 nginx。Caddy **以 Docker 容器运行**，由面板一键部署 `mpanel-caddy` 编排；站点只接受**结构化配置**，由 agent 生成 Caddyfile 片段，不支持粘贴原始 Caddyfile、`import` 或任意指令。
 
-::: tip 实现状态
-站点模型、预览/应用/导入导出与证书扫描的接口契约已冻结（见 [REST API 契约](/api/contract)）；Go 版站点模块仍在移植，本文描述目标行为。已实现的部分是 agent 配置中的 `caddy_bin`、`caddy_config`、`caddy_data`、`caddy_admin` 字段与目录解析。
+::: tip 部署模型
+Caddy 不再依赖宿主机二进制。未部署容器时，站点列表、新建、预览、导入导出与应用全部不可用，页面只保留「一键安装 Caddy」入口。安装模板与说明在仓库 `web/store/caddy/`，通过 GitHub 链接读取。
 :::
 
 ## 1. 为什么是 Caddy
 
-- **片段化**：每个站点一个 `sites.d/<siteId>.caddy` 文件，主 `Caddyfile` 只有 `import sites.d/*.caddy`。增删站点就是增删文件。
+- **片段化**：每个站点一个 `sites.d/<siteId>.caddy` 文件，主 `Caddyfile` 只包含受管全局块与 `import sites.d/*.caddy`。增删站点就是增删文件。
 - **自动 HTTPS**：`tls auto` 由 Caddy 自动申请与续期证书；`tls internal` 用本地 CA；`tls off` 只监听 HTTP。
 - **可验证的 apply**：先 `caddy validate`，再备份、原子替换、`caddy reload`，失败自动回滚。每一步都有明确的阶段与输出。
 - **注入边界清晰**：所有进入 Caddyfile 的用户字符串都经过校验与转义，指令名与结构由代码固定。
 
-## 2. 目录布局
+## 2. 容器与目录布局
 
-agent 的 Caddy 目录由 `caddy_config` 与 `caddy_data` 决定：
+Caddy 容器由 `web/store/caddy/compose.yaml` 创建，固定项目名 `mpanel-caddy`、服务名 `caddy`。agent 通过 compose 标签定位运行中的容器，并用 `docker exec <container> caddy ...` 执行 validate/reload。
+
+宿主目录由 `caddy_config` 与 `caddy_data` 决定：
 
 ```text
-${caddy_config}/                  # 默认 ${agent.data_dir}/caddy
-├─ Caddyfile                      # 受管主配置：import sites.d/*.caddy
+${caddy_config}/                  # 默认 ${agent.data_dir}/caddy，挂载到容器 /etc/caddy
+├─ Caddyfile                      # 受管主配置：admin + import sites.d/*.caddy
 ├─ sites.d/
 │  └─ <siteId>.caddy              # 每站点一个片段
-├─ staging/                       # 生成与 validate 的临时目录
-└─ data/                          # Caddy 数据目录（证书），默认即 ${caddy_data}
+└─ data/                          # 默认 ${caddy_data}，挂载到容器 /data
    └─ certificates/...
 ```
 
@@ -31,14 +32,23 @@ ${caddy_config}/                  # 默认 ${agent.data_dir}/caddy
 
 - `caddy_config` = `/opt/mpanel/data/agent/caddy`
 - `caddy_data` = `${caddy_config}/data`
+- 站点根目录 = `/opt/mpanel/data/agent/sites`（以及 `files_roots` 中的根）
+
+安装前调用 `POST /api/v1/sites/bootstrap` 创建目录、写入主 `Caddyfile`，并返回需要写进 compose 的挂载。站点根会以**相同绝对路径**只读挂进容器，因此 `file_server.root` 在容器内仍然有效。
 
 主 `Caddyfile` 内容固定为：
 
 ```caddyfile
+# Managed by MPanel. Do not edit by hand.
+{
+	admin 127.0.0.1:2019
+	storage file_system /data
+}
+
 import sites.d/*.caddy
 ```
 
-首次 apply 前需要保证 Caddy 进程使用这个主配置启动，否则 reload 会作用到另一个实例，站点看起来“apply 成功但不生效”。
+反代宿主机服务时，upstream 用 `host.docker.internal:<端口>`（模板已配置 `extra_hosts: host-gateway`）；反代其它容器时填容器名和容器端口。
 
 ## 3. 站点模型
 
@@ -138,7 +148,7 @@ interface SitePreviewResult {
 
 - `site` 与 `siteId` 恰好给一个；都不给或都给 → `BAD_REQUEST`。
 - 预览只生成片段，不写线上目录、不改 revision。
-- Caddy 不可用时仍返回片段，`validation=null` 并带原因，不返回 503。
+- Caddy 容器未部署时预览也是 `503 UNAVAILABLE`；站点功能整体不可用。
 
 ### 5.2 apply 流程
 
@@ -155,10 +165,10 @@ POST /api/v1/sites/apply
 
 1. **加锁**：已有 apply 在进行 → `409 CONFLICT`，`details.retryAfterMs`。
 2. **渲染到 staging**：失败 → `400 BAD_REQUEST`，`stage=render`。
-3. **validate**：`caddy validate --config <staging>/Caddyfile --adapter caddyfile`。失败 → `400 BAD_REQUEST`，`stage=validate`，线上配置不变。
+3. **validate**：在容器内执行 `caddy validate --config /etc/caddy/<staging>/Caddyfile --adapter caddyfile`。失败 → `400 BAD_REQUEST`，`stage=validate`，线上配置不变。
 4. **备份**：把当前 `Caddyfile` 与 `sites.d/` 复制到 `${agent.data_dir}/backups/caddy/<timestamp>/`。
 5. **原子替换**：Linux 上用“新目录 → rename”替换；Windows 没有非空目录的原子替换，采用“旧目录改名 → 新目录改名”，存在毫秒级窗口。
-6. **reload**：`caddy reload --config <Caddyfile> --adapter caddyfile`，默认经 `127.0.0.1:2019` 的 admin API。
+6. **reload**：容器内 `caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile`，默认经容器内 `127.0.0.1:2019` 的 admin API。
 7. **失败回滚**：reload 失败时恢复备份目录与主配置，再次 reload；返回 `502 UPSTREAM_ERROR`，`stage=reload`、`rolledBack=true`。恢复也失败 → `500 INTERNAL`。
 8. **记账**：全部成功后，本次渲染站点的 `appliedRevision` 设为当前站点 revision，`lastApply` 记录全局 apply 序号、时间与 Caddyfile 哈希。
 
@@ -182,10 +192,10 @@ interface SiteApplyResult {
 
 | 现象 | 阶段 | 处理 |
 |---|---|---|
-| `503 UNAVAILABLE` | 未开始 | Caddy 不可用；安装 Caddy 或设置 `caddy_bin` 绝对路径，重启 agent |
+| `503 UNAVAILABLE` | 未开始 | Caddy 容器未部署；在站点页一键安装，或到编排页启动 `mpanel-caddy` |
 | `400 BAD_REQUEST` | `render` | 配置字段非法；按 `details.issues` 修正 |
 | `400 BAD_REQUEST` | `validate` | 看 `details.output`；检查域名、root、upstream 与 header |
-| `502 UPSTREAM_ERROR`，`rolledBack=true` | `reload` | Caddy 未运行、admin 地址不可达或权限不足；检查 `caddy_admin` 与 `caddyOutput` |
+| `502 UPSTREAM_ERROR`，`rolledBack=true` | `reload` | 容器内 admin 不可达、配置被外部改动或容器异常；检查容器日志与 `caddyOutput` |
 | `409 CONFLICT` | 加锁 | 等 `retryAfterMs` 后重试，不要并发 apply |
 | `500 INTERNAL` | 回滚也失败 | 检查磁盘空间与目录权限，从 `backups/caddy/` 手工恢复 |
 
@@ -199,16 +209,25 @@ interface SiteApplyResult {
 | `pending` | `appliedRevision` 与当前 `revision` 不一致 |
 | `applied` | `appliedRevision === revision` 且最近一次 apply 成功 |
 
-## 7. 能力缺失时的降级
+## 7. 未部署时的行为
 
-没有安装 Caddy、或 `caddy_bin` 指向的文件不存在时：
+Caddy 只以容器运行，不提供宿主机二进制回退。`mpanel-caddy` 编排的 `caddy` 容器未运行时：
 
-- 站点列表与草稿的增删改查仍可用（JSON 存储）；
-- `preview` 仍生成片段，`validation=null`，并返回 `validationUnavailableReason`；
-- `apply` 返回 `503 UNAVAILABLE`，`details.hint` 提示安装 Caddy 或设置 `caddy_bin`；
-- 证书列表的可用性只取决于 `caddy_data` 目录是否可读，与 Caddy 二进制无关。
+- `capabilities.caddy.available=false`，`reason` 区分「Docker 不可用」「容器未部署」「容器运行但 caddy 命令异常」；
+- `GET /sites` 返回 `200` + `{available:false,reason,items:[]}`；
+- 其余 `/sites` 端点（含 preview、export、import）返回 `503 UNAVAILABLE`，`details.reason` 带上具体原因，`details.hint` 指向一键安装；
+- 面板站点页不展示列表与编辑入口，只保留安装卡片；
+- `POST /sites/bootstrap` 仍可用，用于安装前准备目录与挂载；
+- 证书列表的可用性只取决于 `caddy_data` 目录是否可读，与容器是否运行无关。
 
-agent 不会自动安装或启动 Caddy。
+安装步骤（面板自动完成）：
+
+1. 从 `web/store` 读取 `caddy/app.json` 与 `caddy/compose.yaml`；
+2. `POST /sites/bootstrap` 创建目录、写入主 Caddyfile，拿到挂载列表；
+3. `POST /stacks` 创建 `mpanel-caddy` 编排（已存在则复用），再 `POST /stacks/mpanel-caddy/up`；
+4. 轮询 `GET /system/info?refresh=1`，直到 `capabilities.caddy.available=true`。
+
+Docker 或 Compose v2 缺失时安装会失败，页面会展示可执行的错误输出；修复后点「检查状态」重试。
 
 ## 8. 证书扫描
 
@@ -225,16 +244,16 @@ agent 不会自动安装或启动 Caddy。
 
 ## 9. 运维命令
 
-手工校验与重载（使用与 agent 相同的路径）：
+容器健康后，手工校验与重载（与 agent 执行位置一致）：
 
 ```bash
-caddy validate --config /opt/mpanel/data/agent/caddy/Caddyfile --adapter caddyfile
-caddy reload   --config /opt/mpanel/data/agent/caddy/Caddyfile --adapter caddyfile
+docker exec mpanel-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker exec mpanel-caddy caddy reload   --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
 注意：
 
-- Caddy 的 systemd 单元必须把 `ExecStart` 指向同一个 `Caddyfile`，否则重启 Caddy 会丢失面板刚 apply 的配置。
-- Caddy 需要读 `Caddyfile` 与 `sites.d/`、写 `caddy_data`（证书）；agent 需要写 `caddy_config` 与备份目录。两者不是同一用户时，用组权限或 ACL 协调。
-- `caddy_admin` 默认是 `127.0.0.1:2019`；如果 Caddy 在容器或另一个网络命名空间，必须让 agent 能访问该地址，并只对可信网络开放 admin API。
-- 站点根目录的属主与权限要允许 Caddy 读取，否则 validate 通过但访问 403。
+- 不要在宿主机另起 `caddy run` 使用同一份配置；容器是唯一实例。
+- `caddy_config` 与 `caddy_data` 由容器写入，agent 需要读写权限；站点根目录需要容器可读，否则 validate 通过但访问 403。
+- 修改 compose（例如增加站点根挂载）请到「编排」页编辑 `mpanel-caddy`，不要直接改容器。
+- admin API 只在容器回环地址监听，不对外发布；agent 通过 `docker exec` 操作，不依赖宿主端口。

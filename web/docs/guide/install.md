@@ -11,7 +11,7 @@ Go 重写已落地：`server/cmd/`、`server/core/`、`server/agent/` 与全部�
 - Linux（amd64 或 arm64），systemd 作为服务管理器。
 - Go 工具链版本不低于仓库 `go.mod` 的 `go` 指令（当前为 `1.27.2`）。
 - 一个专用系统用户（下文用 `mpanel`），不要用 root 直接运行面板进程。
-- 可选外部能力：Caddy（站点）、Docker（容器/编排）、PostgreSQL 客户端工具（`pg_dump`、`psql`）、Redis 客户端（`redis-cli`）。缺少这些不会阻止 agent 启动，只影响对应模块的写操作。
+- 可选外部能力：Docker Engine 与 Compose v2（容器/编排；站点的 Caddy 也以容器部署）、PostgreSQL 客户端工具（`pg_dump`、`psql`）、Redis 客户端（`redis-cli`）。缺少这些不会阻止 agent 启动，只影响对应模块的写操作。Caddy 不需要在宿主机安装二进制。
 
 端口约定：
 

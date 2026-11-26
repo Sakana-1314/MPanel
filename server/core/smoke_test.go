@@ -294,26 +294,26 @@ func TestSmoke(t *testing.T) {
 	}
 	client.ok(http.MethodDelete, proxy("/files?root="+rootName+"&path=smoke"), nil, nil)
 
-	var site envelope[struct {
-		ID     string `json:"id"`
-		Status string `json:"status"`
-	}]
-	client.ok(http.MethodPost, proxy("/sites"), map[string]any{
+	// Sites are unavailable until the managed Caddy container is deployed.
+	// Bootstrap is the one install-preparation endpoint that must still work.
+	var bootstrapResp envelope[map[string]any]
+	client.ok(http.MethodPost, proxy("/sites/bootstrap"), map[string]any{}, &bootstrapResp)
+	if _, ok := bootstrapResp.Data["mounts"]; !ok {
+		t.Fatalf("bootstrap missing mounts: %#v", bootstrapResp.Data)
+	}
+	var siteErr envelope[map[string]any]
+	status := client.do(http.MethodPost, proxy("/sites"), map[string]any{
 		"name": "smoke-site",
 		"config": map[string]any{
 			"domains": []string{"smoke.example.test"},
 			"handler": map[string]any{"type": "reverse_proxy", "upstreams": []string{"127.0.0.1:4321"}},
 		},
-	}, &site)
-	var preview envelope[struct {
-		Caddyfile string `json:"caddyfile"`
-	}]
-	client.ok(http.MethodPost, proxy("/sites/"+site.Data.ID+"/preview"), map[string]any{}, &preview)
-	if !strings.Contains(preview.Data.Caddyfile, "smoke.example.test") {
-		t.Fatalf("preview missing domain: %q", preview.Data.Caddyfile)
+	}, &siteErr)
+	if status != 503 || siteErr.Error == nil || siteErr.Error.Code != "UNAVAILABLE" {
+		t.Fatalf("sites without caddy container = %d %#v", status, siteErr.Error)
 	}
 	var applyErr envelope[map[string]any]
-	status := client.do(http.MethodPost, proxy("/sites/apply"), map[string]any{"siteIds": []string{site.Data.ID}}, &applyErr)
+	status = client.do(http.MethodPost, proxy("/sites/apply"), map[string]any{}, &applyErr)
 	if status != 503 || applyErr.Error == nil || applyErr.Error.Code != "UNAVAILABLE" {
 		t.Fatalf("apply without caddy = %d %#v", status, applyErr.Error)
 	}

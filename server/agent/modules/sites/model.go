@@ -199,6 +199,25 @@ type SiteImportResult struct {
 	Warnings []string      `json:"warnings,omitempty"`
 }
 
+// SiteBootstrapResult is POST /sites/bootstrap. It prepares the host
+// directories and root Caddyfile the managed container mounts, and returns the
+// mounts the store compose template must reproduce.
+type SiteBootstrapResult struct {
+	ConfigDir     string           `json:"configDir"`
+	DataDir       string           `json:"dataDir"`
+	CaddyfilePath string           `json:"caddyfilePath"`
+	SitesRoot     string           `json:"sitesRoot"`
+	Mounts        []BootstrapMount `json:"mounts"`
+	Ready         bool             `json:"ready"`
+}
+
+// BootstrapMount is one host bind mount required by the Caddy container.
+type BootstrapMount struct {
+	Source   string `json:"source"`
+	Target   string `json:"target"`
+	ReadOnly bool   `json:"readOnly,omitempty"`
+}
+
 // ImportIssue describes one skipped/invalid imported site.
 type ImportIssue struct {
 	Index   int    `json:"index"`

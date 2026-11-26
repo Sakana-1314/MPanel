@@ -3,6 +3,7 @@ import type {
   PageQuery,
   Site,
   SiteApplyResult,
+  SiteBootstrapResult,
   SiteConfig,
   SiteExportBundle,
   SiteImportResult,
@@ -47,6 +48,8 @@ export interface SiteListQuery extends PageQuery {
 
 export interface SitesApi {
   list(q?: SiteListQuery): Promise<ListResult<Site>>;
+  /** 安装 Caddy 容器前准备受管目录与挂载；未部署时唯一可用的站点端点。 */
+  bootstrap(): Promise<SiteBootstrapResult>;
   create(input: SiteCreateInput): Promise<Site>;
   get(id: string): Promise<Site>;
   update(id: string, input: SiteUpdateInput): Promise<Site>;
@@ -67,6 +70,7 @@ export function createSitesApi(http: ApiTransport): SitesApi {
   const base = (id: string): string => `/sites/${encodeURIComponent(id)}`;
   return {
     list: (q = {}) => http.request<ListResult<Site>>('/sites', { query: q }),
+    bootstrap: () => http.request<SiteBootstrapResult>('/sites/bootstrap', { method: 'POST' }),
     create: (input) => http.request<Site>('/sites', { method: 'POST', body: input }),
     get: (id) => http.request<Site>(base(id)),
     update: (id, input) => http.request<Site>(base(id), { method: 'PUT', body: input }),

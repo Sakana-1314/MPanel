@@ -6,6 +6,7 @@ import {
   NAlert,
   NButton,
   NCard,
+  NEmpty,
   NIcon,
   NSpin,
   NTag,
@@ -61,7 +62,7 @@ const systemQuery = useQuery({
 });
 
 const caddy = computed(() => systemQuery.data.value?.capabilities.caddy);
-const caddyAvailable = computed(() => caddy.value === undefined || caddy.value.available);
+const caddyAvailable = computed(() => caddy.value?.available === true);
 const site = computed(() => siteQuery.data.value);
 let suppressDirty = false;
 
@@ -199,9 +200,9 @@ const applyOutput = computed(() => {
       <template #meta>
         <SiteStatusBadge v-if="site" :status="site.status" />
         <n-tag v-if="dirty" size="small" type="warning" round :bordered="false">未保存</n-tag>
-        <n-tooltip v-if="!caddyAvailable">
+        <n-tooltip v-if="!systemQuery.isLoading.value && !caddyAvailable">
           <template #trigger>
-            <n-tag size="small" type="warning" round :bordered="false">Caddy 不可用</n-tag>
+            <n-tag size="small" type="warning" round :bordered="false">Caddy 容器未安装</n-tag>
           </template>
           {{ caddy?.reason ?? 'Caddy 能力不可用' }}
         </n-tooltip>
@@ -236,55 +237,71 @@ const applyOutput = computed(() => {
       <pre v-if="applyOutput" class="code-block" style="margin-top: 8px; max-height: 180px">{{ applyOutput }}</pre>
     </n-alert>
 
-    <n-spin v-if="!isNew && siteQuery.isLoading.value" size="small">
-      <div style="height: 120px" />
+    <n-spin v-if="systemQuery.isLoading.value" size="small">
+      <div style="height: 140px" />
     </n-spin>
-    <error-state
-      v-else-if="!isNew && siteQuery.isError.value"
-      :error="siteQuery.error.value"
-      @retry="siteQuery.refetch()"
-    />
-    <n-alert v-else-if="!isNew && site === undefined" type="warning" :bordered="true" title="站点不存在">
-      可能已被删除，或当前标签的机器不是创建它的那台。
-    </n-alert>
 
-    <SiteForm
-      v-else
-      :draft="draft"
-      :submitting="saveAction.pending.value"
-      :submit-label="isNew ? '创建站点' : '保存草稿'"
-      :preview-loading="false"
-      @submit="save"
-      @preview="openPreview"
-      @cancel="router.push(`/m/${machineId}/sites`)"
-    >
-      <template #footerExtra>
-        <span class="tiny muted">{{ dirty ? '有未保存修改' : '已保存' }}</span>
-      </template>
-      <template #aside>
-        <n-card size="small" title="站点状态">
-          <div class="kv">
-            <dt>状态</dt><dd><SiteStatusBadge v-if="site" :status="site.status" /><span v-else>未创建</span></dd>
-            <dt>revision</dt><dd>{{ site?.revision ?? '—' }}</dd>
-            <dt>已应用</dt><dd>{{ site?.appliedRevision ?? '—' }}</dd>
-            <dt>最近应用</dt>
-            <dd>
-              <template v-if="site?.lastApply">
-                <span :class="site.lastApply.ok ? 'ok' : 'bad'">
-                  {{ site.lastApply.ok ? '成功' : '失败' }} · #{{ site.lastApply.revision }}
-                </span>
-                <div class="tiny muted"><RelativeTime :value="site.lastApply.at" /></div>
+    <n-card v-else-if="!caddyAvailable" size="small">
+      <n-empty description="Caddy 容器尚未安装，站点编辑不可用">
+        <template #extra>
+          <n-button type="primary" @click="router.push(`/m/${machineId}/sites`)">
+            前往站点页一键安装
+          </n-button>
+        </template>
+      </n-empty>
+    </n-card>
+
+    <template v-else>
+      <n-spin v-if="!isNew && siteQuery.isLoading.value" size="small">
+        <div style="height: 120px" />
+      </n-spin>
+      <error-state
+        v-else-if="!isNew && siteQuery.isError.value"
+        :error="siteQuery.error.value"
+        @retry="siteQuery.refetch()"
+      />
+      <n-alert v-else-if="!isNew && site === undefined" type="warning" :bordered="true" title="站点不存在">
+        可能已被删除，或当前标签的机器不是创建它的那台。
+      </n-alert>
+
+      <SiteForm
+        v-else
+        :draft="draft"
+        :submitting="saveAction.pending.value"
+        :submit-label="isNew ? '创建站点' : '保存草稿'"
+        :preview-loading="false"
+        @submit="save"
+        @preview="openPreview"
+        @cancel="router.push(`/m/${machineId}/sites`)"
+      >
+        <template #footerExtra>
+          <span class="tiny muted">{{ dirty ? '有未保存修改' : '已保存' }}</span>
+        </template>
+        <template #aside>
+          <n-card size="small" title="站点状态">
+            <div class="kv">
+              <dt>状态</dt><dd><SiteStatusBadge v-if="site" :status="site.status" /><span v-else>未创建</span></dd>
+              <dt>revision</dt><dd>{{ site?.revision ?? '—' }}</dd>
+              <dt>已应用</dt><dd>{{ site?.appliedRevision ?? '—' }}</dd>
+              <dt>最近应用</dt>
+              <dd>
+                <template v-if="site?.lastApply">
+                  <span :class="site.lastApply.ok ? 'ok' : 'bad'">
+                    {{ site.lastApply.ok ? '成功' : '失败' }} · #{{ site.lastApply.revision }}
+                  </span>
+                  <div class="tiny muted"><RelativeTime :value="site.lastApply.at" /></div>
+                </template>
+                <span v-else class="muted">从未应用</span>
+              </dd>
+              <dt>更新时间</dt><dd>{{ site === undefined ? '—' : formatDate(site.updatedAt) }}</dd>
+              <template v-if="site?.lastApply?.caddyfileHash">
+                <dt>配置哈希</dt><dd class="mono tiny">{{ site.lastApply.caddyfileHash }}</dd>
               </template>
-              <span v-else class="muted">从未应用</span>
-            </dd>
-            <dt>更新时间</dt><dd>{{ site === undefined ? '—' : formatDate(site.updatedAt) }}</dd>
-            <template v-if="site?.lastApply?.caddyfileHash">
-              <dt>配置哈希</dt><dd class="mono tiny">{{ site.lastApply.caddyfileHash }}</dd>
-            </template>
-          </div>
-        </n-card>
-      </template>
-    </SiteForm>
+            </div>
+          </n-card>
+        </template>
+      </SiteForm>
+    </template>
 
     <SitePreviewModal
       v-model:show="previewOpen"

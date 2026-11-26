@@ -10,7 +10,8 @@
 
 1Panel 用 nginx + 站点配置模板；MPanel 用 Caddy 的 `import sites.d/*.caddy`。好处是自动 HTTPS、
 配置可校验（`caddy validate`）、reload 原子且失败可回滚，站点模型可以完全结构化生成，
-不需要维护 nginx 的 location 片段。代价是宿主上需要安装 Caddy。
+不需要维护 nginx 的 location 片段。Caddy 以 Docker 容器运行，由面板一键部署 `mpanel-caddy`
+编排，不要求在宿主机安装 Caddy 二进制。
 
 ## 三端一定要一起部署吗？
 
