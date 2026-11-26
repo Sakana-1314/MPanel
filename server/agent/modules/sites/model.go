@@ -26,6 +26,8 @@ func isIP(host string) bool { return net.ParseIP(host) != nil }
 
 func netSplitHostPort(addr string) (string, string, error) { return net.SplitHostPort(addr) }
 
+func netJoinHostPort(host, port string) string { return net.JoinHostPort(host, port) }
+
 // SiteStatus is the worker-computed state of a site draft.
 type SiteStatus string
 

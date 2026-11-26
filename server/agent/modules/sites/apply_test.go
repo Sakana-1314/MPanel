@@ -383,3 +383,15 @@ func TestSitesUnavailableWithoutCaddyContainer(t *testing.T) {
 		t.Fatalf("未部署时创建站点应返回 UNAVAILABLE: %+v", created)
 	}
 }
+
+func TestAdminAddressPinsWildcardToLoopback(t *testing.T) {
+	cfg := config.NewAgent("")
+	cfg.Agent.CaddyAdmin = "0.0.0.0:2020"
+	if got := adminAddress(cfg); got != "127.0.0.1:2020" {
+		t.Fatalf("adminAddress = %q, want 127.0.0.1:2020", got)
+	}
+	cfg.Agent.CaddyAdmin = "[::]:2021"
+	if got := adminAddress(cfg); got != "[::1]:2021" && got != "127.0.0.1:2021" {
+		t.Fatalf("adminAddress 通配 IPv6 = %q", got)
+	}
+}
