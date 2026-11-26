@@ -77,10 +77,32 @@ func (m *Module) jobsPath() string {
 	return filepath.Join(m.dataDir, "backups", "jobs.json")
 }
 
-// backupDir is the only directory backups may be written to or downloaded
-// from.
+// backupDir is where new database backups are written. 1Panel keeps them in
+// the top-level backup directory; legacy records remain readable through
+// backupRoots.
 func (m *Module) backupDir() string {
+	if m.cfg != nil && strings.TrimSpace(m.cfg.Agent.BaseDir) != "" {
+		return filepath.Join(m.cfg.BackupRoot(), "databases")
+	}
 	return filepath.Join(m.dataDir, "backups", "databases")
+}
+
+func (m *Module) backupRoots() []string {
+	roots := []string{m.backupDir()}
+	legacy := filepath.Join(m.dataDir, "backups", "databases")
+	if !samePathString(roots[0], legacy) {
+		roots = append(roots, legacy)
+	}
+	return roots
+}
+
+func samePathString(a, b string) bool {
+	left, errA := filepath.Abs(a)
+	right, errB := filepath.Abs(b)
+	if errA != nil || errB != nil {
+		return a == b
+	}
+	return left == right
 }
 
 // loadBackups reads backups/databases.json.
@@ -198,25 +220,30 @@ func (m *Module) isWithinBackupDir(path string) bool {
 	if strings.TrimSpace(path) == "" {
 		return false
 	}
-	root, err := filepath.Abs(m.backupDir())
-	if err != nil {
-		return false
-	}
 	target, err := filepath.Abs(path)
 	if err != nil {
 		return false
 	}
-	if resolvedRoot, err := filepath.EvalSymlinks(root); err == nil {
-		root = resolvedRoot
-	}
 	if resolvedTarget, err := filepath.EvalSymlinks(target); err == nil {
 		target = resolvedTarget
 	}
-	rel, err := filepath.Rel(root, target)
-	if err != nil || filepath.IsAbs(rel) {
-		return false
+	for _, candidate := range m.backupRoots() {
+		root, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if resolvedRoot, err := filepath.EvalSymlinks(root); err == nil {
+			root = resolvedRoot
+		}
+		rel, err := filepath.Rel(root, target)
+		if err != nil || filepath.IsAbs(rel) {
+			continue
+		}
+		if rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != "." {
+			return true
+		}
 	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != "."
+	return false
 }
 
 // reconcileInterruptedBackups marks records left "running" by an agent restart

@@ -81,7 +81,7 @@ func buildInfo(ctx *agent.Context, refresh bool) protocol.SystemInfo {
 			CaddyConfig: caddyConf,
 			CaddyData:   caddyData,
 			FilesRoots:  roots,
-			Backups:     ctx.Cfg.Agent.DataDir + "/backups",
+			Backups:     ctx.Cfg.BackupRoot(),
 			Stacks:      ctx.Cfg.Agent.DataDir + "/stacks",
 		},
 	}

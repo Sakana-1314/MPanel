@@ -343,7 +343,7 @@ export function defaultStoreValues(
     let value = variable.default ?? '';
     if (variable.key === 'MPANEL_DATA_DIR' && paths?.home !== undefined && paths.home.length > 0) {
       // Compose/YAML 里统一用正斜杠；Windows 开发机写 C:/... 也能被 Docker 接受。
-      value = `${paths.home.replace(/\\/g, '/').replace(/\/+$/, '')}/data`;
+      value = `${paths.home.replace(/\\/g, '/').replace(/\/+$/, '')}/data/apps`;
     }
     if (value.length === 0 && variable.generate !== undefined) {
       value = generateSecret(variable.generate.length ?? 28);

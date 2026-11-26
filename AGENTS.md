@@ -26,7 +26,7 @@ go.mod  go.sum  README.md  LICENSE  AGENTS.md  CLAUDE.md  .gitignore
 
 - **根目录不直接放代码**；`go.mod` / `go.sum` 留在根作为 module root，Go 代码全部在 `server/`。
 - **禁止新增根级目录或文件**；不要恢复根级 `cmd/`、`core/`、`agent/`、`scripts/`、`deploy/`、`docs/`、根 `package.json`、`tsconfig*`、`pnpm-*` 等旧结构。
-- `server/cmd/`：`mpanel-core`、`mpanel-agent`、`mpanelctl` 三个入口。
+- `server/cmd/`：`mpanel-core`、`mpanel-agent`、`mpctl` 三个入口。
 - `server/core/`：认证、机器注册、三种传输、代理、边缘调度、审计、静态托管；不实现站点/Caddyfile/数据库/容器/文件/终端/任务逻辑。
 - `server/agent/`：模块注册、能力探测、命令执行与 `system/` 模块；功能只在 agent 实现。
 - `server/core/{protocol,config,store,auth,httpapi,tunnel}`：共享实现；跨 core/agent 的类型只在这里定义（agent 把它们当契约库引用，不依赖 core 应用）。
@@ -48,7 +48,7 @@ go.mod  go.sum  README.md  LICENSE  AGENTS.md  CLAUDE.md  .gitignore
 ## 1Panel 风格路径与配置
 
 - 安装根 `/opt/mpanel`，布局固定为 `{conf,data,log,db,backup,tmp}`；配置是 `conf/app.yaml`（core）与 `conf/agent.yaml`（agent），权限 `0600`。
-- 二进制名固定：`mpanel-core`、`mpanel-agent`、`mpanelctl`；systemd 单元名固定：`mpanel-core.service`、`mpanel-agent.service`。
+- 二进制名固定：`mpanel-core`、`mpanel-agent`、`mpctl`；systemd 单元名固定：`mpanel-core.service`、`mpanel-agent.service`。
 - 默认端口：core `10086`、agent `10087`；所有配置可用 `MPANEL_*` 环境变量覆盖，保证容器与 CI 不写 `/opt`。
 - 网站管理只用 **Caddy**，不引入 nginx/OpenResty；agent 只写配置、执行 `caddy validate` 与 reload，不守护 Caddy 进程。
 - 不要新增与 1Panel 无关的根级安装目录或配置文件名；需要新路径时先改 `web/docs/guide/config.md` 与 `server/core/config`。

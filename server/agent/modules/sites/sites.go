@@ -164,7 +164,7 @@ func siteMatches(site Site, q string) bool {
 // while Caddy is still undeployed.
 func (m *Module) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	confDir, dataDir := m.ctx.Cfg.CaddyDirs()
-	sitesDir := filepath.Join(m.ctx.DataDir(), "sites")
+	sitesDir := m.ctx.Cfg.SitesDir()
 	for _, dir := range []string{confDir, filepath.Join(confDir, "sites.d"), dataDir, sitesDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			httpapi.Fail(w, internalFailure("无法创建 Caddy 目录", err))

@@ -54,13 +54,13 @@ type System struct {
 	CorsOrigins string `yaml:"cors_origins"`
 	// CorsTrustForwarded 为真时按 Origin 回显并加 Vary: Origin，便于中间缓存
 	// 正确分片。默认空值表示回 Access-Control-Allow-Origin: *。
-	CorsTrustForwarded bool `yaml:"cors_vary_origin"`
-	Username    string `yaml:"username"`
-	Password    string `yaml:"password"`
-	Secret      string `yaml:"secret"`
-	Version     string `yaml:"version"`
-	Entrance    string `yaml:"entrance"`
-	Language    string `yaml:"language"`
+	CorsTrustForwarded bool   `yaml:"cors_vary_origin"`
+	Username           string `yaml:"username"`
+	Password           string `yaml:"password"`
+	Secret             string `yaml:"secret"`
+	Version            string `yaml:"version"`
+	Entrance           string `yaml:"entrance"`
+	Language           string `yaml:"language"`
 }
 
 // Log is the [log] section.
@@ -439,6 +439,7 @@ func (cfg *App) EnsureDirs() error {
 	for _, dir := range []string{
 		filepath.Join(s.BaseDir, "conf"),
 		s.DataDir, s.LogPath, s.DBPath, s.BackupDir, s.TmpDir,
+		filepath.Join(s.BaseDir, "runtime"), s.WebDir,
 	} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
@@ -453,10 +454,17 @@ func (cfg *Agent) EnsureDirs() error {
 	dirs := []string{
 		filepath.Join(a.BaseDir, "conf"),
 		a.DataDir, a.LogPath,
-		filepath.Join(a.DataDir, "sites"),
+		cfg.AppsDir(),
+		cfg.SitesDir(),
+		cfg.ComposeDir(),
+		cfg.RuntimeDir(),
+		filepath.Join(a.BaseDir, "web"),
 		filepath.Join(a.DataDir, "backups"),
 		filepath.Join(a.DataDir, "trash"),
 		filepath.Join(a.DataDir, "tasks"),
+		cfg.BackupRoot(),
+		filepath.Join(cfg.BackupRoot(), "caddy"),
+		filepath.Join(cfg.BackupRoot(), "databases"),
 	}
 	for _, root := range a.FilesRoots {
 		dirs = append(dirs, root.Path)
@@ -469,17 +477,87 @@ func (cfg *Agent) EnsureDirs() error {
 	return nil
 }
 
+// AppsDir is the 1Panel-style root for one-click applications.
+func (cfg *Agent) AppsDir() string {
+	if strings.TrimSpace(cfg.Agent.BaseDir) == "" {
+		return filepath.Join(cfg.Agent.DataDir, "apps")
+	}
+	return filepath.Join(cfg.Agent.BaseDir, "data", "apps")
+}
+
+// SitesDir is the default file_server root. Existing installs keep the legacy
+// <agent.data_dir>/sites tree until they choose to move it.
+func (cfg *Agent) SitesDir() string {
+	if strings.TrimSpace(cfg.Agent.BaseDir) == "" {
+		return filepath.Join(cfg.Agent.DataDir, "sites")
+	}
+	preferred := filepath.Join(cfg.Agent.BaseDir, "data", "sites")
+	legacy := filepath.Join(cfg.Agent.DataDir, "sites")
+	if dirExists(preferred) || !dirExists(legacy) {
+		return preferred
+	}
+	return legacy
+}
+
+// ComposeDir is the 1Panel-style root for Docker Compose stacks.
+func (cfg *Agent) ComposeDir() string {
+	if strings.TrimSpace(cfg.Agent.BaseDir) == "" {
+		return filepath.Join(cfg.Agent.DataDir, "stacks")
+	}
+	preferred := filepath.Join(cfg.Agent.BaseDir, "data", "compose")
+	legacy := filepath.Join(cfg.Agent.DataDir, "stacks")
+	if dirExists(preferred) || !dirExists(legacy) {
+		return preferred
+	}
+	return legacy
+}
+
+// BackupRoot is the 1Panel-style top-level backup directory.
+func (cfg *Agent) BackupRoot() string {
+	if strings.TrimSpace(cfg.Agent.BaseDir) == "" {
+		return filepath.Join(cfg.Agent.DataDir, "backups")
+	}
+	return filepath.Join(cfg.Agent.BaseDir, "backup")
+}
+
+// RuntimeDir holds sockets, temp files and other runtime state.
+func (cfg *Agent) RuntimeDir() string {
+	if strings.TrimSpace(cfg.Agent.BaseDir) == "" {
+		return filepath.Join(cfg.Agent.DataDir, "runtime")
+	}
+	return filepath.Join(cfg.Agent.BaseDir, "runtime")
+}
+
 // CaddyDirs resolves the managed Caddy configuration/data directories.
 func (cfg *Agent) CaddyDirs() (confDir, dataDir string) {
 	confDir = cfg.Agent.CaddyConfig
 	if confDir == "" {
-		confDir = filepath.Join(cfg.Agent.DataDir, "caddy")
+		if strings.TrimSpace(cfg.Agent.BaseDir) == "" {
+			confDir = filepath.Join(cfg.Agent.DataDir, "caddy")
+			dataDir = cfg.Agent.CaddyData
+			if dataDir == "" {
+				dataDir = filepath.Join(confDir, "data")
+			}
+			return confDir, dataDir
+		}
+		preferred := filepath.Join(cfg.AppsDir(), "caddy")
+		legacy := filepath.Join(cfg.Agent.DataDir, "caddy")
+		if dirExists(preferred) || !dirExists(legacy) {
+			confDir = preferred
+		} else {
+			confDir = legacy
+		}
 	}
 	dataDir = cfg.Agent.CaddyData
 	if dataDir == "" {
 		dataDir = filepath.Join(confDir, "data")
 	}
 	return confDir, dataDir
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 // RandomToken returns a URL-safe random token of n bytes entropy.

@@ -54,7 +54,6 @@ func (m *Module) Register(ctx *agent.Context) error {
 		logger = slog.Default()
 	}
 	bin := dockerDefaultBin
-	dataDir := ""
 	daemonConfig := defaultDaemonConfigPath
 	if ctx.Cfg != nil {
 		if strings.TrimSpace(ctx.Cfg.Agent.DockerBin) != "" {
@@ -63,10 +62,9 @@ func (m *Module) Register(ctx *agent.Context) error {
 		if strings.TrimSpace(ctx.Cfg.Agent.DockerConfig) != "" {
 			daemonConfig = ctx.Cfg.Agent.DockerConfig
 		}
-		dataDir = ctx.DataDir()
 	}
 	m.docker = newDockerClient(ctx.Runner, bin)
-	m.stacks = newStackManager(dataDir)
+	m.stacks = newStackManager(ctx.Cfg.ComposeDir())
 	m.daemonConfigPath = daemonConfig
 	m.logger = logger
 	m.ctx = ctx

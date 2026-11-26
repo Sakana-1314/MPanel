@@ -24,9 +24,8 @@ type stackManager struct {
 	root string
 }
 
-func newStackManager(dataDir string) *stackManager {
-	root := filepath.Join(dataDir, "stacks")
-	if strings.TrimSpace(dataDir) == "" {
+func newStackManager(root string) *stackManager {
+	if strings.TrimSpace(root) == "" {
 		root = "stacks"
 	}
 	if absolute, err := filepath.Abs(root); err == nil {

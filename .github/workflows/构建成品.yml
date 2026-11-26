@@ -63,7 +63,7 @@ jobs:
             staging="dist/mpanel-linux-${arch}"
             rm -rf "$staging"
             mkdir -p "$staging"
-            for cmd in mpanel-core mpanel-agent mpanelctl; do
+            for cmd in mpanel-core mpanel-agent mpctl; do
               CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
                 -ldflags "-s -w -X github.com/sakana-1314/mpanel/server/core/config.Version=dev-${short_sha}" \
                 -o "$staging/$cmd" "./server/cmd/$cmd"
@@ -86,7 +86,7 @@ jobs:
           tar -xzf dist/mpanel-linux-amd64.tar.gz -C dist
           ./dist/mpanel-linux-amd64/mpanel-core version
           ./dist/mpanel-linux-amd64/mpanel-agent version
-          ./dist/mpanel-linux-amd64/mpanelctl version || true
+          ./dist/mpanel-linux-amd64/mpctl version || true
           test -f dist/mpanel-linux-amd64/web/index.html
           test -f dist/mpanel-linux-amd64/web/store/index.json
 
@@ -145,7 +145,7 @@ jobs:
           - 版本：\`dev-${short_sha}\`
           - 构建时间：\`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`
           - 架构：Linux amd64 / arm64（CGO 关闭，静态运行）
-          - 内容：\`mpanel-core\`、\`mpanel-agent\`、\`mpanelctl\`、已构建的 \`web/\` 面板、\`LICENSE\`
+          - 内容：\`mpanel-core\`、\`mpanel-agent\`、\`mpctl\`、已构建的 \`web/\` 面板、\`LICENSE\`
 
           校验：
 

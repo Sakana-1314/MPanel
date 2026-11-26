@@ -2,7 +2,7 @@
 
 ## 机器离线
 
-1. `mpanelctl status core` / `mpanelctl status agent` 确认服务在跑。
+1. `mpctl status core` / `mpctl status agent` 确认服务在跑。
 2. http 传输：core 访问 `http://<agent>:<port>/healthz`；确认 `MPANEL_AGENT_TOKEN` 与面板里填的一致。
 3. reverse-ws：agent 日志里应有「已连接 core」；反向代理必须透传 `Upgrade`/`Connection` 头。
 4. stdio：核心需显式设置 `MPANEL_ALLOW_STDIO=1`，且 `mpanel-agent` 在 PATH 或 `MPANEL_AGENT_ENTRY` 指向它。

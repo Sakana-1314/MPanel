@@ -20,7 +20,7 @@ Caddy 容器由 `web/store/caddy/compose.yaml` 创建，固定项目名 `mpanel-
 宿主目录由 `caddy_config` 与 `caddy_data` 决定：
 
 ```text
-${caddy_config}/                  # 默认 ${agent.data_dir}/caddy，挂载到容器 /etc/caddy
+${caddy_config}/                  # 默认 ${base_dir}/data/apps/caddy，挂载到容器 /etc/caddy
 ├─ Caddyfile                      # 受管主配置：admin + import sites.d/*.caddy
 ├─ sites.d/
 │  └─ <siteId>.caddy              # 每站点一个片段
@@ -30,9 +30,9 @@ ${caddy_config}/                  # 默认 ${agent.data_dir}/caddy，挂载到�
 
 默认路径：
 
-- `caddy_config` = `/opt/mpanel/data/agent/caddy`
+- `caddy_config` = `/opt/mpanel/data/apps/caddy`
 - `caddy_data` = `${caddy_config}/data`
-- 站点根目录 = `/opt/mpanel/data/agent/sites`（以及 `files_roots` 中的根）
+- 站点根目录 = `/opt/mpanel/data/sites`（以及 `files_roots` 中的根）
 
 安装前调用 `POST /api/v1/sites/bootstrap` 创建目录、写入主 `Caddyfile`，并返回需要写进 compose 的挂载。站点根会以**相同绝对路径**只读挂进容器，因此 `file_server.root` 在容器内仍然有效。
 
@@ -86,7 +86,7 @@ interface Site {
     "listen": ["0.0.0.0:443"],
     "handler": {
       "type": "file_server",
-      "root": "/opt/mpanel/data/agent/sites/demo",
+      "root": "/opt/mpanel/data/sites/demo",
       "indexNames": ["index.html"],
       "spa": true,
       "precompressed": ["gzip", "zstd"]
@@ -102,7 +102,7 @@ interface Site {
 关键约束：
 
 - `domains` 为 1–50 个 hostname、`localhost` 或前导 `*.` 的通配域名。
-- `file_server.root` 必须是绝对宿主路径，且在允许根白名单内（默认包含文件管理根与 `${agent.data_dir}/sites`；站点模块会校验，对应 1Panel 时代的 `MPANEL_SITES_ROOTS` 约定）。
+- `file_server.root` 必须是绝对宿主路径，且在允许根白名单内（默认包含文件管理根与 `${base_dir}/data/sites`；站点模块会校验，对应 1Panel 时代的 `MPANEL_SITES_ROOTS` 约定）。
 - `reverse_proxy.upstreams`、`healthUri`、header 名与值、redirect 目标都不允许控制字符、未转义的引号或花括号。
 - 站点名唯一；同一站点内域名重复会返回 `BAD_REQUEST`。
 - 修改只改 JSON 草稿，不会自动 apply；删除已应用站点需要一次全量 apply 才会从 Caddy 移除。

@@ -871,8 +871,20 @@ func siteRoots(cfg *config.Agent) []string {
 			roots = append(roots, root.Path)
 		}
 	}
-	roots = append(roots, filepath.Join(cfg.Agent.DataDir, "sites"))
+	roots = appendUniqueRoot(roots, cfg.SitesDir())
+	// Keep legacy <agent.data_dir>/sites visible during upgrades.
+	roots = appendUniqueRoot(roots, filepath.Join(cfg.Agent.DataDir, "sites"))
 	return roots
+}
+
+func appendUniqueRoot(roots []string, root string) []string {
+	root = filepath.Clean(root)
+	for _, existing := range roots {
+		if samePath(existing, root) {
+			return roots
+		}
+	}
+	return append(roots, root)
 }
 
 func nowRFC3339() string { return time.Now().UTC().Format(time.RFC3339) }

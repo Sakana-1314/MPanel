@@ -3,7 +3,7 @@
 ## 和 1Panel 是什么关系？
 
 目录、配置与 systemd 约定参考 1Panel：安装根 `/opt/mpanel`、`conf/app.yaml`、`data/`、`log/`、
-`db/`、`backup/`、`mpanel-core.service` / `mpanel-agent.service`、`mpanelctl` 控制脚本。
+`db/`、`backup/`、`mpanel-core.service` / `mpanel-agent.service`、`mpctl` 控制脚本。
 但网站管理用 **Caddy** 而不是 nginx。
 
 ## 为什么用 Caddy 而不是 nginx？
@@ -38,8 +38,8 @@
 
 ## 数据存在哪里？怎么备份？
 
-core：`/opt/mpanel/db/*.json` 与 `conf/`；agent：`/opt/mpanel/data/agent/`（站点、任务、备份、回收站）
-与 `conf/agent.yaml`。整体备份 `/opt/mpanel` 即可；密钥文件（`conf/app.yaml` 的 `secret`、
+core：`/opt/mpanel/db/*.json` 与 `conf/`；agent：`/opt/mpanel/data/`（状态、应用、编排、站点/文件根）
+与 `conf/agent.yaml`；备份在 `/opt/mpanel/backup/`。整体备份 `/opt/mpanel` 即可；密钥文件（`conf/app.yaml` 的 `secret`、
 `data/agent/secrets.key`）必须一起备份，否则已加密的 token/密码无法解密。
 
 ## 面板端口是多少？
