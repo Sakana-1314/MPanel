@@ -121,7 +121,7 @@ watch(
   <n-layout has-sider style="height: 100vh">
     <n-layout-sider
       v-if="!isMobile"
-      :width="238"
+      :width="210"
       :native-scrollbar="false"
       content-style="height: 100%"
     >
@@ -137,7 +137,7 @@ watch(
 
       <n-layout-content
         :native-scrollbar="false"
-        content-style="height: calc(100vh - 50px); overflow: auto"
+        content-style="height: calc(100vh - 46px); overflow: auto"
       >
         <div class="content-inner">
           <router-view v-slot="{ Component }">
@@ -150,7 +150,7 @@ watch(
     </n-layout>
   </n-layout>
 
-  <n-drawer v-model:show="mobileOpen" placement="left" :width="272">
+  <n-drawer v-model:show="mobileOpen" placement="left" :width="240">
     <n-drawer-content :native-scrollbar="false" body-content-style="padding: 0">
       <div style="height: 100vh">
         <AppSidebar @quick-open="quickOpen = true" />
