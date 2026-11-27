@@ -20,7 +20,6 @@ import { MACHINE_NAV_ITEMS, openMachineNavItem, openMachinePage } from '@/lib/na
 import PageHeader from '@/components/common/PageHeader.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import MachineStatusTag from '@/components/common/MachineStatusTag.vue';
-import RelativeTime from '@/components/common/RelativeTime.vue';
 
 const route = useRoute();
 const machineId = String(route.params.machineId ?? '');
@@ -30,12 +29,14 @@ const machine = computed(() => machineQuery.data.value);
 
 const connectAction = useAction(() => api.value.machines.connect(machineId), {
   success: '已请求连接机器',
+  errorMessage: '连接失败，请确认服务器在线后重试',
   invalidate: [coreKey('machines', 'list', { limit: 200 }), coreKey('machines', 'detail', machineId)],
 });
 
 const testResult = ref<string | null>(null);
 const testAction = useAction(() => api.value.machines.test(machineId), {
-  success: (result) => (result.reachable ? `可达 · ${result.latencyMs ?? '?'} ms` : `不可达：${result.error ?? ''}`),
+  success: (result) => (result.reachable ? `可达 · ${result.latencyMs ?? '?'} ms` : '暂时无法连接'),
+  errorMessage: '连接失败，请确认服务器在线后重试',
   invalidate: [coreKey('machines', 'detail', machineId)],
 });
 
@@ -44,7 +45,7 @@ async function test(): Promise<void> {
   if (result !== undefined) {
     testResult.value = result.reachable
       ? `可达 · ${result.latencyMs ?? '?'} ms`
-      : `不可达 · ${result.error ?? '未知错误'}`;
+      : '暂时无法连接';
   }
 }
 
@@ -106,7 +107,7 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
               <n-tag v-if="machine.group" size="tiny" round :bordered="false">{{ machine.group }}</n-tag>
             </div>
             <div class="tiny muted" style="margin-top: 4px">
-              {{ machineAddressLabel(machine) }} · 心跳 <RelativeTime :value="machine.lastSeenAt" />
+              {{ machineAddressLabel(machine) }}
             </div>
           </div>
           <div class="toolbar">
@@ -125,13 +126,13 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
         </div>
 
         <n-alert
-          v-if="machine.lastError"
+          v-if="machine.lastError && machine.status !== 'online'"
           type="warning"
           :bordered="true"
-          title="最近错误"
+          title="暂时无法连接"
           style="margin-top: 12px"
         >
-          {{ machine.lastError }}
+          请确认服务器在线、面板地址正确后重试。
         </n-alert>
 
         <div class="descriptions">
@@ -144,7 +145,6 @@ const snapshot = computed(() => machine.value?.snapshot ?? null);
             <n-descriptions-item label="更新时间">{{ formatDate(machine.updatedAt) }}</n-descriptions-item>
             <n-descriptions-item label="节点信息" :span="2">
               <template v-if="machine.worker">
-                版本 v{{ machine.worker.version }} ·
                 {{ machine.worker.platform }}/{{ machine.worker.arch }}
               </template>
               <span v-else class="muted">尚未上报</span>
