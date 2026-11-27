@@ -1,0 +1,2 @@
+import{h as n,f as c}from"./format-BaTbiPxH.js";import{u as l}from"./index-DyVSKBLe.js";import{g as i,o as m,h as u,X as p,t as a,v}from"./index-Dj3udJXr.js";const f=["title"],g=i({__name:"RelativeTime",props:{value:{}},setup(o){const e=o,t=v(0);l(()=>{t.value+=1},3e4);const s=a(()=>(t.value,n(e.value))),r=a(()=>c(e.value));return(_,d)=>(m(),u("span",{title:r.value,class:"muted"},p(s.value),9,f))}});export{g as _};
+//# sourceMappingURL=RelativeTime.vue_vue_type_script_setup_true_lang-Bk0sw1zL.js.map

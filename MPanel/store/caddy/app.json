@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "caddy",
+  "name": "Caddy",
+  "category": "web",
+  "tagline": "容器化网站入口与自动 HTTPS",
+  "description": "Caddy 以 Docker Compose 编排运行，负责站点反向代理、静态文件与自动证书。安装后面板会接管 /etc/caddy 下的受管配置，站点功能才可用。",
+  "version": "2-alpine",
+  "stack": "mpanel-caddy",
+  "service": "caddy",
+  "compose": "caddy/compose.yaml",
+  "bootstrap": "sites",
+  "capability": "caddy",
+  "variables": [
+    {
+      "key": "CADDY_HTTP_PORT",
+      "label": "HTTP 端口",
+      "default": "80",
+      "description": "宿主机对外提供 HTTP 的端口。"
+    },
+    {
+      "key": "CADDY_HTTPS_PORT",
+      "label": "HTTPS 端口",
+      "default": "443",
+      "description": "宿主机对外提供 HTTPS 与自动证书挑战的端口。"
+    },
+    {
+      "key": "CADDY_VOLUMES",
+      "label": "挂载",
+      "default": "",
+      "hidden": true
+    }
+  ],
+  "links": [
+    {
+      "label": "Caddy 官方镜像",
+      "url": "https://hub.docker.com/_/caddy"
+    }
+  ]
+}

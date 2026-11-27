@@ -1,0 +1,2 @@
+import{a as l,m as n}from"./status-mJuFyBdE.js";import{S as u}from"./StatusTag-BsSV2i-N.js";import{g as c,o as m,k as p,t as e}from"./index-BxObNuTL.js";const S=c({__name:"MachineStatusTag",props:{status:{},dot:{type:Boolean,default:!0},size:{default:"small"}},setup(t){const a=t,s=e(()=>l(a.status)),o=e(()=>n(a.status));return(r,i)=>(m(),p(u,{label:s.value,type:o.value,dot:t.dot,size:t.size},null,8,["label","type","dot","size"]))}});export{S as _};
+//# sourceMappingURL=MachineStatusTag.vue_vue_type_script_setup_true_lang-DpzTkl5M.js.map

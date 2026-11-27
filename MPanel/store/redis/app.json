@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "redis",
+  "name": "Redis",
+  "category": "database",
+  "tagline": "带 AOF 持久化的内存数据库",
+  "description": "创建一个只监听宿主机回环地址的 Redis 7 容器，开启 AOF 持久化与密码认证。安装完成后自动创建连接档案，可直接测试、查看统计、备份和用 dbx 查询。",
+  "version": "7-alpine",
+  "stack": "mpanel-redis",
+  "service": "redis",
+  "compose": "redis/compose.yaml",
+  "profile": {
+    "kind": "redis",
+    "name": "本机 Redis",
+    "host": "127.0.0.1",
+    "portVariable": "REDIS_PORT",
+    "passwordVariable": "REDIS_PASSWORD",
+    "redisDb": 0
+  },
+  "variables": [
+    {
+      "key": "CONTAINER_NAME",
+      "label": "容器名",
+      "default": "mpanel-redis",
+      "description": "Docker 容器名称，在当前主机内必须唯一。"
+    },
+    {
+      "key": "MPANEL_DATA_DIR",
+      "label": "数据根目录",
+      "default": "/opt/mpanel/data/apps",
+      "description": "宿主机数据目录；Redis 数据写入其 redis 子目录。"
+    },
+    {
+      "key": "REDIS_PASSWORD",
+      "label": "密码",
+      "default": "",
+      "secret": true,
+      "generate": { "length": 28 }
+    },
+    {
+      "key": "REDIS_PORT",
+      "label": "宿主端口",
+      "default": "6379",
+      "description": "只绑定 127.0.0.1，不对公网开放。"
+    }
+  ],
+  "links": [
+    {
+      "label": "Redis 官方镜像",
+      "url": "https://hub.docker.com/_/redis"
+    }
+  ]
+}

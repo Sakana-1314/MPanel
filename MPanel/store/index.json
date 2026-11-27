@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-26",
+  "apps": [
+    {
+      "id": "caddy",
+      "name": "Caddy",
+      "category": "web",
+      "tagline": "容器化网站入口与自动 HTTPS",
+      "manifest": "caddy/app.json"
+    },
+    {
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "category": "database",
+      "tagline": "关系型数据库，一键运行在 127.0.0.1",
+      "manifest": "postgres/app.json"
+    },
+    {
+      "id": "redis",
+      "name": "Redis",
+      "category": "database",
+      "tagline": "带 AOF 持久化的内存数据库",
+      "manifest": "redis/app.json"
+    }
+  ]
+}

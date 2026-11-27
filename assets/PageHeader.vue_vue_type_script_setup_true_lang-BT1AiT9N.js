@@ -1,0 +1,2 @@
+import{g as i,h as s,z as o,X as l,a$ as a,$ as n,o as t}from"./index-BxObNuTL.js";const c={class:"page-header"},d={style:{"min-width":"0"}},m={key:0,class:"toolbar",style:{"margin-top":"8px"}},p={key:0,class:"toolbar"},u=i({__name:"PageHeader",props:{title:{}},setup(r){return(e,_)=>(t(),s("div",c,[o("div",d,[o("h1",null,l(r.title),1),e.$slots.meta?(t(),s("div",m,[a(e.$slots,"meta")])):n("",!0)]),e.$slots.actions?(t(),s("div",p,[a(e.$slots,"actions")])):n("",!0)]))}});export{u as _};
+//# sourceMappingURL=PageHeader.vue_vue_type_script_setup_true_lang-BT1AiT9N.js.map

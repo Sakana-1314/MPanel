@@ -1,0 +1,2 @@
+import{u as s,f as u,e as i}from"./api-CZe_9B6u.js";import{t,aY as a,a6 as o}from"./index-BxObNuTL.js";function n(){return t(()=>o().status==="authenticated")}function m(){const e=i();return s({queryKey:u("machines","list",{limit:200}),queryFn:()=>e.value.machines.list({limit:200}),enabled:n(),staleTime:1e4})}function y(e){const r=i();return s({queryKey:t(()=>u("machines","detail",a(e))),queryFn:()=>r.value.machines.get(a(e)),enabled:t(()=>n().value&&a(e).length>0),staleTime:1e4})}export{n as a,y as b,m as u};
+//# sourceMappingURL=machines-mQzz0wfs.js.map

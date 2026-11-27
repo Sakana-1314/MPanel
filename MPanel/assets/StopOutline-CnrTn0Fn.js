@@ -1,0 +1,2 @@
+import{g as t,o,h as n,z as r}from"./index-Dj3udJXr.js";const s={xmlns:"http://www.w3.org/2000/svg","xmlns:xlink":"http://www.w3.org/1999/xlink",viewBox:"0 0 512 512"},x=t({name:"StopOutline",render:function(l,e){return o(),n("svg",s,e[0]||(e[0]=[r("rect",{x:"96",y:"96",width:"320",height:"320",rx:"24",ry:"24",fill:"none",stroke:"currentColor","stroke-linejoin":"round","stroke-width":"32"},null,-1)]))}});export{x as S};
+//# sourceMappingURL=StopOutline-CnrTn0Fn.js.map
