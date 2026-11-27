@@ -24,8 +24,12 @@ import {
   ServerOutline,
   SettingsOutline,
   SunnyOutline,
+  TimeOutline,
 } from '@vicons/ionicons5';
+import { useQuery } from '@tanstack/vue-query';
 import { useMachinesQuery } from '@/lib/machines';
+import { useMachineApi } from '@/lib/api';
+import { machineKey } from '@/lib/query-keys';
 import { activeTab } from '@/lib/workspace';
 import {
   MACHINE_NAV_GROUPS,
@@ -40,6 +44,7 @@ import { logout, sessionSnapshot } from '@/lib/session';
 import { useTheme } from '@/lib/theme';
 import { transportLabel } from '@/lib/format';
 import logoMark from '@/assets/logo-square.png';
+import JobCenterDrawer from './jobs/JobCenterDrawer.vue';
 
 const emit = defineEmits<{ quickOpen: [] }>();
 
@@ -51,6 +56,23 @@ const { isDark, toggle } = useTheme();
 
 const machines = computed(() => machinesQuery.data.value?.items ?? []);
 const activeMachineId = computed(() => activeTab.value?.machineId ?? null);
+
+const jobCenterOpen = ref(false);
+const jobMachineId = computed(() => activeTab.value?.machineId ?? null);
+const jobApi = useMachineApi(() => jobMachineId.value ?? '');
+const jobsQuery = useQuery({
+  queryKey: computed(() => machineKey(jobMachineId.value ?? '', 'jobs', 'active')),
+  queryFn: () => jobApi.value.jobs.list({ limit: 20 }),
+  enabled: computed(() => jobMachineId.value !== null),
+  refetchInterval: 5_000,
+  retry: 0,
+});
+const activeJobCount = computed(
+  () =>
+    (jobsQuery.data.value?.items ?? []).filter(
+      (job) => job.status === 'queued' || job.status === 'running',
+    ).length,
+);
 
 const user = computed(() => sessionSnapshot().user);
 const displayName = computed(() => user.value?.displayName ?? user.value?.username ?? '账户');
@@ -154,6 +176,13 @@ function goMachines(): void {
 function goSettings(): void {
   accountOpen.value = false;
   openCorePage('/settings', '设置');
+}
+
+/** 任务中心挂在当前机器的后台任务上；没有打开机器页面时不可用。 */
+function goJobCenter(): void {
+  if (jobMachineId.value === null) return;
+  accountOpen.value = false;
+  jobCenterOpen.value = true;
 }
 
 function goQuickOpen(): void {
@@ -275,6 +304,18 @@ async function onLogout(): Promise<void> {
               <n-icon :component="ServerOutline" size="16" />
               机器总览
             </button>
+            <button
+              type="button"
+              class="panel-action"
+              :disabled="jobMachineId === null"
+              @click="goJobCenter"
+            >
+              <n-icon :component="TimeOutline" size="16" />
+              任务中心
+              <span v-if="activeJobCount > 0" class="panel-action-badge">
+                {{ activeJobCount > 9 ? '9+' : activeJobCount }}
+              </span>
+            </button>
             <button type="button" class="panel-action" @click="goSettings">
               <n-icon :component="SettingsOutline" size="16" />
               设置
@@ -294,6 +335,7 @@ async function onLogout(): Promise<void> {
         </div>
       </n-popover>
     </div>
+    <JobCenterDrawer v-model:show="jobCenterOpen" :machine-id="jobMachineId" />
   </div>
 </template>
 
@@ -587,6 +629,27 @@ async function onLogout(): Promise<void> {
 }
 .panel-action:hover {
   background: var(--mpanel-surface-soft);
+}
+.panel-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.panel-action:disabled:hover {
+  background: transparent;
+}
+.panel-action-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mpanel-accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
 }
 .panel-footer {
   display: flex;
