@@ -1,30 +1,24 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NBadge, NButton, NDropdown, NIcon, NTooltip } from 'naive-ui';
+import { NButton, NDropdown, NIcon, NTooltip } from 'naive-ui';
 import {
   AddOutline,
   CloseOutline,
   EllipsisHorizontalOutline,
   MenuOutline,
   ServerOutline,
-  TimeOutline,
 } from '@vicons/ionicons5';
-import { useQuery } from '@tanstack/vue-query';
 import { useMachinesQuery } from '@/lib/machines';
-import { useMachineApi } from '@/lib/api';
-import { machineKey } from '@/lib/query-keys';
 import {
   activeTabId,
   closeAllTabs,
   closeOtherTabs,
   closeTab,
-  activeTab,
   setActiveTab,
   tabs,
 } from '@/lib/workspace';
 import { machineStatusType } from '@/lib/status';
-import JobCenterDrawer from './jobs/JobCenterDrawer.vue';
 
 withDefaults(defineProps<{ mobile?: boolean }>(), { mobile: false });
 
@@ -33,23 +27,6 @@ const emit = defineEmits<{ quickOpen: []; menu: [] }>();
 const route = useRoute();
 const router = useRouter();
 const machinesQuery = useMachinesQuery();
-
-const jobCenterOpen = ref(false);
-const jobMachineId = computed(() => activeTab.value?.machineId ?? null);
-const jobApi = useMachineApi(() => jobMachineId.value ?? '');
-const jobsQuery = useQuery({
-  queryKey: computed(() => machineKey(jobMachineId.value ?? '', 'jobs', 'active')),
-  queryFn: () => jobApi.value.jobs.list({ limit: 20 }),
-  enabled: computed(() => jobMachineId.value !== null),
-  refetchInterval: 5_000,
-  retry: 0,
-});
-const activeJobCount = computed(
-  () =>
-    (jobsQuery.data.value?.items ?? []).filter(
-      (job) => job.status === 'queued' || job.status === 'running',
-    ).length,
-);
 
 const machineMap = computed(() => {
   const map = new Map<string, { name: string; status: string }>();
@@ -157,36 +134,11 @@ const menuOptions = [
         打开新页面 / 其它机器（Ctrl+K）
       </n-tooltip>
     </div>
-    <n-tooltip>
-      <template #trigger>
-        <n-badge
-          :value="activeJobCount"
-          :max="9"
-          :show="activeJobCount > 0"
-          :color="'var(--mpanel-accent)'"
-          :offset="[-4, 4]"
-        >
-          <n-button
-            size="tiny"
-            quaternary
-            circle
-            class="tab-menu"
-            title="任务中心"
-            :disabled="jobMachineId === null"
-            @click="jobCenterOpen = true"
-          >
-            <template #icon><n-icon :component="TimeOutline" /></template>
-          </n-button>
-        </n-badge>
-      </template>
-      任务中心
-    </n-tooltip>
     <n-dropdown trigger="click" :options="menuOptions" @select="onMenuSelect">
       <n-button size="tiny" quaternary circle class="tab-menu" title="标签页操作">
         <template #icon><n-icon :component="EllipsisHorizontalOutline" /></template>
       </n-button>
     </n-dropdown>
-    <JobCenterDrawer v-model:show="jobCenterOpen" :machine-id="jobMachineId" />
   </div>
 </template>
 
