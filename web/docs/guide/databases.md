@@ -28,6 +28,8 @@ MPanel 的数据库能力分两层：
 
 说明：
 
+- 安装向导可自定义容器名（默认 `mpanel-postgres` / `mpanel-redis`），需符合 Docker 命名规则且在主机内唯一。
+- 数据库编排统一接入 `mpanel-network` 桥网络；Caddy 与其它内置应用可直接用容器名互相访问。
 - 端口只绑定 `127.0.0.1`，不直接对公网开放；需要远程访问时到「编排」页改 compose 并自行加防火墙。
 - 已存在同名编排时只执行启动，不覆盖 compose 与密码；此时不会自动创建档案，请按实际密码手动新建。
 - 商店来源可在 `config.json` 用 `storeUrl` 覆盖；默认依次尝试 GitHub raw、jsDelivr 与同源 `/store`。

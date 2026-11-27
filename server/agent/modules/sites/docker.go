@@ -20,6 +20,7 @@ const (
 	// these are the in-container mount points the agent writes through.
 	caddyContainerConfigRoot = "/etc/caddy"
 	caddyContainerDataRoot   = "/data"
+	caddyContainerLogRoot    = "/var/log/caddy"
 	// caddyPlaceholder keeps `import sites.d/*.caddy` matching at least one
 	// file even when no site is enabled. Caddy treats an empty glob as an
 	// error, which would make the container fail to start or reload.

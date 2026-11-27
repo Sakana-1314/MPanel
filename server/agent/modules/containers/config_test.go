@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -224,5 +225,52 @@ func TestValidateDaemonJSON(t *testing.T) {
 	}
 	if _, ok := parsed["registry-mirrors"]; !ok {
 		t.Fatalf("missing key: %s", pretty)
+	}
+}
+
+func TestEnsureManagedNetworkCreatesWhenMissing(t *testing.T) {
+	var calls []string
+	env := newConfigTestEnv(t, filepath.Join(t.TempDir(), "daemon.json"), func(args []string) (agent.Result, error) {
+		joined := strings.Join(args, " ")
+		calls = append(calls, joined)
+		switch joined {
+		case "network inspect mpanel-network":
+			return agent.Result{Code: 1, Stderr: "Error response from daemon: network mpanel-network not found"}, nil
+		case "network create --driver bridge mpanel-network":
+			return agent.Result{Code: 0, Stdout: "net-created\n"}, nil
+		default:
+			return agent.Result{Code: 0}, nil
+		}
+	})
+
+	if pErr := env.module.ensureManagedNetwork(context.Background()); pErr != nil {
+		t.Fatalf("ensureManagedNetwork: %+v", pErr)
+	}
+	created := false
+	for _, call := range calls {
+		if call == "network create --driver bridge mpanel-network" {
+			created = true
+		}
+	}
+	if !created {
+		t.Fatalf("未创建 mpanel-network: %v", calls)
+	}
+}
+
+func TestEnsureManagedNetworkReusesExisting(t *testing.T) {
+	created := false
+	env := newConfigTestEnv(t, filepath.Join(t.TempDir(), "daemon.json"), func(args []string) (agent.Result, error) {
+		joined := strings.Join(args, " ")
+		if strings.HasPrefix(joined, "network create ") {
+			created = true
+		}
+		return agent.Result{Code: 0}, nil
+	})
+
+	if pErr := env.module.ensureManagedNetwork(context.Background()); pErr != nil {
+		t.Fatalf("ensureManagedNetwork: %+v", pErr)
+	}
+	if created {
+		t.Fatal("已存在的网络不应重复创建")
 	}
 }

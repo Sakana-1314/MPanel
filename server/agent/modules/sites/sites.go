@@ -165,7 +165,8 @@ func siteMatches(site Site, q string) bool {
 func (m *Module) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	confDir, dataDir := m.ctx.Cfg.CaddyDirs()
 	sitesDir := m.ctx.Cfg.SitesDir()
-	for _, dir := range []string{confDir, filepath.Join(confDir, "sites.d"), dataDir, sitesDir} {
+	logDir := m.ctx.Cfg.CaddyLogDir()
+	for _, dir := range []string{confDir, filepath.Join(confDir, "sites.d"), dataDir, logDir, sitesDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			httpapi.Fail(w, internalFailure("无法创建 Caddy 目录", err))
 			return
@@ -183,29 +184,33 @@ func (m *Module) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	httpapi.OK(w, SiteBootstrapResult{
 		ConfigDir:     canonicalPath(confDir),
 		DataDir:       canonicalPath(dataDir),
+		LogDir:        canonicalPath(logDir),
 		CaddyfilePath: canonicalPath(rootPath),
 		SitesRoot:     canonicalPath(sitesDir),
-		Mounts:        bootstrapMounts(confDir, dataDir, m.roots()),
+		Mounts:        bootstrapMounts(confDir, dataDir, logDir, m.roots()),
 		Ready:         m.caddyAvailable(),
 	})
 }
 
 // bootstrapMounts lists the host paths the Caddy container must see. Caddy
-// config/data get fixed container paths; every readable site root is mounted
-// at the same absolute path so Caddyfile roots stay valid inside the
+// config/data/logs get fixed container paths; every readable site root is
+// mounted at the same absolute path so Caddyfile roots stay valid inside the
 // container.
-func bootstrapMounts(confDir, dataDir string, roots []string) []BootstrapMount {
+func bootstrapMounts(confDir, dataDir, logDir string, roots []string) []BootstrapMount {
 	mounts := []BootstrapMount{
 		{Source: canonicalPath(confDir), Target: caddyContainerConfigRoot},
 		{Source: canonicalPath(dataDir), Target: caddyContainerDataRoot},
+		{Source: canonicalPath(logDir), Target: caddyContainerLogRoot},
 	}
 	seenTarget := map[string]bool{
 		caddyContainerConfigRoot: true,
 		caddyContainerDataRoot:   true,
+		caddyContainerLogRoot:    true,
 	}
 	seenSource := map[string]bool{
 		canonicalPath(confDir): true,
 		canonicalPath(dataDir): true,
+		canonicalPath(logDir):  true,
 	}
 	for _, root := range roots {
 		target, err := filepath.Abs(root)

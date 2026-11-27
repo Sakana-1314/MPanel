@@ -43,7 +43,7 @@ Linux 上默认安装根为 `/opt/mpanel`；非 Linux 开发机回退到 `~/.mpa
 - `data/`、`log/`、`db/`、`backup/`、`tmp/`、`web/` 在 `app.yaml` 中有独立字段，可以分别指向不同磁盘。
 - 默认布局对齐 1Panel：面板状态在 `db/`，应用数据在 `data/apps/`，编排在 `data/compose/`，站点根在 `data/sites/`，备份在 `backup/`。
 - `db/` 是 1Panel 同名目录。1Panel 在这里放 SQLite 的 `core.db`；MPanel 的控制面使用原子 JSON 文档（`server/core/store`），按 1Panel 习惯放在同一棵树里，备份时直接打包整个 `db/`。
-- agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${base_dir}/data/apps/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。两者分别挂载到容器 `/etc/caddy` 与 `/data`；`caddy_bin` 已弃用，Caddy 只以容器运行。升级前的 `${agent.data_dir}/caddy` 仍会被识别。
+- agent 的 Caddy 目录解析顺序：`caddy_config` 非空则用它，否则 `${base_dir}/data/apps/caddy`；`caddy_data` 非空则用它，否则 `${caddy_config}/data`。日志固定写到 `${base_dir}/log/caddy`。三者分别挂载到容器 `/etc/caddy`、`/data` 与 `/var/log/caddy`；`caddy_bin` 已弃用，Caddy 只以容器运行。升级前的 `${agent.data_dir}/caddy` 仍会被识别。
 - 升级兼容：旧 `${agent.data_dir}/caddy`、`${agent.data_dir}/sites`、`${agent.data_dir}/stacks` 在新目录不存在时继续沿用，已有部署不会因目录调整失效。
 - 目录创建权限：core 的 `conf/`、`data/`、`log/`、`db/`、`backup/`、`tmp/`、`runtime/` 为 `0700`；agent 的目录为 `0755`（站点/文件根需要被 Web 服务器读取），配置文件统一 `0600`。
 

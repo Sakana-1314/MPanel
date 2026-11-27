@@ -6,9 +6,7 @@ import {
   NButton,
   NCollapse,
   NCollapseItem,
-  NFormItem,
   NIcon,
-  NInput,
   NModal,
   NSpin,
   useMessage,
@@ -26,6 +24,7 @@ import { describeError } from '@/api/errors';
 import { waitForJob } from '@/lib/job';
 import { useMachineApi } from '@/lib/api';
 import { machineKey } from '@/lib/query-keys';
+import FloatingField from '@/components/common/FloatingField.vue';
 import {
   defaultStoreValues,
   fetchStoreApp,
@@ -304,7 +303,7 @@ async function deploy(): Promise<void> {
       setStep(
         'prepare',
         'done',
-        `${prepared.mounts.length} 个挂载 · ${prepared.configDir}`,
+        `${prepared.mounts.length} 个挂载 · 配置 ${prepared.configDir} · 日志 ${prepared.logDir}`,
       );
     }
 
@@ -467,22 +466,17 @@ function stepIcon(status: StepStatus) {
         </n-alert>
 
         <div v-if="phase === 'idle' || phase === 'error'" class="form">
-          <n-form-item
-            v-for="variable in visibleVariables"
-            :key="variable.key"
-            :label="variable.label ?? variable.key"
-          >
-            <n-input
-              v-model:value="values[variable.key]"
+          <div v-for="variable in visibleVariables" :key="variable.key" class="field">
+            <floating-field
+              v-model="values[variable.key]"
+              :label="variable.label ?? variable.key"
               :type="variable.secret ? 'password' : 'text'"
               :show-password-on="variable.secret ? 'click' : undefined"
-              :placeholder="variable.default || variable.key"
-              class="mono"
             />
             <div v-if="variable.description" class="tiny muted field-hint">
               {{ variable.description }}
             </div>
-          </n-form-item>
+          </div>
 
           <n-collapse>
             <n-collapse-item title="查看将写入的 compose" name="compose">
@@ -578,10 +572,18 @@ function stepIcon(status: StepStatus) {
 .form {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field :deep(.n-input__input-el) {
+  font-family: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono',
+    monospace;
 }
 .field-hint {
-  margin-top: 4px;
   width: 100%;
 }
 .compose-preview {

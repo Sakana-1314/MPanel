@@ -37,6 +37,15 @@ func managedCaddyfile(admin string) string {
 	// Pin storage to the container /data mount so certificate scanning has a
 	// deterministic host path (<caddy_data>/certificates).
 	b.WriteString("\tstorage file_system /data\n")
+	// Runtime logs go to the host-mounted log directory so they survive
+	// container recreation and can be inspected without docker logs.
+	b.WriteString("\tlog default {\n")
+	b.WriteString("\t\toutput file " + caddyContainerLogRoot + "/caddy.log {\n")
+	b.WriteString("\t\t\troll_size 20MiB\n")
+	b.WriteString("\t\t\troll_keep 5\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t\tformat json\n")
+	b.WriteString("\t}\n")
 	b.WriteString("}\n\n")
 	b.WriteString("import sites.d/*.caddy\n")
 	return b.String()

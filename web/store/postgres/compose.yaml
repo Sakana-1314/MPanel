@@ -5,7 +5,7 @@ name: mpanel-postgres
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: mpanel-postgres
+    container_name: "{{CONTAINER_NAME}}"
     restart: unless-stopped
     environment:
       POSTGRES_USER: "{{POSTGRES_USER}}"
@@ -20,3 +20,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 24
+    networks:
+      - mpanel-network
+
+networks:
+  mpanel-network:
+    external: true

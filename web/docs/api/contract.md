@@ -902,7 +902,7 @@ Caddy **只以容器运行**。安装由面板完成三步：读取 `web/store` 
 
 - Auth：需要。
 - Body：`{}`（可省略）。
-- 行为：创建 `caddy_config`、`caddy_config/sites.d`、`caddy_data` 与站点根目录；写入受管主 `Caddyfile`（`admin 127.0.0.1:2019` + `import sites.d/*.caddy`）。不启动容器，不改站点草稿。
+- 行为：创建 `caddy_config`、`caddy_config/sites.d`、`caddy_data`、Caddy 日志目录与站点根目录；写入受管主 `Caddyfile`（`admin 127.0.0.1:2019` + 文件日志 + `import sites.d/*.caddy`）。不启动容器，不改站点草稿。
 - 该端点不受 Caddy 能力门禁限制；其余 `/sites` 端点仍返回不可用。
 
 ```ts
@@ -915,6 +915,7 @@ interface SiteBootstrapMount {
 interface SiteBootstrapResult {
   configDir: string;          // 宿主 caddy_config
   dataDir: string;            // 宿主 caddy_data，挂载到容器 /data
+  logDir: string;             // 宿主日志目录 ${base_dir}/log/caddy，挂载到容器 /var/log/caddy
   caddyfilePath: string;      // 宿主受管 Caddyfile
   sitesRoot: string;          // 默认站点根 ${base_dir}/data/sites
   mounts: SiteBootstrapMount[]; // 商店模板必须复现的挂载
@@ -925,7 +926,8 @@ interface SiteBootstrapResult {
 约定：
 
 - Compose 项目名与服务名固定为 `mpanel-caddy` / `caddy`；agent 用这两个标签定位容器并通过 `docker exec <container> caddy ...` 执行 validate/reload。
-- `caddy_config` 挂载到容器 `/etc/caddy`，`caddy_data` 挂载到 `/data`；站点根按相同绝对路径只读挂载，保证 `file_server.root` 在容器内仍有效。
+- `caddy_config` 挂载到容器 `/etc/caddy`，`caddy_data` 挂载到 `/data`，日志目录挂载到 `/var/log/caddy`；站点根按相同绝对路径只读挂载，保证 `file_server.root` 在容器内仍有效。
+- 主 Caddyfile 的默认日志写入 `/var/log/caddy/caddy.log`；每个开启日志的站点写入 `/var/log/caddy/<siteId>.log`，均按 20 MiB 滚动、保留 5 份。
 - 安装模板位于 `web/store/caddy/`，由面板通过 GitHub 链接读取；`storeUrl` 可在 `config.json` 覆盖。
 - 容器未运行时 `/sites` 全功能不可用，不尝试回退到宿主机二进制。
 
@@ -1270,7 +1272,7 @@ interface ContainerCreateInput {
   env?: Record<string, string>;        // --env KEY=VALUE
   ports?: string[];                    // "8080:80"、"127.0.0.1:8080:80"、"8080:80/udp"
   volumes?: string[];                  // "/host/path:/container/path[:ro|rw]"
-  network?: string;                    // --network
+  network?: string;                    // --network，留空使用 mpanel-network（agent 自动创建）
   restart?: string;                    // no | always | unless-stopped | on-failure[:N]，默认 unless-stopped
   labels?: Record<string, string>;
 }

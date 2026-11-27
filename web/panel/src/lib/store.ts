@@ -330,6 +330,9 @@ export function validateStoreValues(
     if (variable.key === 'MPANEL_DATA_DIR' && !/^(\/|[A-Za-z]:\/)/.test(value)) {
       return `${label} 必须是绝对路径（/ 开头或 X:/ 形式）`;
     }
+    if (variable.key === 'CONTAINER_NAME' && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value)) {
+      return `${label} 只能包含字母、数字、下划线、点和短横线，且以字母或数字开头`;
+    }
   }
   return null;
 }

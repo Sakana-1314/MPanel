@@ -369,6 +369,7 @@ export interface SiteBootstrapMount {
 export interface SiteBootstrapResult {
   configDir: string;
   dataDir: string;
+  logDir: string;
   caddyfilePath: string;
   sitesRoot: string;
   mounts: SiteBootstrapMount[];

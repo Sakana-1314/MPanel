@@ -39,7 +39,7 @@ func renderSite(site Site, roots []string) (string, []string, error) {
 	if err != nil {
 		return "", warnings, err
 	}
-	out, err := renderConfig(normalized)
+	out, err := renderConfig(normalized, site.ID)
 	if err != nil {
 		return "", warnings, err
 	}
@@ -60,8 +60,27 @@ func envRoots() []string {
 	return roots
 }
 
+// caddyLogName keeps log file names inside /var/log/caddy even if a legacy
+// site ID contains path separators or other unsafe characters.
+func caddyLogName(siteID string) string {
+	if siteID == "" {
+		return "site"
+	}
+	for _, r := range siteID {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_' || r == '-':
+		default:
+			return "site"
+		}
+	}
+	return siteID
+}
+
 // renderConfig assumes the config already passed validateConfig.
-func renderConfig(cfg SiteConfig) (string, error) {
+func renderConfig(cfg SiteConfig, siteID string) (string, error) {
 	var b strings.Builder
 	b.WriteString("# Managed by MPanel from structured site config; do not edit.\n")
 
@@ -124,7 +143,15 @@ func renderConfig(cfg SiteConfig) (string, error) {
 	writeHeaders(&b, cfg.Headers)
 
 	if cfg.Log {
-		b.WriteString("\tlog\n")
+		// One file per site keeps concurrent writers from contending on the
+		// same rolled log and makes the owner obvious on disk.
+		b.WriteString("\tlog {\n")
+		b.WriteString("\t\toutput file " + caddyContainerLogRoot + "/" + caddyLogName(siteID) + ".log {\n")
+		b.WriteString("\t\t\troll_size 20MiB\n")
+		b.WriteString("\t\t\troll_keep 5\n")
+		b.WriteString("\t\t}\n")
+		b.WriteString("\t\tformat json\n")
+		b.WriteString("\t}\n")
 	}
 
 	if err := renderHandler(&b, cfg.Handler); err != nil {

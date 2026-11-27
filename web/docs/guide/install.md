@@ -137,7 +137,8 @@ sudo ln -sf /usr/local/bin/mpctl /usr/bin/mpctl
 │  ├─ files/              # 文件管理根
 │  └─ sites/              # 站点根
 ├─ db/                    # 控制面状态文档
-├─ log/                   # 运行日志
+├─ log/
+│  └─ caddy/              # Caddy 运行日志与站点访问日志
 ├─ backup/                # 站点/数据库备份
 ├─ runtime/               # 运行时文件
 ├─ tmp/                   # 临时文件
@@ -145,6 +146,8 @@ sudo ln -sf /usr/local/bin/mpctl /usr/bin/mpctl
 ```
 
 首次启动时 `server/core/config` 会在配置缺失时按默认值创建 `conf/app.yaml` 与 `conf/agent.yaml`，权限 `0600`；`conf/` 目录权限为 `0700`。
+
+Caddy 容器安装后会挂载：`data/apps/caddy` → `/etc/caddy`（配置文件）、`data/apps/caddy/data` → `/data`（证书与状态）、`log/caddy` → `/var/log/caddy`（运行与访问日志）、`data/sites` 等站点根（按宿主绝对路径只读挂载）。一键应用与面板手动运行的容器默认接入 `mpanel-network` 桥网络，首次使用时自动创建。
 
 ## 4. systemd 单元
 

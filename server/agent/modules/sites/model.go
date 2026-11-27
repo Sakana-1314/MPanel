@@ -207,6 +207,7 @@ type SiteImportResult struct {
 type SiteBootstrapResult struct {
 	ConfigDir     string           `json:"configDir"`
 	DataDir       string           `json:"dataDir"`
+	LogDir        string           `json:"logDir"`
 	CaddyfilePath string           `json:"caddyfilePath"`
 	SitesRoot     string           `json:"sitesRoot"`
 	Mounts        []BootstrapMount `json:"mounts"`

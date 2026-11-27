@@ -61,7 +61,7 @@ func TestRenderFileServer(t *testing.T) {
 	mustContain(t, out, "tls internal")
 	mustContain(t, out, "encode gzip zstd")
 	mustContain(t, out, "header X-Frame-Options SAMEORIGIN")
-	mustContain(t, out, "log\n")
+	mustContain(t, out, "output file /var/log/caddy/site_test.log")
 	mustContain(t, out, "root * ")
 	mustContain(t, out, "index index.html")
 	mustContain(t, out, "try_files {path} /index.html")
@@ -355,6 +355,7 @@ func TestManagedCaddyfileIncludesImportAndAdmin(t *testing.T) {
 	content := managedCaddyfile("127.0.0.1:2019")
 	mustContain(t, content, "import sites.d/*.caddy")
 	mustContain(t, content, "admin 127.0.0.1:2019")
+	mustContain(t, content, "output file /var/log/caddy/caddy.log")
 }
 
 func TestApplyChangedNoOpDetection(t *testing.T) {
@@ -587,5 +588,18 @@ func TestModuleHTTPRoutes(t *testing.T) {
 	missing := doRequest(t, ctx.Mux, http.MethodGet, "/api/v1/sites/site_missing", "")
 	if missing.OK || missing.Error == nil || missing.Error.Code != "NOT_FOUND" {
 		t.Fatalf("缺失站点应返回 NOT_FOUND: %+v", missing)
+	}
+}
+
+func TestCaddyLogName(t *testing.T) {
+	for input, want := range map[string]string{
+		"site_abc-123": "site_abc-123",
+		"":             "site",
+		"../escape":    "site",
+		"site/1":       "site",
+	} {
+		if got := caddyLogName(input); got != want {
+			t.Fatalf("caddyLogName(%q) = %q，期望 %q", input, got, want)
+		}
 	}
 }

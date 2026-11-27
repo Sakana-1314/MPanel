@@ -322,7 +322,8 @@ func TestBootstrapPreparesDirsAndMounts(t *testing.T) {
 	}
 	result := envelope.Data
 	confDir, dataDir := ctx.Cfg.CaddyDirs()
-	if result.ConfigDir == "" || result.DataDir == "" || result.CaddyfilePath == "" {
+	logDir := ctx.Cfg.CaddyLogDir()
+	if result.ConfigDir == "" || result.DataDir == "" || result.LogDir == "" || result.CaddyfilePath == "" {
 		t.Fatalf("bootstrap 返回路径不完整: %+v", result)
 	}
 	content, err := os.ReadFile(filepath.Join(confDir, "Caddyfile"))
@@ -332,15 +333,15 @@ func TestBootstrapPreparesDirsAndMounts(t *testing.T) {
 	if !strings.Contains(string(content), "import sites.d/*.caddy") {
 		t.Fatalf("Caddyfile 内容错误: %s", content)
 	}
-	if !pathIsDir(filepath.Join(confDir, "sites.d")) || !pathIsDir(dataDir) {
-		t.Fatal("bootstrap 未创建 sites.d 或 data 目录")
+	if !pathIsDir(filepath.Join(confDir, "sites.d")) || !pathIsDir(dataDir) || !pathIsDir(logDir) {
+		t.Fatal("bootstrap 未创建 sites.d、data 或 log 目录")
 	}
 	targets := map[string]bool{}
 	for _, mount := range result.Mounts {
 		targets[mount.Target] = true
 	}
-	if !targets["/etc/caddy"] || !targets["/data"] {
-		t.Fatalf("缺少 Caddy config/data 挂载: %+v", result.Mounts)
+	if !targets["/etc/caddy"] || !targets["/data"] || !targets["/var/log/caddy"] {
+		t.Fatalf("缺少 Caddy config/data/log 挂载: %+v", result.Mounts)
 	}
 	if !targets[strings.ReplaceAll(result.SitesRoot, "\\", "/")] {
 		t.Fatalf("缺少站点根挂载: %+v", result.Mounts)
