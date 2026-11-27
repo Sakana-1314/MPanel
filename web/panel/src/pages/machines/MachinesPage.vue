@@ -19,17 +19,14 @@ import {
   NTag,
   NIcon as NIconAlias,
 } from 'naive-ui';
-import type { Component, VNode } from 'vue';
+import type { VNode } from 'vue';
 import {
   AddOutline,
   ChevronDownOutline,
   CopyOutline,
   CreateOutline,
-  CubeOutline,
   EllipsisHorizontalOutline,
-  FolderOpenOutline,
   GitNetworkOutline,
-  GlobeOutline,
   KeyOutline,
   LayersOutline,
   PlayOutline,
@@ -38,7 +35,6 @@ import {
   ServerOutline,
   SettingsOutline,
   StopOutline,
-  TerminalOutline,
   TrashOutline,
   WifiOutline,
 } from '@vicons/ionicons5';
@@ -47,12 +43,11 @@ import { useCoreApi } from '@/lib/api';
 import { useMachinesQuery } from '@/lib/machines';
 import { coreKey } from '@/lib/query-keys';
 import { useAction } from '@/composables/use-action';
-import { openMachineDetail, openMachinePage } from '@/lib/navigation';
+import { openMachineDetail } from '@/lib/navigation';
 import { machineStatusLabel, machineStatusType } from '@/lib/status';
 import { machineAddressLabel, transportLabel } from '@/lib/format';
 import { usePageActive } from '@/composables/use-page-active';
 import ErrorState from '@/components/common/ErrorState.vue';
-import RelativeTime from '@/components/common/RelativeTime.vue';
 import MachineFormModal from './MachineFormModal.vue';
 import MachineMetrics from './MachineMetrics.vue';
 import EnrollmentModal from './EnrollmentModal.vue';
@@ -123,6 +118,7 @@ const invalidate = computed(() => [
 
 const connectAction = useAction((machine: Machine) => api.value.machines.connect(machine.id), {
   success: (machine) => `已请求连接 ${machine.name}`,
+  errorMessage: '连接失败，请确认服务器在线后重试',
   invalidate: invalidate.value,
 });
 const disconnectAction = useAction((machine: Machine) => api.value.machines.disconnect(machine.id), {
@@ -133,7 +129,8 @@ const testAction = useAction((machine: Machine) => api.value.machines.test(machi
   success: (result, machine) =>
     result.reachable
       ? `${machine.name} 可达 · ${result.latencyMs ?? '?'} ms`
-      : `${machine.name} 不可达`,
+      : `${machine.name} 暂时无法连接`,
+  errorMessage: '连接失败，请确认服务器在线后重试',
   invalidate: invalidate.value,
 });
 const deleteAction = useAction((machine: Machine) => api.value.machines.delete(machine.id), {
@@ -208,17 +205,6 @@ function onMenuSelect(key: string, machine: Machine): void {
     }
   }
 }
-
-function openArea(machine: Machine, area: string): void {
-  openMachinePage(machine.id, area);
-}
-
-const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
-  { area: 'sites', label: '站点', icon: GlobeOutline },
-  { area: 'containers', label: '容器', icon: CubeOutline },
-  { area: 'files', label: '文件', icon: FolderOpenOutline },
-  { area: 'terminal', label: '终端', icon: TerminalOutline },
-];
 </script>
 
 <template>
@@ -330,27 +316,8 @@ const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
 
         <machine-metrics :machine="machine" />
 
-        <div class="facts tiny muted">
-          <span>心跳 <relative-time :value="machine.lastSeenAt" /></span>
-          <span v-if="machine.worker">v{{ machine.worker.version }}</span>
-          <span v-if="machine.snapshot">{{ machine.snapshot.ips[0] ?? '' }}</span>
-        </div>
-
-        <div v-if="machine.lastError" class="error-line tiny truncate" :title="machine.lastError">
-          {{ machine.lastError }}
-        </div>
-
-        <div class="card-actions">
-          <n-button
-            v-for="item in shortcuts"
-            :key="item.area"
-            size="tiny"
-            quaternary
-            @click="openArea(machine, item.area)"
-          >
-            <template #icon><n-icon :component="item.icon" size="14" /></template>
-            {{ item.label }}
-          </n-button>
+        <div v-if="machine.lastError && machine.status !== 'online'" class="connect-hint tiny muted">
+          暂时无法连接，请检查服务器是否在线
         </div>
       </n-card>
     </div>
@@ -493,22 +460,7 @@ const shortcuts: Array<{ area: string; label: string; icon: Component }> = [
   justify-content: space-between;
   gap: 8px;
 }
-.facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-}
-.error-line {
-  color: var(--mpanel-danger);
-  font-weight: 600;
-}
-.card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-top: auto;
-  padding: 6px 4px 2px;
-  border-radius: 8px;
-  background: var(--mpanel-surface-soft);
+.connect-hint {
+  line-height: 1.5;
 }
 </style>

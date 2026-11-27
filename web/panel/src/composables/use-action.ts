@@ -7,6 +7,8 @@ export interface ActionOptions<TArgs extends unknown[], TResult> {
   success?: string | ((result: TResult, ...args: TArgs) => string);
   successDescription?: string | ((result: TResult, ...args: TArgs) => string | undefined);
   errorTitle?: string;
+  /** 失败时使用的固定提示；用于不向普通用户暴露底层错误详情的操作。 */
+  errorMessage?: string;
   /** 成功后要失效的查询 key（数组的数组）。 */
   invalidate?: readonly (readonly unknown[])[];
 }
@@ -55,7 +57,7 @@ export function useAction<TArgs extends unknown[], TResult>(
           : new AppError('INTERNAL', raw instanceof Error ? raw.message : String(raw));
       error.value = appError;
       const described = describeError(appError, options.errorTitle ?? '操作失败');
-      message.error(`${described.title}：${described.description}`, {
+      message.error(options.errorMessage ?? `${described.title}：${described.description}`, {
         duration: 6000,
         closable: true,
       });
