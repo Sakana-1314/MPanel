@@ -22,3 +22,9 @@ services:
       - /etc/caddy/Caddyfile
       - --adapter
       - caddyfile
+    networks:
+      - mpanel-network
+
+networks:
+  mpanel-network:
+    external: true

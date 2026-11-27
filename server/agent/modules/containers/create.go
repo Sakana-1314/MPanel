@@ -64,6 +64,9 @@ func (m *Module) handleCreateContainer(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.DecodeJSON(w, r, &input) {
 		return
 	}
+	if strings.TrimSpace(input.Network) == "" {
+		input.Network = managedNetworkName
+	}
 	args, created, pErr := buildRunArgs(input)
 	if pErr != nil {
 		httpapi.Fail(w, pErr)
@@ -72,6 +75,12 @@ func (m *Module) handleCreateContainer(w http.ResponseWriter, r *http.Request) {
 	if pErr := m.docker.ensure(r.Context()); pErr != nil {
 		httpapi.Fail(w, pErr)
 		return
+	}
+	if input.Network == managedNetworkName {
+		if pErr := m.ensureManagedNetwork(r.Context()); pErr != nil {
+			httpapi.Fail(w, pErr)
+			return
+		}
 	}
 	if httpapi.WantsAsync(r) {
 		job, err := m.ctx.Jobs.Submit(agent.JobSpec{

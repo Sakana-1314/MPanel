@@ -463,6 +463,7 @@ func (cfg *Agent) EnsureDirs() error {
 		cfg.BackupRoot(),
 		filepath.Join(cfg.BackupRoot(), "caddy"),
 		filepath.Join(cfg.BackupRoot(), "databases"),
+		cfg.CaddyLogDir(),
 	}
 	for _, root := range a.FilesRoots {
 		dirs = append(dirs, root.Path)
@@ -551,6 +552,16 @@ func (cfg *Agent) CaddyDirs() (confDir, dataDir string) {
 		dataDir = filepath.Join(confDir, "data")
 	}
 	return confDir, dataDir
+}
+
+// CaddyLogDir is the host directory bind-mounted to the Caddy container's
+// /var/log/caddy, so runtime and access logs survive container recreation.
+func (cfg *Agent) CaddyLogDir() string {
+	logPath := cfg.Agent.LogPath
+	if strings.TrimSpace(logPath) == "" {
+		logPath = filepath.Join(cfg.Agent.BaseDir, "log")
+	}
+	return filepath.Join(logPath, "caddy")
 }
 
 func dirExists(path string) bool {

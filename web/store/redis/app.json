@@ -19,6 +19,12 @@
   },
   "variables": [
     {
+      "key": "CONTAINER_NAME",
+      "label": "容器名",
+      "default": "mpanel-redis",
+      "description": "Docker 容器名称，在当前主机内必须唯一。"
+    },
+    {
       "key": "MPANEL_DATA_DIR",
       "label": "数据根目录",
       "default": "/opt/mpanel/data/apps",

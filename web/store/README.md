@@ -48,5 +48,7 @@ web/store/
 ## 约定
 
 - 所有编排只绑定 `127.0.0.1`（数据库），或仅暴露必要的 80/443（Caddy）。
+- 所有编排统一接入外部桥网络 `mpanel-network`；agent 在首次启动编排时自动创建。
+- 数据库清单通过 `CONTAINER_NAME` 变量允许用户自定义容器名（默认 `mpanel-postgres` / `mpanel-redis`）。
 - 不在这里放真实密码、Token、IP 或内部域名；密码由安装向导在浏览器本地生成。
 - 修改模板后需要同步更新 `web/docs/guide/sites.md` 与 `web/docs/guide/databases.md` 中描述的行为。

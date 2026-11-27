@@ -45,7 +45,7 @@ const form = reactive({
   image: '',
   name: '',
   restart: 'unless-stopped',
-  network: '',
+  network: 'mpanel-network',
   envText: '',
   ports: [] as PortRow[],
   volumeText: '',
@@ -70,7 +70,7 @@ watch(
     form.image = preset?.input.image ?? '';
     form.name = preset?.input.name ?? '';
     form.restart = preset?.input.restart ?? 'unless-stopped';
-    form.network = preset?.input.network ?? '';
+    form.network = preset?.input.network ?? 'mpanel-network';
     form.envText = Object.entries(preset?.input.env ?? {})
       .map(([key, value]) => `${key}=${value}`)
       .join('\n');
@@ -231,7 +231,7 @@ function close(): void {
           <n-select v-model:value="form.restart" :options="restartOptions" />
         </n-form-item>
         <n-form-item label="网络">
-          <n-input v-model:value="form.network" placeholder="留空使用默认 bridge" />
+          <n-input v-model:value="form.network" placeholder="默认 mpanel-network" />
         </n-form-item>
       </div>
 

@@ -22,6 +22,9 @@ import (
 const (
 	defaultDaemonConfigPath = "/etc/docker/daemon.json"
 	maxDaemonConfigBytes    = 1 << 20
+	// managedNetworkName is the shared bridge network that all built-in store
+	// stacks and containers started from the panel attach to.
+	managedNetworkName = "mpanel-network"
 )
 
 var networkDrivers = map[string]bool{
@@ -244,6 +247,31 @@ func isNoSuchNetworkOutput(res agent.Result) bool {
 	text := strings.ToLower(res.Stderr + "\n" + res.Stdout)
 	return strings.Contains(text, "no such network") ||
 		strings.Contains(text, "not found")
+}
+
+// ensureManagedNetwork creates the shared bridge network on first use. It is
+// safe to call before every compose up / container run: an existing network is
+// left untouched, and a creation race is treated as success.
+func (m *Module) ensureManagedNetwork(ctx context.Context) *protocol.PanelError {
+	res, err := m.docker.run(ctx, 20*time.Second, "network", "inspect", managedNetworkName)
+	if err == nil && res.Code == 0 {
+		return nil
+	}
+	if err != nil {
+		return m.docker.unavailable("无法检查容器网络：" + err.Error())
+	}
+	created, err := m.docker.run(ctx, 30*time.Second, "network", "create", "--driver", "bridge", managedNetworkName)
+	if err != nil {
+		return m.docker.unavailable("无法创建容器网络：" + err.Error())
+	}
+	if created.Code != 0 {
+		// Another request may have created it between inspect and create.
+		if again, inspectErr := m.docker.run(ctx, 20*time.Second, "network", "inspect", managedNetworkName); inspectErr == nil && again.Code == 0 {
+			return nil
+		}
+		return dockerCommandFailed("network create "+managedNetworkName, created)
+	}
+	return nil
 }
 
 func (m *Module) handleCreateNetwork(w http.ResponseWriter, r *http.Request) {

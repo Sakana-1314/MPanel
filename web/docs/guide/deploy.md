@@ -42,8 +42,8 @@ sudo chmod 0600 /opt/mpanel/conf/*.yaml
 要点：
 
 - `/opt/mpanel/conf` 含会话密钥、机器凭据与数据库密码密文，目录 `0700`、文件 `0600`。
-- 站点的 Caddy 以 Docker 容器运行（`mpanel-caddy` 编排），容器需要写 `caddy_config`（挂载 `/etc/caddy`）与 `caddy_data`（挂载 `/data`）；agent 用户只负责写宿主目录与通过 docker exec 操作容器。宿主机不需要安装 Caddy 二进制。
-- agent 需要写站点根、文件根、Caddy 配置目录与备份目录；这些目录不在 `/opt/mpanel` 时，必须加进 systemd 的 `ReadWritePaths=`。
+- 站点的 Caddy 以 Docker 容器运行（`mpanel-caddy` 编排），容器需要写 `caddy_config`（挂载 `/etc/caddy`）、`caddy_data`（挂载 `/data`）与 `log/caddy`（挂载 `/var/log/caddy`）；agent 用户只负责写宿主目录与通过 docker exec 操作容器。宿主机不需要安装 Caddy 二进制。
+- agent 需要写站点根、文件根、Caddy 配置目录、Caddy 日志目录与备份目录；这些目录不在 `/opt/mpanel` 时，必须加进 systemd 的 `ReadWritePaths=`。
 - 管理 Docker 时把运行用户加入 `docker` 组（`SupplementaryGroups=docker`），但这等价于给该用户宿主 root 能力；更稳妥的是 rootless Docker。
 - 容器配置页要写 `docker_config`（默认 `/etc/docker/daemon.json`）。`ProtectSystem=strict` 下需要 drop-in 放行目录，并给 agent 用户最小 ACL：
 
@@ -340,7 +340,7 @@ sudo ausearch -m avc -ts recent
   sudo setsebool -P httpd_can_network_connect 1
   ```
 
-- 受管 Caddy 容器写 `caddy_config`/`caddy_data` 时若被 SELinux 拒绝，会出现在容器日志与 `ausearch` 中；给宿主目录加容器可写标签或用 `:z` 挂载，可用 `audit2allow` 生成最小策略并人工复核，不要直接 `setenforce 0` 长期关闭。
+- 受管 Caddy 容器写 `caddy_config`/`caddy_data`/`log/caddy` 时若被 SELinux 拒绝，会出现在容器日志与 `ausearch` 中；给宿主目录加容器可写标签或用 `:z` 挂载，可用 `audit2allow` 生成最小策略并人工复核，不要直接 `setenforce 0` 长期关闭。
 
 ### 7.2 防火墙
 

@@ -17,24 +17,29 @@ Caddy 不再依赖宿主机二进制。未部署容器时，站点列表、新�
 
 Caddy 容器由 `web/store/caddy/compose.yaml` 创建，固定项目名 `mpanel-caddy`、服务名 `caddy`。agent 通过 compose 标签定位运行中的容器，并用 `docker exec <container> caddy ...` 执行 validate/reload。
 
-宿主目录由 `caddy_config` 与 `caddy_data` 决定：
+宿主目录由 `caddy_config`、`caddy_data` 与日志目录决定：
 
 ```text
 ${caddy_config}/                  # 默认 ${base_dir}/data/apps/caddy，挂载到容器 /etc/caddy
-├─ Caddyfile                      # 受管主配置：admin + import sites.d/*.caddy
+├─ Caddyfile                      # 受管主配置：admin + 文件日志 + import sites.d/*.caddy
 ├─ sites.d/
 │  └─ <siteId>.caddy              # 每站点一个片段
 └─ data/                          # 默认 ${caddy_data}，挂载到容器 /data
    └─ certificates/...
+
+${base_dir}/log/caddy/            # 挂载到容器 /var/log/caddy
+├─ caddy.log                      # Caddy 运行日志
+└─ <siteId>.log                   # 开启日志的站点访问日志
 ```
 
 默认路径：
 
 - `caddy_config` = `/opt/mpanel/data/apps/caddy`
 - `caddy_data` = `${caddy_config}/data`
+- 日志目录 = `/opt/mpanel/log/caddy`
 - 站点根目录 = `/opt/mpanel/data/sites`（以及 `files_roots` 中的根）
 
-安装前调用 `POST /api/v1/sites/bootstrap` 创建目录、写入主 `Caddyfile`，并返回需要写进 compose 的挂载。站点根会以**相同绝对路径**只读挂进容器，因此 `file_server.root` 在容器内仍然有效。
+安装前调用 `POST /api/v1/sites/bootstrap` 创建目录、写入主 `Caddyfile`，并返回需要写进 compose 的挂载。站点根会以**相同绝对路径**只读挂进容器，因此 `file_server.root` 在容器内仍然有效。Caddy 与内置数据库编排统一接入 `mpanel-network` 桥网络，agent 在首次启动编排时自动创建该网络。
 
 主 `Caddyfile` 内容固定为：
 
@@ -256,6 +261,6 @@ docker exec mpanel-caddy caddy reload   --config /etc/caddy/Caddyfile --adapter 
 注意：
 
 - 不要在宿主机另起 `caddy run` 使用同一份配置；容器是唯一实例。
-- `caddy_config` 与 `caddy_data` 由容器写入，agent 需要读写权限；站点根目录需要容器可读，否则 validate 通过但访问 403。
+- `caddy_config`、`caddy_data` 与 `log/caddy` 由容器写入，agent 需要读写权限；站点根目录需要容器可读，否则 validate 通过但访问 403。
 - 修改 compose（例如增加站点根挂载）请到「编排」页编辑 `mpanel-caddy`，不要直接改容器。
 - admin API 只在容器回环地址监听，不对外发布；agent 通过 `docker exec` 操作，不依赖宿主端口。

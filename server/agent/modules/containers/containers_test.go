@@ -919,6 +919,8 @@ func TestStackActionArgs(t *testing.T) {
 			return agent.Result{Stdout: "ok"}, nil
 		case "ps":
 			return agent.Result{Stdout: ""}, nil
+		case "network":
+			return agent.Result{}, nil
 		default:
 			return agent.Result{Code: 1, Stderr: "unexpected"}, nil
 		}

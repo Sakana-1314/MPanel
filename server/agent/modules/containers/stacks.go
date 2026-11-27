@@ -847,6 +847,12 @@ func (m *Module) handleStackAction(action string) http.HandlerFunc {
 			httpapi.Fail(w, pErr)
 			return
 		}
+		if action == "up" {
+			if pErr := m.ensureManagedNetwork(r.Context()); pErr != nil {
+				httpapi.Fail(w, pErr)
+				return
+			}
+		}
 		args, timeout, pErr := stackActionCommand(name, paths, action, body)
 		if pErr != nil {
 			httpapi.Fail(w, pErr)
